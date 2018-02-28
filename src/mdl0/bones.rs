@@ -41,78 +41,50 @@ pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bones {
         let prev_offset        = (&resource_data[0x68..]).read_i32::<BigEndian>().unwrap();
         let user_data_offset   = (&resource_data[0x6c..]).read_i32::<BigEndian>().unwrap();
 
-        let transform0         = (&resource_data[0x70..]).read_f32::<BigEndian>().unwrap();
-        let transform1         = (&resource_data[0x74..]).read_f32::<BigEndian>().unwrap();
-        let transform2         = (&resource_data[0x78..]).read_f32::<BigEndian>().unwrap();
-        let transform3         = (&resource_data[0x7c..]).read_f32::<BigEndian>().unwrap();
-
-        let transform4         = (&resource_data[0x80..]).read_f32::<BigEndian>().unwrap();
-        let transform5         = (&resource_data[0x84..]).read_f32::<BigEndian>().unwrap();
-        let transform6         = (&resource_data[0x88..]).read_f32::<BigEndian>().unwrap();
-        let transform7         = (&resource_data[0x8c..]).read_f32::<BigEndian>().unwrap();
-
-        let transform8         = (&resource_data[0x90..]).read_f32::<BigEndian>().unwrap();
-        let transform9         = (&resource_data[0x94..]).read_f32::<BigEndian>().unwrap();
-        let transform10        = (&resource_data[0x98..]).read_f32::<BigEndian>().unwrap();
-        let transform11        = (&resource_data[0x9c..]).read_f32::<BigEndian>().unwrap();
-
-        let transform_inv0     = (&resource_data[0xa0..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv1     = (&resource_data[0xa4..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv2     = (&resource_data[0xa8..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv3     = (&resource_data[0xac..]).read_f32::<BigEndian>().unwrap();
-
-        let transform_inv4     = (&resource_data[0xb0..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv5     = (&resource_data[0xb4..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv6     = (&resource_data[0xb8..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv7     = (&resource_data[0xbc..]).read_f32::<BigEndian>().unwrap();
-
-        let transform_inv8     = (&resource_data[0xc0..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv9     = (&resource_data[0xc4..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv10    = (&resource_data[0xc8..]).read_f32::<BigEndian>().unwrap();
-        let transform_inv11    = (&resource_data[0xcc..]).read_f32::<BigEndian>().unwrap();
-
-        // TODO: Pretty sure this is how the matrices should be read, alternatively I might need to: transform0, transform1 ... 0.0, 0.0, 0.0, 0.1
+        // BrawlBox uses a Matrix43 for this which I'm assuming is a 4 x 3 matrix.
+        // This means there are 4 rows and 3 columns we need to read.
+        // We only have 4x4 matrices available, so use [0.0, 0.0 0.0, 1.0] as the last column,
         let transform = Matrix4::new(
-            transform0,
-            transform4,
-            transform8,
-            0.0,
+            (&resource_data[0x70..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x74..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x78..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x7c..]).read_f32::<BigEndian>().unwrap(),
 
-            transform1,
-            transform5,
-            transform9,
-            0.0,
+            (&resource_data[0x80..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x84..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x88..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x8c..]).read_f32::<BigEndian>().unwrap(),
 
-            transform2,
-            transform6,
-            transform10,
-            0.0,
+            (&resource_data[0x90..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x94..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x98..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0x9c..]).read_f32::<BigEndian>().unwrap(),
 
-            transform3,
-            transform7,
-            transform11,
+            0.0,
+            0.0,
+            0.0,
             1.0,
         );
 
         let transform_inv = Matrix4::new(
-            transform_inv0,
-            transform_inv4,
-            transform_inv8,
-            0.0,
+            (&resource_data[0xa0..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xa4..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xa8..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xac..]).read_f32::<BigEndian>().unwrap(),
 
-            transform_inv1,
-            transform_inv5,
-            transform_inv9,
-            0.0,
+            (&resource_data[0xb0..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xb4..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xb8..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xbc..]).read_f32::<BigEndian>().unwrap(),
 
-            transform_inv2,
-            transform_inv6,
-            transform_inv10,
-            0.0,
+            (&resource_data[0xc0..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xc4..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xc8..]).read_f32::<BigEndian>().unwrap(),
+            (&resource_data[0xcc..]).read_f32::<BigEndian>().unwrap(),
 
-            transform_inv3,
-            transform_inv7,
-            transform_inv11,
+            0.0,
+            0.0,
+            0.0,
             1.0,
         );
 
