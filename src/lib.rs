@@ -18,6 +18,9 @@ use std::io::Read;
 
 use parse::BrawlFighter;
 
+/// This is the main entry point of the library.
+/// Call this function with a ReadDir pointing at the exported Brawl fighters directory
+/// to receive a tree of fighter structs.
 pub fn fighters(fighter_dir: ReadDir) -> Vec<BrawlFighter> {
     let mut fighters = vec!();
     for fighter_path in fighter_dir {

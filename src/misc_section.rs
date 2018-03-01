@@ -116,16 +116,16 @@ fn hurtbox(data: &[u8]) -> HurtBox {
     let radius = (&data[0x18..]).read_f32::<BigEndian>().unwrap();
     let flags = (&data[0x1c..]).read_u16::<BigEndian>().unwrap();
 
-    let enabled    =  flags & 0b0000_0000_0000_0001 == 1;
-    let unk        = (flags & 0b0000_0000_0000_0110) as u8;
-    let zone       =  flags & 0b0000_0000_0001_1000;
-    let region     = (flags & 0b0000_0000_0110_0000) as u8;
-    let bone_index = (flags & 0b1111_1111_1000_0000) as u16;
+    let enabled    =   flags & 0b0000_0000_0000_0001 == 1;
+    let unk        = ((flags & 0b0000_0000_0000_0110) >> 1) as u8;
+    let zone       = ((flags & 0b0000_0000_0001_1000) >> 3) as u8;
+    let region     = ((flags & 0b0000_0000_0110_0000) >> 5) as u8;
+    let bone_index = ((flags & 0b1111_1111_1000_0000) >> 7) as u16;
 
     let zone = match zone {
-        0b0000_0000 => HurtBoxZone::Low,
-        0b0000_1000 => HurtBoxZone::Middle,
-        0b0001_0000 => HurtBoxZone::High,
+        0 => HurtBoxZone::Low,
+        1 => HurtBoxZone::Middle,
+        2 => HurtBoxZone::High,
         _ => unreachable!()
     };
 
@@ -170,19 +170,19 @@ fn unk7(data: &[u8]) -> Unk7 {
 #[derive(Debug)]
 pub struct MiscSection {
     unk0_offset: i32,
-    final_smash_auras: Vec<FinalSmashAura>,
-    hurt_boxes: Vec<HurtBox>,
-    ledge_grabs: Vec<LedgeGrab>,
-    unk7s: Vec<Unk7>,
-    bone_refs: Vec<i32>,
+    pub final_smash_auras: Vec<FinalSmashAura>,
+    pub hurt_boxes: Vec<HurtBox>,
+    pub ledge_grabs: Vec<LedgeGrab>,
+    pub unk7s: Vec<Unk7>,
+    pub bone_refs: Vec<i32>,
     unk10_offset: i32,
     sound_data_offset: i32,
     unk12_offset: i32,
     multi_jump_offset: i32,
     glide_offset: i32,
-    crawl: Option<Crawl>,
+    pub crawl: Option<Crawl>,
     collision_data_offset: i32,
-    tether: Option<Tether>,
+    pub tether: Option<Tether>,
     unk18_offset: i32,
 }
 
