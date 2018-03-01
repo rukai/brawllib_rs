@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use resources::*;
 use resources;
-use mdl0::bones::Bones;
+use mdl0::bones::Bone;
 use mbox::MBox;
 use mbox;
 
@@ -25,7 +25,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     //    _   => 0 // no data
     //};
 
-    //let name = String::from(util::parse_str(&data[string_offset .. ]).unwrap());
+    //let name = format!("yo {}", (util::parse_str(&data[string_offset .. ]).unwrap()));
     //println!("{} {}", version, util::hex_dump(&data[string_offset - 40 .. string_offset + 40]));
 
     let props_offset = match version {
@@ -104,6 +104,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     }
 
     Mdl0 {
+        //name,
         version,
         props,
         definitions,
@@ -124,10 +125,11 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
 
 #[derive(Debug)]
 pub struct Mdl0 {
+    //pub name: String,
     version: i32,
     pub props: Option<Mdl0Props>,
-    definitions: Option<Mdl0Definitions>,
-    bones: Option<Bones>,
+    pub definitions: Option<Mdl0Definitions>,
+    pub bones: Option<Bone>,
     vertices: Option<Vec<Resource>>,
     normals: Option<Vec<Resource>>,
     colors: Option<Vec<Resource>>,
