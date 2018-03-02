@@ -30,7 +30,7 @@ fn bone_siblings(data: &[u8]) -> Vec<Bone> {
         (&data[0x30..]).read_f32::<BigEndian>().unwrap(),
         (&data[0x34..]).read_f32::<BigEndian>().unwrap(),
     );
-    let trans = Vector3::<f32>::new(
+    let translate = Vector3::<f32>::new(
         (&data[0x38..]).read_f32::<BigEndian>().unwrap(),
         (&data[0x3c..]).read_f32::<BigEndian>().unwrap(),
         (&data[0x40..]).read_f32::<BigEndian>().unwrap(),
@@ -128,7 +128,7 @@ fn bone_siblings(data: &[u8]) -> Vec<Bone> {
         bb_index,
         scale,
         rot,
-        trans,
+        translate,
         extents,
         user_data_offset,
         transform,
@@ -151,7 +151,7 @@ pub struct Bone {
     bb_index: u32,
     pub scale: Vector3<f32>,
     pub rot: Vector3<f32>,
-    pub trans: Vector3<f32>,
+    pub translate: Vector3<f32>,
     pub extents: MBox,
     user_data_offset: i32,
     pub transform: Matrix4<f32>,
