@@ -5,6 +5,7 @@ use mbox::MBox;
 use mbox;
 use resources::Resource;
 use util;
+use std::f32::consts::PI;
 
 pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bone {
     bone_siblings(&data[resources[0].data_offset as usize ..]).pop().unwrap()
@@ -43,51 +44,80 @@ fn bone_siblings(data: &[u8]) -> Vec<Bone> {
     let _prev_offset       = (&data[0x68..]).read_i32::<BigEndian>().unwrap();
     let user_data_offset   = (&data[0x6c..]).read_i32::<BigEndian>().unwrap();
 
-    // BrawlBox uses a Matrix43 for this which I'm assuming is a 4 x 3 matrix.
-    // This means there are 4 rows and 3 columns we need to read.
-    // We only have 4x4 matrices available, so use [0.0, 0.0 0.0, 1.0] as the last column,
+    let transform0         = (&data[0x70..]).read_f32::<BigEndian>().unwrap();
+    let transform1         = (&data[0x74..]).read_f32::<BigEndian>().unwrap();
+    let transform2         = (&data[0x78..]).read_f32::<BigEndian>().unwrap();
+    let transform3         = (&data[0x7c..]).read_f32::<BigEndian>().unwrap();
+
+    let transform4         = (&data[0x80..]).read_f32::<BigEndian>().unwrap();
+    let transform5         = (&data[0x84..]).read_f32::<BigEndian>().unwrap();
+    let transform6         = (&data[0x88..]).read_f32::<BigEndian>().unwrap();
+    let transform7         = (&data[0x8c..]).read_f32::<BigEndian>().unwrap();
+
+    let transform8         = (&data[0x90..]).read_f32::<BigEndian>().unwrap();
+    let transform9         = (&data[0x94..]).read_f32::<BigEndian>().unwrap();
+    let transform10        = (&data[0x98..]).read_f32::<BigEndian>().unwrap();
+    let transform11        = (&data[0x9c..]).read_f32::<BigEndian>().unwrap();
+
+    let transform_inv0     = (&data[0xa0..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv1     = (&data[0xa4..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv2     = (&data[0xa8..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv3     = (&data[0xac..]).read_f32::<BigEndian>().unwrap();
+
+    let transform_inv4     = (&data[0xb0..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv5     = (&data[0xb4..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv6     = (&data[0xb8..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv7     = (&data[0xbc..]).read_f32::<BigEndian>().unwrap();
+
+    let transform_inv8     = (&data[0xc0..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv9     = (&data[0xc4..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv10    = (&data[0xc8..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv11    = (&data[0xcc..]).read_f32::<BigEndian>().unwrap();
+
+    // BrawlBox uses a Matrix43, this means there are 4 columns and 3 rows we need to read.
+    // We only have 4x4 matrices available, so use [0.0, 0.0, 0.0, 1.0] as the last row,
     let transform = Matrix4::new(
-        (&data[0x70..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x74..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x78..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x7c..]).read_f32::<BigEndian>().unwrap(),
-
-        (&data[0x80..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x84..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x88..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x8c..]).read_f32::<BigEndian>().unwrap(),
-
-        (&data[0x90..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x94..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x98..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x9c..]).read_f32::<BigEndian>().unwrap(),
-
+        transform0,
+        transform4,
+        transform8,
         0.0,
+
+        transform1,
+        transform5,
+        transform9,
         0.0,
+
+        transform2,
+        transform6,
+        transform10,
         0.0,
+
+        transform3,
+        transform7,
+        transform11,
         1.0,
     );
 
     let transform_inv = Matrix4::new(
-        (&data[0xa0..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xa4..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xa8..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xac..]).read_f32::<BigEndian>().unwrap(),
-
-        (&data[0xb0..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xb4..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xb8..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xbc..]).read_f32::<BigEndian>().unwrap(),
-
-        (&data[0xc0..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xc4..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xc8..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0xcc..]).read_f32::<BigEndian>().unwrap(),
-
+        transform_inv0,
+        transform_inv4,
+        transform_inv8,
         0.0,
+
+        transform_inv1,
+        transform_inv5,
+        transform_inv9,
         0.0,
+
+        transform_inv2,
+        transform_inv6,
+        transform_inv10,
         0.0,
-        1.0,
+
+        transform_inv3,
+        transform_inv7,
+        transform_inv11,
+         1.0,
     );
 
     let name = String::from(util::parse_str(&data[string_offset as usize..]).unwrap());
@@ -149,14 +179,49 @@ pub struct Bone {
     pub flags: BoneFlags,
     pub billboard: BoneBillboard,
     bb_index: u32,
+    // these values are depdendent on the parent bone
     pub scale: Vector3<f32>,
     pub rot: Vector3<f32>,
     pub translate: Vector3<f32>,
     pub extents: MBox,
     user_data_offset: i32,
+    // these matrices are calculated from scale, rot and translate but are INdependent of the parent bone
     pub transform: Matrix4<f32>,
     pub transform_inv: Matrix4<f32>,
     pub children: Vec<Bone>,
+}
+
+impl Bone {
+    pub fn gen_transform(&self) -> Matrix4<f32> {
+        let cosx = (self.rot.x / 180.0 * PI).cos();
+        let sinx = (self.rot.x / 180.0 * PI).sin();
+        let cosy = (self.rot.y / 180.0 * PI).cos();
+        let siny = (self.rot.y / 180.0 * PI).sin();
+        let cosz = (self.rot.z / 180.0 * PI).cos();
+        let sinz = (self.rot.z / 180.0 * PI).sin();
+
+        Matrix4::new(
+            self.scale.x * cosy * cosz,
+            self.scale.x * cosy * sinz,
+            self.scale.x * siny,
+            0.0,
+
+            self.scale.y * (sinx * siny * cosz - cosx * sinz),
+            self.scale.y * (sinx * siny * sinz + cosx * cosz),
+            self.scale.y * sinx * cosy,
+            0.0,
+
+            self.scale.z * (cosx * siny * cosz + sinx * sinz),
+            self.scale.z * (cosx * siny * sinz - sinx * cosz),
+            self.scale.z * cosx * cosy,
+            0.0,
+
+            self.translate.x,
+            self.translate.y,
+            self.translate.z,
+            1.0,
+        )
+    }
 }
 
 bitflags! {
