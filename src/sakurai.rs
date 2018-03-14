@@ -1,62 +1,10 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use bres::*;
 use util;
 use misc_section::MiscSection;
 use misc_section;
 
-pub(crate) fn arc(data: &[u8]) -> Arc {
-    //read the main header
-    let num_sub_headers = (&data[6..8]).read_u16::<BigEndian>().unwrap();
-    let name = String::from(util::parse_str(&data[0x10..]).unwrap());
-
-    // read the sub headers
-    let mut children = vec!();
-    let mut header_index = ARC_HEADER_SIZE;
-    for i in 0..num_sub_headers {
-        let mut arc_child = arc_child(&data[header_index ..]);
-        if arc_child.redirect_index == 0xFF {
-            let tag = util::parse_tag(&data[header_index + ARC_CHILD_HEADER_SIZE .. ]);
-            let child_data = &data[header_index + ARC_CHILD_HEADER_SIZE ..];
-            arc_child.data = match tag.as_ref() {
-                "ARC"  => ArcChildData::Arc(arc(&child_data)),
-                "EFLS" => ArcChildData::Efls,
-                "bres" => ArcChildData::Bres(bres(&child_data)),
-                "ATKD" => ArcChildData::Atkd,
-                "REFF" => ArcChildData::Reff,
-                "REFT" => ArcChildData::Reft,
-                "AIPD" => ArcChildData::Aipd,
-                "W"    => ArcChildData::W,
-                "" if i == 0 => ArcChildData::Sakurai(arc_sakurai(&data[header_index + ARC_CHILD_HEADER_SIZE ..])),
-                _ => ArcChildData::Unknown
-            };
-
-            header_index += ARC_CHILD_HEADER_SIZE + arc_child.size as usize;
-
-            // align to the next ARC_CHILD_HEADER_SIZE
-            let offset = header_index % ARC_CHILD_HEADER_SIZE;
-            if offset != 0 {
-                header_index += ARC_CHILD_HEADER_SIZE - offset;
-            }
-            children.push(arc_child);
-        }
-    }
-
-    Arc { name, children }
-}
-
-fn arc_child(data: &[u8]) -> ArcChild {
-    ArcChild {
-        ty:             (&data[0..2]).read_i16::<BigEndian>().unwrap(),
-        index:          (&data[2..4]).read_i16::<BigEndian>().unwrap(),
-        size:           (&data[4..8]).read_i32::<BigEndian>().unwrap(),
-        group_index:      data[8],
-        redirect_index: (&data[9..11]).read_i16::<BigEndian>().unwrap(),
-        data:           ArcChildData::Unknown,
-    }
-}
-
-fn arc_sakurai(data: &[u8]) -> ArcSakurai {
+pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     let size                      = (&data[0..4]).read_i32::<BigEndian>().unwrap();
     let lookup_offset             = (&data[4..8]).read_i32::<BigEndian>().unwrap();
     let lookup_entry_count        = (&data[8..12]).read_i32::<BigEndian>().unwrap();
@@ -195,39 +143,6 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
         hip_n_bone2:                       (&data[0x1cc..0x1d0]).read_u32::<BigEndian>().unwrap(),
         x_rot_n_bone:                      (&data[0x1e0..0x1e4]).read_u32::<BigEndian>().unwrap(),
     }
-}
-
-const ARC_HEADER_SIZE: usize = 0x40;
-/// Arc is for archive not to be confused with an atomic reference count
-#[derive(Debug)]
-pub struct Arc {
-    pub name: String,
-    pub children: Vec<ArcChild>,
-}
-
-const ARC_CHILD_HEADER_SIZE: usize = 0x20;
-#[derive(Debug)]
-pub struct ArcChild {
-    ty: i16,
-    index: i16,
-    size: i32,
-    group_index: u8,
-    redirect_index: i16, // The index of a different file to read
-    pub data: ArcChildData,
-}
-
-#[derive(Debug)]
-pub enum ArcChildData {
-    Arc (Arc),
-    Sakurai (ArcSakurai),
-    Efls,
-    Bres (Bres),
-    Atkd,
-    Reff,
-    Reft,
-    Aipd,
-    W,
-    Unknown
 }
 
 const ARC_SAKURAI_HEADER_SIZE: usize = 0x20;

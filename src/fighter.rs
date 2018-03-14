@@ -4,8 +4,8 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use parse;
-use parse::Arc;
+use arc::Arc;
+use arc;
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -30,7 +30,7 @@ impl Fighter {
         for fighter_data in fighter_datas(brawl_fighter_dir, mod_fighter_dir) {
             let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
             let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
-                parse::arc(data)
+                arc::arc(data)
             } else {
                 println!("Missing moveset file: {}", moveset_file_name);
                 continue;
@@ -38,7 +38,7 @@ impl Fighter {
 
             let motion_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
             let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
-                parse::arc(data)
+                arc::arc(data)
             } else {
                 // TODO: This is being hit because some fighters just use another fighters motion file
                 //       Handle this in the FighterFolder by duplicating the file in each special case.
@@ -52,7 +52,7 @@ impl Fighter {
             let mut models = vec!();
             for i in 0..100 {
                 if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
-                    models.push(parse::arc(&model_data));
+                    models.push(arc::arc(&model_data));
                     if single_model {
                         break;
                     }
