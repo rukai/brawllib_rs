@@ -70,7 +70,7 @@ pub struct Chr0 {
 pub struct Chr0Child {
     string_offset: i32,
     pub name: String,
-    data_offset: i32,
+    data_offset: i32, // TODO: FOLLOW THIS OFFSET
     code: u32,
 }
 
@@ -88,7 +88,7 @@ impl Chr0Child {
     pub fn use_model_trans          (&self) -> bool { self.code & 0b0000_0000_0000_0000_0000_0010_0000_0000 != 0 }
 
     pub fn scale_compensate_apply   (&self) -> bool { self.code & 0b0000_0000_0000_0000_0000_0100_0000_0000 != 0 } // Maya calculations
-    pub fn cale_compenstate_parent  (&self) -> bool { self.code & 0b0000_0000_0000_0000_0000_1000_0000_0000 != 0 } // Maya calculations
+    pub fn scale_compenstate_parent (&self) -> bool { self.code & 0b0000_0000_0000_0000_0000_1000_0000_0000 != 0 } // Maya calculations
     pub fn classic_scale_off        (&self) -> bool { self.code & 0b0000_0000_0000_0000_0001_0000_0000_0000 != 0 } // SoftImage calculations
 
     pub fn scale_fixed_x            (&self) -> bool { self.code & 0b0000_0000_0000_0000_0010_0000_0000_0000 != 0 }

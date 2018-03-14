@@ -197,15 +197,6 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
     }
 }
 
-#[derive(Debug)]
-pub struct BrawlFighter {
-    pub cased_fighter_name: String,
-    pub folder_name: String,
-    pub moveset: Arc,
-    pub motion: Arc,
-    pub models: Vec<Arc>
-}
-
 const ARC_HEADER_SIZE: usize = 0x40;
 /// Arc is for archive not to be confused with an atomic reference count
 #[derive(Debug)]
