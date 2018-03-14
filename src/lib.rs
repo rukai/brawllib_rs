@@ -24,4 +24,4 @@ pub mod mdl0;
 pub mod misc_section;
 pub mod resources;
 pub mod sakurai;
-pub mod util;
+mod util;

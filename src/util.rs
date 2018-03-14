@@ -1,6 +1,6 @@
 use std::str;
 
-pub(crate) fn parse_str(data: &[u8]) -> Result<&str, String> {
+pub fn parse_str(data: &[u8]) -> Result<&str, String> {
     if let Some(length) = data.iter().position(|x| *x == 0) {
         str::from_utf8(&data[..length]).map_err(|x| format!("{}", x))
     }
@@ -9,7 +9,7 @@ pub(crate) fn parse_str(data: &[u8]) -> Result<&str, String> {
     }
 }
 
-pub(crate) fn parse_tag(data: &[u8]) -> String {
+pub fn parse_tag(data: &[u8]) -> String {
     let mut tag = String::new();
     for j in 0..4 {
         let byte = data[j] as char;
@@ -23,6 +23,7 @@ pub(crate) fn parse_tag(data: &[u8]) -> String {
     tag
 }
 
+#[allow(unused)]
 pub fn hex_dump(data: &[u8]) -> String {
     let mut string = String::new();
     for (i, byte) in data.iter().enumerate() {
@@ -34,6 +35,7 @@ pub fn hex_dump(data: &[u8]) -> String {
     string
 }
 
+#[allow(unused)]
 pub fn ascii_dump(data: &[u8]) -> String {
     let mut string = String::new();
     for byte in data {
