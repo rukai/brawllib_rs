@@ -28,11 +28,12 @@ impl Fighter {
     pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, single_model: bool) -> Vec<Fighter> {
         let mut fighters = vec!();
         for fighter_data in fighter_datas(brawl_fighter_dir, mod_fighter_dir) {
+            info!("Parsing fighter: {}", fighter_data.cased_name);
             let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
             let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
                 arc::arc(data)
             } else {
-                println!("Missing moveset file: {}", moveset_file_name);
+                error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
                 continue;
             };
 
@@ -45,7 +46,7 @@ impl Fighter {
                 // TODO: This is being hit because some fighters dont have a MotionEtc file.
                 //       instead they have seperate Motion and Etc files.
                 //       Need to investigate if I can handle this by just reading the Motion file instead of the MotionEtc file
-                println!("Missing motion file: {}", motion_file_name);
+                error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_file_name);
                 continue;
             };
 
@@ -94,7 +95,7 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
                 let fighter_path = fighter_path.path();
                 let dir_name = fighter_path.file_name().unwrap().to_str().unwrap().to_string();
 
-                if let Some(fighter_data) = fighter_datas.iter_mut().find(|x| x.cased_name.to_lowercase() == dir_name) {
+                if let Some(fighter_data) = fighter_datas.iter_mut().find(|x| x.cased_name.to_lowercase() == dir_name.to_lowercase()) {
                     // fighter data already exists, overwrite and insert new files
                     for data_path in fs::read_dir(&fighter_path).unwrap() {
                         let data_path = data_path.unwrap().path();
@@ -129,14 +130,19 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
     }
 
     if let Some(cased_name) = cased_name {
-        let mut data = HashMap::new();
-        for data_path in fs::read_dir(&fighter_path).unwrap() {
-            let data_path = data_path.unwrap().path();
-            let mut file_data: Vec<u8> = vec!();
-            File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
-            data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+        if cased_name != "ZakoBoy" && cased_name != "ZakoGirl" && cased_name != "ZakoChild" && cased_name != "ZakoBall" { // TODO: Figure out why these dont work
+            let mut data = HashMap::new();
+            for data_path in fs::read_dir(&fighter_path).unwrap() {
+                let data_path = data_path.unwrap().path();
+                let mut file_data: Vec<u8> = vec!();
+                File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
+                data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+            }
+            Some(FighterData { cased_name, data })
+        } else {
+            error!("Cant load: {} (unfixed bug)", cased_name);
+            None
         }
-        Some(FighterData { cased_name, data })
     } else { None }
 }
 

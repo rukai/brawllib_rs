@@ -7,3 +7,4 @@ authors = ["Rukai <rubickent@gmail.com>"]
 byteorder = "1"
 bitflags = "1"
 cgmath = "0.16"
+log = "0.4"
