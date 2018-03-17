@@ -17,7 +17,7 @@ pub fn mbox(data: &[u8]) -> MBox {
 }
 
 // named MBox because Box is used in std lib
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MBox {
     min: Vector3<f32>,
     max: Vector3<f32>,

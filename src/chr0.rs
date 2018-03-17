@@ -1,7 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
+use cgmath::{Vector3, Matrix4};
 
 use util;
 use resources;
+use math;
 
 pub(crate) fn chr0(data: &[u8]) -> Chr0 {
     let size             = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
@@ -29,70 +31,17 @@ pub(crate) fn chr0(data: &[u8]) -> Chr0 {
 
         let mut data_offset = CHR0_CHILD_SIZE;
 
-        let mut scale_x_keyframe = Keyframe::None;
-        let mut scale_y_keyframe = Keyframe::None;
-        let mut scale_z_keyframe = Keyframe::None;
-        let rot_x_keyframe = Keyframe::None;
-        let rot_y_keyframe = Keyframe::None;
-        let rot_z_keyframe = Keyframe::None;
-        let translation_x_keyframe = Keyframe::None;
-        let translation_y_keyframe = Keyframe::None;
-        let translation_z_keyframe = Keyframe::None;
-
-        // TODO: AnimationConverter.cs :113
-        if code.scale_exists() {
-            if code.scale_isotropic() {
-                if code.scale_fixed_z() {
-                    let value = (&child_data[data_offset..]).read_f32::<BigEndian>().unwrap();
-                    scale_x_keyframe = Keyframe::Fixed(value);
-                    scale_y_keyframe = Keyframe::Fixed(value);
-                    scale_z_keyframe = Keyframe::Fixed(value);
-                }
-                else {
-                    // TODO
-                }
-                //data_offset += 4;
-            }
-            else {
-                scale_x_keyframe = if code.scale_fixed_x() {
-                    Keyframe::Fixed((&child_data[data_offset..]).read_f32::<BigEndian>().unwrap())
-                } else {
-                    let offset = (&child_data[data_offset..]).read_u32::<BigEndian>().unwrap();
-                    keyframe(&child_data[offset as usize ..], code.scale_format())
-                };
-                data_offset += 4;
-
-                scale_y_keyframe = if code.scale_fixed_y() {
-                    Keyframe::Fixed((&child_data[data_offset..]).read_f32::<BigEndian>().unwrap())
-                } else {
-                    let offset = (&child_data[data_offset..]).read_u32::<BigEndian>().unwrap();
-                    keyframe(&child_data[offset as usize ..], code.scale_format())
-                };
-                data_offset += 4;
-
-                scale_z_keyframe = if code.scale_fixed_z() {
-                    Keyframe::Fixed((&child_data[data_offset..]).read_f32::<BigEndian>().unwrap())
-                } else {
-                    let offset = (&child_data[data_offset..]).read_u32::<BigEndian>().unwrap();
-                    keyframe(&child_data[offset as usize ..], code.scale_format())
-                };
-                //data_offset += 4;
-            };
-        }
+        let scale = keyframe_holder(child_data, &mut data_offset, code.scale_exists(), code.scale_isotropic(), code.scale_fixed_x(), code.scale_fixed_y(), code.scale_fixed_z(), code.scale_format(), num_frames);
+        let rot = keyframe_holder(child_data, &mut data_offset, code.rot_exists(), code.rot_isotropic(), code.rot_fixed_x(), code.rot_fixed_y(), code.rot_fixed_z(), code.rot_format(), num_frames);
+        let translation = keyframe_holder(child_data, &mut data_offset, code.translation_exists(), code.translation_isotropic(), code.translation_fixed_x(), code.translation_fixed_y(), code.translation_fixed_z(), code.translation_format(), num_frames);
 
         children.push(Chr0Child {
             string_offset: resource.string_offset,
             name:          resource.string,
             code,
-            scale_x_keyframe,
-            scale_y_keyframe,
-            scale_z_keyframe,
-            rot_x_keyframe,
-            rot_y_keyframe,
-            rot_z_keyframe,
-            translation_x_keyframe,
-            translation_y_keyframe,
-            translation_z_keyframe,
+            scale,
+            rot,
+            translation,
         });
     }
 
@@ -131,16 +80,19 @@ const CHR0_CHILD_SIZE: usize = 0x8;
 pub struct Chr0Child {
     string_offset: i32,
     pub name: String,
-    pub scale_x_keyframe:       Keyframe,
-    pub scale_y_keyframe:       Keyframe,
-    pub scale_z_keyframe:       Keyframe,
-    pub rot_x_keyframe:         Keyframe,
-    pub rot_y_keyframe:         Keyframe,
-    pub rot_z_keyframe:         Keyframe,
-    pub translation_x_keyframe: Keyframe,
-    pub translation_y_keyframe: Keyframe,
-    pub translation_z_keyframe: Keyframe,
+    pub scale:       KeyframeHolder,
+    pub rot:         KeyframeHolder,
+    pub translation: KeyframeHolder,
     code: Chr0ChildCode,
+}
+
+impl Chr0Child {
+    pub fn get_transform(&self, frame: usize) -> Matrix4<f32> {
+        let scale = self.scale.get_value(frame, 1.0);
+        let rot = self.rot.get_value(frame, 0.0);
+        let translation = self.translation.get_value(frame, 0.0);
+        math::gen_transform(scale, rot, translation)
+    }
 }
 
 #[derive(Debug)]
@@ -199,7 +151,7 @@ fn f(value: u32) -> Chr0Format {
         3 => Chr0Format::Interpolated12,
         4 => Chr0Format::Linear1,
         5 => Chr0Format::Linear2,
-        6 => Chr0Format::Linear3,
+        6 => Chr0Format::Linear4,
         _ => unreachable!()
     }
 }
@@ -212,16 +164,121 @@ pub enum Chr0Format {
     Interpolated12,
     Linear1,
     Linear2,
-    Linear3,
+    Linear4,
+}
+
+fn keyframe_holder(child_data: &[u8], data_offset: &mut usize, exists: bool, isotropic: bool, fixed_x: bool, fixed_y: bool, fixed_z: bool, format: Chr0Format, num_frames: u16) -> KeyframeHolder {
+    if !exists {
+        KeyframeHolder::None
+    } else if isotropic {
+        let keyframe = if fixed_z {
+            Keyframe::Fixed((&child_data[*data_offset..]).read_f32::<BigEndian>().unwrap())
+        } else {
+            let offset = (&child_data[*data_offset..]).read_u32::<BigEndian>().unwrap();
+            keyframe(&child_data[offset as usize ..], &format, num_frames)
+        };
+        *data_offset += 4;
+        KeyframeHolder::Isotropic (keyframe)
+    } else {
+        let x = if fixed_x {
+            Keyframe::Fixed((&child_data[*data_offset..]).read_f32::<BigEndian>().unwrap())
+        } else {
+            let offset = (&child_data[*data_offset..]).read_u32::<BigEndian>().unwrap();
+            keyframe(&child_data[offset as usize ..], &format, num_frames)
+        };
+        *data_offset += 4;
+
+        let y = if fixed_y {
+            Keyframe::Fixed((&child_data[*data_offset..]).read_f32::<BigEndian>().unwrap())
+        } else {
+            let offset = (&child_data[*data_offset..]).read_u32::<BigEndian>().unwrap();
+            keyframe(&child_data[offset as usize ..], &format, num_frames)
+        };
+        *data_offset += 4;
+
+        let z = if fixed_z {
+            Keyframe::Fixed((&child_data[*data_offset..]).read_f32::<BigEndian>().unwrap())
+        } else {
+            let offset = (&child_data[*data_offset..]).read_u32::<BigEndian>().unwrap();
+            keyframe(&child_data[offset as usize ..], &format, num_frames)
+        };
+        *data_offset += 4;
+        KeyframeHolder::Individual { x, y, z }
+    }
+}
+
+#[derive(Debug)]
+pub enum KeyframeHolder {
+    Isotropic (Keyframe),
+    Individual { x: Keyframe, y: Keyframe, z: Keyframe },
+    None,
+}
+
+impl KeyframeHolder {
+    pub fn get_value(&self, frame: usize, default: f32) -> Vector3<f32> {
+        match self {
+            &KeyframeHolder::Isotropic (ref keyframe) => {
+                let value = keyframe.get_value(frame);
+                Vector3::new(value, value, value)
+            }
+            &KeyframeHolder::Individual { ref x, ref y, ref z } => {
+                Vector3::new(x.get_value(frame), y.get_value(frame), z.get_value(frame))
+            }
+            &KeyframeHolder::None => Vector3::new(default, default, default)
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum Keyframe {
-    None,
     Fixed (f32),
     Interpolated4 (Interpolated4Header),
     Interpolated6 (Interpolated6Header),
     Interpolated12 (Interpolated12Header),
+    Linear1 (Linear1Header),
+    Linear2 (Linear2Header),
+    Linear4 (Vec<f32>),
+}
+
+impl Keyframe {
+    pub fn get_value(&self, _frame: usize) -> f32 {
+        match self {
+            &Keyframe::Fixed(value) => {
+                return value;
+            }
+            &Keyframe::Interpolated4(ref header) => {
+                for child in &header.children {
+                    return header.base + header.step * child.step() as f32;
+                }
+            }
+            &Keyframe::Interpolated6(ref header) => {
+                for child in &header.children {
+                    return header.base + header.step * child.step as f32;
+                }
+            }
+            &Keyframe::Interpolated12(ref header) => {
+                for child in &header.children {
+                    return child.value;
+                }
+            }
+            &Keyframe::Linear1(ref header) => {
+                for child_step in &header.children_steps {
+                    return header.base + header.step * *child_step as f32;
+                }
+            }
+            &Keyframe::Linear2(ref header) => {
+                for child_step in &header.children_steps {
+                    return header.base + header.step * *child_step as f32;
+                }
+            }
+            &Keyframe::Linear4(ref values) => {
+                for value in values {
+                    return *value
+                }
+            }
+        }
+        0.0
+    }
 }
 
 const INTERPOLATED_4_HEADER_SIZE: usize = 0x10;
@@ -288,9 +345,25 @@ pub struct Interpolated12Entry {
     pub tangent: f32,
 }
 
-fn keyframe(data: &[u8], format: Chr0Format) -> Keyframe {
+const LINEAR_1_HEADER_SIZE: usize = 0x8;
+#[derive(Debug)]
+pub struct Linear1Header {
+    pub step: f32,
+    pub base: f32,
+    pub children_steps: Vec<u8>,
+}
+
+const LINEAR_2_HEADER_SIZE: usize = 0x8;
+#[derive(Debug)]
+pub struct Linear2Header {
+    pub step: f32,
+    pub base: f32,
+    pub children_steps: Vec<u16>,
+}
+
+fn keyframe(data: &[u8], format: &Chr0Format, num_frames: u16) -> Keyframe {
     match format {
-        Chr0Format::Interpolated4 => {
+        &Chr0Format::Interpolated4 => {
             let entries     = (&data[0x0..]).read_u16::<BigEndian>().unwrap();
             let unk         = (&data[0x2..]).read_u16::<BigEndian>().unwrap();
             let frame_scale = (&data[0x4..]).read_f32::<BigEndian>().unwrap();
@@ -304,7 +377,7 @@ fn keyframe(data: &[u8], format: Chr0Format) -> Keyframe {
             }
             Keyframe::Interpolated4 (Interpolated4Header { entries, unk, frame_scale, step, base, children })
         }
-        Chr0Format::Interpolated6 => {
+        &Chr0Format::Interpolated6 => {
             let num_frames  = (&data[0x0..]).read_u16::<BigEndian>().unwrap();
             let unk         = (&data[0x2..]).read_u16::<BigEndian>().unwrap();
             let frame_scale = (&data[0x4..]).read_f32::<BigEndian>().unwrap();
@@ -321,7 +394,7 @@ fn keyframe(data: &[u8], format: Chr0Format) -> Keyframe {
             }
             Keyframe::Interpolated6 (Interpolated6Header { num_frames, unk, frame_scale, step, base, children })
         }
-        Chr0Format::Interpolated12 => {
+        &Chr0Format::Interpolated12 => {
             let num_frames  = (&data[0x0..]).read_u16::<BigEndian>().unwrap();
             let unk         = (&data[0x2..]).read_u16::<BigEndian>().unwrap();
             let frame_scale = (&data[0x4..]).read_f32::<BigEndian>().unwrap();
@@ -336,6 +409,29 @@ fn keyframe(data: &[u8], format: Chr0Format) -> Keyframe {
             }
             Keyframe::Interpolated12 (Interpolated12Header { num_frames, unk, frame_scale, children })
         }
-        _ => Keyframe::None,
+        &Chr0Format::Linear1 => {
+            let step = (&data[0x0..]).read_f32::<BigEndian>().unwrap();
+            let base = (&data[0x4..]).read_f32::<BigEndian>().unwrap();
+            let children_steps = data[LINEAR_1_HEADER_SIZE .. LINEAR_1_HEADER_SIZE + num_frames as usize].iter().cloned().collect();
+            Keyframe::Linear1 (Linear1Header { step, base, children_steps })
+        }
+        &Chr0Format::Linear2 => {
+            let step = (&data[0x0..]).read_f32::<BigEndian>().unwrap();
+            let base = (&data[0x4..]).read_f32::<BigEndian>().unwrap();
+
+            let mut children_steps = vec!();
+            for i in 0..num_frames as usize {
+                children_steps.push((&data[LINEAR_2_HEADER_SIZE + 2 * i ..]).read_u16::<BigEndian>().unwrap());
+            }
+            Keyframe::Linear2 (Linear2Header { step, base, children_steps })
+        }
+        &Chr0Format::Linear4 => {
+            let mut values = vec!();
+            for i in 0..num_frames as usize {
+                values.push((&data[4 * i ..]).read_f32::<BigEndian>().unwrap());
+            }
+            Keyframe::Linear4 (values)
+        }
+        &Chr0Format::None => panic!("this function should not be called with a format of None"),
     }
 }

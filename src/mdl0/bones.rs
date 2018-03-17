@@ -5,7 +5,7 @@ use mbox::MBox;
 use mbox;
 use resources::Resource;
 use util;
-use std::f32::consts::PI;
+use math;
 
 pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bone {
     bone_siblings(&data[resources[0].data_offset as usize ..]).pop().unwrap()
@@ -168,7 +168,7 @@ fn bone_siblings(data: &[u8]) -> Vec<Bone> {
     siblings
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Bone {
     pub name: String,
     header_len: i32,
@@ -185,7 +185,7 @@ pub struct Bone {
     pub translate: Vector3<f32>,
     pub extents: MBox,
     user_data_offset: i32,
-    // these matrices are calculated from scale, rot and translate but are INdependent of the parent bone
+    // these matrices are calculated from scale, rot and translate but are independent of the parent bone
     pub transform: Matrix4<f32>,
     pub transform_inv: Matrix4<f32>,
     pub children: Vec<Bone>,
@@ -193,34 +193,7 @@ pub struct Bone {
 
 impl Bone {
     pub fn gen_transform(&self) -> Matrix4<f32> {
-        let cosx = (self.rot.x / 180.0 * PI).cos();
-        let sinx = (self.rot.x / 180.0 * PI).sin();
-        let cosy = (self.rot.y / 180.0 * PI).cos();
-        let siny = (self.rot.y / 180.0 * PI).sin();
-        let cosz = (self.rot.z / 180.0 * PI).cos();
-        let sinz = (self.rot.z / 180.0 * PI).sin();
-
-        Matrix4::new(
-            self.scale.x * cosy * cosz,
-            self.scale.x * cosy * sinz,
-            self.scale.x * siny,
-            0.0,
-
-            self.scale.y * (sinx * siny * cosz - cosx * sinz),
-            self.scale.y * (sinx * siny * sinz + cosx * cosz),
-            self.scale.y * sinx * cosy,
-            0.0,
-
-            self.scale.z * (cosx * siny * cosz + sinx * sinz),
-            self.scale.z * (cosx * siny * sinz - sinx * cosz),
-            self.scale.z * cosx * cosy,
-            0.0,
-
-            self.translate.x,
-            self.translate.y,
-            self.translate.z,
-            1.0,
-        )
+        math::gen_transform(self.scale, self.rot, self.translate)
     }
 }
 
@@ -240,7 +213,7 @@ bitflags! {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BoneBillboard {
     Off,
     Standard,
