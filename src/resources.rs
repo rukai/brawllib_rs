@@ -7,7 +7,7 @@ pub(crate) fn resources(data: &[u8]) -> Vec<Resource> {
     let num_children = (&data[4 ..]).read_i32::<BigEndian>().unwrap();
 
     let mut resources = vec!();
-    for i in 1..num_children+1 { // the first child is a dummy so we skip it.
+    for i in 1..=num_children { // the first child is a dummy so we skip it.
         let child_index = RESOURCE_HEADER_SIZE + RESOURCE_SIZE * i as usize;
 
         let string_offset = (&data[child_index + 8 .. ]).read_i32::<BigEndian>().unwrap();
