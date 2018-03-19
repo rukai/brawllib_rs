@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::{Vector3, Matrix4};
+use noisy_float::prelude::*;
 
 use util;
 use resources;
@@ -70,7 +71,7 @@ pub struct Chr0 {
     orig_path_offset: i32,
     pub num_frames: u16,
     num_children: u16,
-    loop_value: bool,
+    pub loop_value: bool,
     scaling_rule: i32,
     pub children: Vec<Chr0Child>
 }
@@ -87,10 +88,10 @@ pub struct Chr0Child {
 }
 
 impl Chr0Child {
-    pub fn get_transform(&self, frame: usize) -> Matrix4<f32> {
-        let scale = self.scale.get_value(frame, 1.0);
-        let rot = self.rot.get_value(frame, 0.0);
-        let translation = self.translation.get_value(frame, 0.0);
+    pub fn get_transform(&self, loop_value: bool, frame: usize) -> Matrix4<f32> {
+        let scale = self.scale.get_value(loop_value, frame, 1.0);
+        let rot = self.rot.get_value(loop_value, frame, 0.0);
+        let translation = self.translation.get_value(loop_value, frame, 0.0);
         math::gen_transform(scale, rot, translation)
     }
 }
@@ -215,14 +216,14 @@ pub enum KeyframeHolder {
 }
 
 impl KeyframeHolder {
-    pub fn get_value(&self, frame: usize, default: f32) -> Vector3<f32> {
+    pub fn get_value(&self, loop_value: bool, frame: usize, default: f32) -> Vector3<f32> {
         match self {
             &KeyframeHolder::Isotropic (ref keyframe) => {
-                let value = keyframe.get_value(frame);
+                let value = keyframe.get_value(loop_value, frame);
                 Vector3::new(value, value, value)
             }
             &KeyframeHolder::Individual { ref x, ref y, ref z } => {
-                Vector3::new(x.get_value(frame), y.get_value(frame), z.get_value(frame))
+                Vector3::new(x.get_value(loop_value, frame), y.get_value(loop_value, frame), z.get_value(loop_value, frame))
             }
             &KeyframeHolder::None => Vector3::new(default, default, default)
         }
@@ -241,43 +242,154 @@ pub enum Keyframe {
 }
 
 impl Keyframe {
-    pub fn get_value(&self, _frame: usize) -> f32 {
+    pub fn get_value(&self, loop_value: bool, frame: usize) -> f32 {
         match self {
             &Keyframe::Fixed(value) => {
-                return value;
+                value
             }
             &Keyframe::Interpolated4(ref header) => {
-                for child in &header.children {
-                    return header.base + header.step * child.step() as f32;
-                }
+                let children: Vec<_> = header.children.iter().map(|child| {
+                    Interpolated12Entry {
+                        value: header.base + header.step * child.step() as f32,
+                        frame_index: child.frame_index() as f32,
+                        tangent: child.tangent() as f32
+                    }
+                }).collect();
+                Keyframe::get_value_interpolated_12_entry(&children, loop_value, frame)
             }
             &Keyframe::Interpolated6(ref header) => {
-                for child in &header.children {
-                    return header.base + header.step * child.step as f32;
-                }
+                let children: Vec<_> = header.children.iter().map(|child| {
+                    Interpolated12Entry {
+                        value: header.base + header.step * child.step as f32,
+                        frame_index: child.frame_index() as f32,
+                        tangent: child.tangent() as f32
+                    }
+                }).collect();
+                Keyframe::get_value_interpolated_12_entry(&children, loop_value, frame)
             }
             &Keyframe::Interpolated12(ref header) => {
-                for child in &header.children {
-                    return child.value;
-                }
+                Keyframe::get_value_interpolated_12_entry(&header.children, loop_value, frame)
             }
             &Keyframe::Linear1(ref header) => {
-                for child_step in &header.children_steps {
-                    return header.base + header.step * *child_step as f32;
-                }
+                // TODO: Pretty sure I need to interpolate these still to handle non integer frame indexes (currently frame is a usize though so lol)
+                //let mut children = vec!();
+                //for (i, child_step) in header.children_steps.iter().enumerate() {
+                //    let weight_count = 0;
+                //    let tangent = 0.0;
+                //    children.push(Interpolated12Entry {
+                //        value: header.base + header.step * *child_step as f32,
+                //        frame_index: i as f32,
+                //        tangent,
+                //    });
+                //}
+                //return Keyframe::get_value_interpolated_12_entry(&children, loop_value, frame);
+                header.base + header.step as f32 * header.children_steps[frame] as f32
             }
             &Keyframe::Linear2(ref header) => {
-                for child_step in &header.children_steps {
-                    return header.base + header.step * *child_step as f32;
-                }
+                header.base + header.step * header.children_steps[frame] as f32
             }
             &Keyframe::Linear4(ref values) => {
-                for value in values {
-                    return *value
+                values[frame]
+            }
+        }
+    }
+
+    /// to be generic we take Interpolated12Entry's as we can convert all other formats to this one
+    fn get_value_interpolated_12_entry(children: &[Interpolated12Entry], loop_value: bool, frame: usize) -> f32 {
+        // TODO: Could probably make this faster by sorting once by frame_index and then using the known order to determine prev/next values
+        // TODO: maybe its already sorted, maybe I should investigate how brawlbox creates its KeyframeEntry linked list
+        let mut prev_prev: Option<&Interpolated12Entry> = None; // the keyframe before the keyframe before the current frame
+        let mut prev: Option<&Interpolated12Entry> = None; // the keyframe before the current before
+        let mut next: Option<&Interpolated12Entry> = None; // the keyframe after the current before
+        let mut next_next: Option<&Interpolated12Entry> = None; // the keyframe after the keyframe after the current frame
+
+        // find prev and next
+        for child in children {
+            if child.frame_index <= frame as f32 && prev.map_or(true, |x| child.frame_index > x.frame_index) {
+                prev = Some(child);
+            }
+            if child.frame_index >= frame as f32 && next.map_or(true, |x| child.frame_index < x.frame_index) {
+                next = Some(child);
+            }
+        }
+
+        // TODO: Might be broken, brawlbox seems more complicated
+        // find prev and next handling looping animations
+        if loop_value {
+            if prev.is_none() {
+                prev = children.iter().max_by_key(|x| n32(x.frame_index));
+            }
+            if next.is_none() {
+                next = children.iter().min_by_key(|x| n32(x.frame_index));
+            }
+        }
+
+        // find prev_prev and next_next
+        for child in children {
+            if let Some(prev) = prev {
+                if child.frame_index <= prev.frame_index as f32 && prev as *const _ != child as *const _ && prev_prev.map_or(true, |x| child.frame_index > x.frame_index) {
+                    prev_prev = Some(child);
+                }
+            }
+            if let Some(next) = next {
+                if child.frame_index >= next.frame_index as f32 && next as *const _ != child as *const _ && next_next.map_or(true, |x| child.frame_index < x.frame_index) {
+                    next_next = Some(child);
                 }
             }
         }
-        0.0
+
+        match (prev, next) {
+            (Some(prev), Some(next)) => {
+                if prev as *const _ == next as *const _ { // TODO: Should this be prev.value == next.value
+                    prev.value
+                } else {
+                    let one_apart = next.frame_index == prev.frame_index + 1.0;
+                    let prev_double = if let Some(prev_prev) = prev_prev {
+                        prev_prev.frame_index >= 0.0 && prev_prev.frame_index == prev.frame_index - 1.0
+                    } else {
+                        false
+                    };
+                    let next_double = if let Some(next_next) = next_next {
+                        next_next.frame_index >= 0.0 && next_next.frame_index == next.frame_index + 1.0
+                    } else {
+                        false
+                    };
+
+                    let double_value = (next.value - prev.value) / (next.frame_index - prev.frame_index);
+                    let prev_tangent = if one_apart || prev_double { double_value } else { prev.tangent };
+                    let next_tangent = if one_apart || next_double { double_value } else { next.tangent };
+
+                    // Interpolate using a hermite curve
+                    let value_diff = next.value - prev.value;
+                    let span = next.frame_index - prev.frame_index;
+                    let offset = frame as f32 - prev.frame_index;
+                    let time = offset / span;
+                    let time_inv = time - 1.0;
+                    let result = prev.value
+                        + (offset * time_inv * (time_inv * prev_tangent + time * next_tangent))
+                        + ((time * time) * (3.0 - 2.0 * time) * value_diff);
+
+                    if result > next.value && result > prev.value && false {
+                        println!("");
+                        println!("prev.value: {}", prev.value);
+                        println!("next.value: {}", next.value);
+                        println!("prev.frame_index: {}", prev.frame_index);
+                        println!("next.frame_index: {}", next.frame_index);
+                        println!("prev_tangent: {}", prev_tangent);
+                        println!("next_tangent: {}", next_tangent);
+                        println!("span: {}", span);
+                        println!("offset: {}", offset);
+                        println!("time: {}", time);
+                        println!("result: {}", result);
+                    }
+                    result
+                }
+            }
+            (Some(child), None) | (None, Some(child)) => {
+                child.value
+            }
+            (None, None) => unreachable!()
+        }
     }
 }
 
@@ -301,7 +413,16 @@ pub struct Interpolated4Entry {
 impl Interpolated4Entry {
     pub fn frame_index(&self) -> u32 { (self.data & 0xFF00_0000) >> 24 }
     pub fn step       (&self) -> u32 { (self.data & 0x00FF_F000) >> 12 }
-    pub fn tangent    (&self) -> f32 { (self.data & 0x0000_0FFF) as f32 }
+    //     tangent                     (self.data & 0x0000_0FFF) + refer implementation below
+
+    #[allow(exceeding_bitshifts)]
+    pub fn tangent    (&self) -> f32 {
+        // We need to read the tangent value as a SIGNED integer so we bit shift to the left and then to the right, so that the +/- bit is correct
+        let signed_int = ((self.data as i32) << 20) >> 20;
+
+        // Then we map to [0,1]
+        signed_int as f32 / 32.0
+    }
 }
 
 const INTERPOLATED_6_HEADER_SIZE: usize = 0x10;
@@ -320,12 +441,13 @@ const INTERPOLATED_6_ENTRY_SIZE: usize = 0x6;
 pub struct Interpolated6Entry {
     frame_index: u16,
     pub step: u16,
-    pub tangent: u8, // TODO: Order might be swapped with unk
     pub unk: u8,
+    tangent: u8,
 }
 
 impl Interpolated6Entry {
     pub fn frame_index(&self) -> u16 { (self.frame_index >> 5) as u16 }
+    pub fn tangent(&self) -> f32 { self.tangent as f32 / 256.0 }
 }
 
 const INTERPOLATED_12_HEADER_SIZE: usize = 0x8;
@@ -388,8 +510,8 @@ fn keyframe(data: &[u8], format: &Chr0Format, num_frames: u16) -> Keyframe {
                 let child_data = &data[INTERPOLATED_6_HEADER_SIZE + INTERPOLATED_6_ENTRY_SIZE * i ..];
                 let frame_index = (&child_data[0x0..]).read_u16::<BigEndian>().unwrap();
                 let step        = (&child_data[0x2..]).read_u16::<BigEndian>().unwrap();
-                let tangent     = (&child_data[0x4..]).read_u8().unwrap();
-                let unk         = (&child_data[0x5..]).read_u8().unwrap();
+                let unk         = (&child_data[0x4..]).read_u8().unwrap();
+                let tangent     = (&child_data[0x5..]).read_u8().unwrap();
                 children.push(Interpolated6Entry { frame_index, step, tangent, unk });
             }
             Keyframe::Interpolated6 (Interpolated6Header { num_frames, unk, frame_scale, step, base, children })

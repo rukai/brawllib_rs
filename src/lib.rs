@@ -10,8 +10,10 @@
 //! You can now read data from the tree of structs contained within the Fighter.
 
 #![feature(nll)]
+
              extern crate byteorder;
              extern crate cgmath;
+             extern crate noisy_float;
 #[macro_use] extern crate log;
 #[macro_use] extern crate bitflags;
 
