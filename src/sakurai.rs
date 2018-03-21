@@ -202,7 +202,7 @@ pub struct ArcFighterData {
     flags2: i32,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FighterAttributes {
     pub walk_init_vel: f32,
     pub walk_acc: f32,
