@@ -120,10 +120,24 @@ impl HighLevelFighter {
         let mut actions = vec!();
         if let Some(first_bone) = first_bone {
             for chr0 in chr0s {
+                // TODO: DELETE THIS
+                //if chr0.name == "AttackAirHi" {
+                if chr0.name == "AttackS4S" {
+                //if chr0.name == "AttackAirB" {
+                //if chr0.name == "Wait1" {
+                    //println!("{:#?}", chr0);
+                    println!("animation name: {}", chr0.name);
+                    for child in &chr0.children {
+                        if child.name == "YRotN" {
+                            println!("{}", child.debug_string(chr0.loop_value, chr0.num_frames as i32));
+                        }
+                    }
+                }
+
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 for frame in 0..chr0.num_frames {
                     let mut first_bone = first_bone.clone();
-                    HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, frame as usize);
+                    HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, frame as i32);
                     if let Some(hurt_boxes) = hurt_boxes {
                         let hurt_boxes = HighLevelHurtBox::gen_hurt_boxes(
                             &first_bone,
@@ -153,7 +167,7 @@ impl HighLevelFighter {
         }
     }
 
-    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: usize) {
+    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: i32) {
         bone.transform = parent_transform;
         for chr0_child in &chr0.children {
             if chr0_child.name == bone.name {

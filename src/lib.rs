@@ -21,7 +21,6 @@
 
              extern crate byteorder;
              extern crate cgmath;
-             extern crate noisy_float;
 #[macro_use] extern crate log;
 #[macro_use] extern crate bitflags;
 
