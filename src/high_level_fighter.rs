@@ -1,10 +1,9 @@
-use cgmath::{Vector3, Matrix4, SquareMatrix, ElementWise};
+use cgmath::{Matrix4, SquareMatrix};
 
 use arc::ArcChildData;
 use bres::BresChildData;
 use chr0::Chr0;
 use fighter::Fighter;
-use math;
 use mdl0::bones::Bone;
 use misc_section::HurtBox;
 use sakurai::{SectionData, FighterAttributes};
@@ -195,39 +194,19 @@ pub struct HighLevelFrame {
 
 #[derive(Clone, Debug)]
 pub struct HighLevelHurtBox {
-    pub start: Vector3<f32>,
-    pub end:   Option<Vector3<f32>>,
-    pub radius: f32,
+    pub bone_matrix: Matrix4<f32>,
+    pub hurt_box: HurtBox,
 }
 
 impl HighLevelHurtBox {
-    fn gen_hurt_boxes(
-        bone: &Bone,
-        hurt_boxes: &[HurtBox],
-    ) -> Vec<HighLevelHurtBox> {
+    fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {
         let mut hl_hurt_boxes = vec!();
-
         for hurt_box in hurt_boxes {
-            // create hurt_box
             if bone.index == hurt_box.bone_index as i32 {
-                let transform = bone.transform * Matrix4::<f32>::from_translation(hurt_box.offset);
-                let bones_cl = bone.scale * hurt_box.radius;
-                let _matrix = math::gen_transform(bones_cl, bone.rot, bone.translate) * Matrix4::<f32>::from_translation(hurt_box.offset.div_element_wise(bones_cl));
-
-                let end = if let Some(last_child_bone) = bone.children.get(bone.children.len()-1) { // TODO: This is weird but seems to work, maybe I need to do it for all children instead? Maybe there is a value that says which child to use.
-                    let child_transform = last_child_bone.transform * Matrix4::<f32>::from_translation(hurt_box.offset);
-                    Some(Vector3::new(child_transform.w.z, child_transform.w.y, child_transform.w.x))
-                } else {
-                    None
-                };
-
-                // TODO: properly handle stretch
                 hl_hurt_boxes.push(HighLevelHurtBox {
-                    radius: hurt_box.radius,
-                    start: Vector3::new(transform.w.z, transform.w.y, transform.w.x),
-                    end,
+                    bone_matrix: bone.transform,
+                    hurt_box: hurt_box.clone(),
                 });
-
                 break;
             }
         }
