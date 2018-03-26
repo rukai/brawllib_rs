@@ -1,12 +1,12 @@
-use cgmath::{Matrix4, SquareMatrix};
+use cgmath::{Vector3, Matrix4, SquareMatrix};
 
 use arc::ArcChildData;
 use bres::BresChildData;
 use chr0::Chr0;
 use fighter::Fighter;
 use mdl0::bones::Bone;
-use misc_section::HurtBox;
-use sakurai::{SectionData, FighterAttributes};
+use misc_section::{LedgeGrab, HurtBox};
+use sakurai::{SectionData, FighterAttributes, AnimationFlags};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -15,20 +15,20 @@ pub struct HighLevelFighter {
     pub name: String,
     pub attributes: FighterAttributes,
     pub actions: Vec<HighLevelAction>,
+    pub ledge_grabs: Vec<LedgeGrab> // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
 }
 
 impl HighLevelFighter {
-    /// The processes data from an &Fighter and stores it in a HighLevelFighter
+    /// Processes data from an &Fighter and stores it in a HighLevelFighter
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
-        let mut hurt_boxes = None;
-        let mut attributes = None;
+        // locate fighter data
+        let mut fighter_data = None;
         for sub_arc in &fighter.moveset.children {
             match &sub_arc.data {
                 &ArcChildData::Sakurai (ref data) => {
                     for section in &data.sections {
-                        if let &SectionData::FighterData { attributes: ref attributes_value, ref misc, .. } = &section.data {
-                            hurt_boxes = Some(&misc.hurt_boxes);
-                            attributes = Some(attributes_value.clone());
+                        if let &SectionData::FighterData (ref fighter_data_ref) = &section.data {
+                            fighter_data = Some(fighter_data_ref);
                         }
                     }
                 }
@@ -133,18 +133,34 @@ impl HighLevelFighter {
                     }
                 }
 
+                let animation_flags = if let Some(sub_action) = fighter_data.unwrap().sub_action_flags.iter().find(|x| x.name == chr0.name) {
+                    sub_action.animation_flags.clone()
+                } else {
+                    AnimationFlags::NONE
+                };
+
                 let mut frames: Vec<HighLevelFrame> = vec!();
+                let mut prev_offset = None;
                 for frame in 0..chr0.num_frames {
                     let mut first_bone = first_bone.clone();
-                    HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, frame as i32);
-                    if let Some(hurt_boxes) = hurt_boxes {
-                        let hurt_boxes = HighLevelHurtBox::gen_hurt_boxes(
-                            &first_bone,
-                            hurt_boxes,
-                        );
+                    let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, frame as i32, animation_flags);
+                    let hurt_boxes = HighLevelHurtBox::gen_hurt_boxes(
+                        &first_bone,
+                        &fighter_data.unwrap().misc.hurt_boxes,
+                    );
+                    let animation_velocity = match (prev_offset, next_offset) {
+                        (Some(prev_offset), Some(next_offset)) => Some(next_offset - prev_offset),
+                        (Some(_),           None)              => unreachable!(),
+                        (None,              Some(next_offset)) => Some(next_offset),
+                        (None,              None)              => None
+                    };
+                    prev_offset = next_offset;
 
-                        frames.push(HighLevelFrame { hurt_boxes });
-                    }
+                    frames.push(HighLevelFrame {
+                        hurt_boxes,
+                        animation_velocity,
+                    });
+
                     // TODO: Hitboxes
                     // Hitboxes are circle at the bone point (appear long because PM debug mode uses interpolation with the previous frames hitbox)
                     // Need to take hitbox from previous frame and interpolate into this frame
@@ -153,7 +169,8 @@ impl HighLevelFighter {
                 let action = HighLevelAction {
                     name: chr0.name.clone(),
                     iasa: 0,
-                    frames
+                    frames,
+                    animation_flags
                 };
                 actions.push(action);
             }
@@ -161,35 +178,51 @@ impl HighLevelFighter {
 
         HighLevelFighter {
             name: fighter.cased_name.clone(),
-            attributes: attributes.unwrap(),
+            attributes: fighter_data.unwrap().attributes.clone(),
             actions,
+            ledge_grabs: fighter_data.unwrap().misc.ledge_grabs.clone(),
         }
     }
 
-    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: i32) {
+    /// Modifies, in place, the matrices of the passed tree of bones, to follow that of the specified animation frame
+    /// Returns the MOVES_CHARACTER offset if enabled.
+    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> Option<Vector3<f32>> {
+        let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
+
         bone.transform = parent_transform;
+        let mut offset = None;
         for chr0_child in &chr0.children {
-            if chr0_child.name == bone.name {
-                bone.transform = bone.transform * chr0_child.get_transform(chr0.loop_value, frame);
+            let transform = bone.transform * chr0_child.get_transform(chr0.loop_value, frame);
+            if moves_character && bone.name == "TransN" {
+                offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
+                // TODO: Should this case modify bone.transform rot and scale?
+            }
+            else if chr0_child.name == bone.name {
+                bone.transform = transform;
             }
         }
 
         for child in bone.children.iter_mut() {
-            HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame);
+            if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame, animation_flags) {
+                offset = Some(result);
+            }
         }
+        offset
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct HighLevelAction {
-    pub name:   String,
-    pub iasa:   usize,
-    pub frames: Vec<HighLevelFrame>
+    pub name:            String,
+    pub iasa:            usize,
+    pub frames:          Vec<HighLevelFrame>,
+    pub animation_flags: AnimationFlags,
 }
 
 #[derive(Clone, Debug)]
 pub struct HighLevelFrame {
-    pub hurt_boxes: Vec<HighLevelHurtBox>
+    pub hurt_boxes:         Vec<HighLevelHurtBox>,
+    pub animation_velocity: Option<Vector3<f32>>,
 }
 
 #[derive(Clone, Debug)]

@@ -223,7 +223,7 @@ pub enum HurtBoxZone {
 }
 
 pub const LEDGE_GRAB_SIZE: usize = 0x10;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct LedgeGrab {
     pub x: f32,
     pub y: f32,

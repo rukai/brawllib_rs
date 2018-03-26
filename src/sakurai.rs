@@ -5,11 +5,11 @@ use misc_section::MiscSection;
 use misc_section;
 
 pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
-    let size                      = (&data[0..4]).read_i32::<BigEndian>().unwrap();
-    let lookup_offset             = (&data[4..8]).read_i32::<BigEndian>().unwrap();
-    let lookup_entry_count        = (&data[8..12]).read_i32::<BigEndian>().unwrap();
-    let section_count             = (&data[12..16]).read_i32::<BigEndian>().unwrap();
-    let external_subroutine_count = (&data[16..20]).read_i32::<BigEndian>().unwrap();
+    let size                      = (&data[0x0..]).read_i32::<BigEndian>().unwrap();
+    let lookup_offset             = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
+    let lookup_entry_count        = (&data[0x8..]).read_i32::<BigEndian>().unwrap();
+    let section_count             = (&data[0xc..]).read_i32::<BigEndian>().unwrap();
+    let external_subroutine_count = (&data[0x10..]).read_i32::<BigEndian>().unwrap();
     let mut sections = vec!();
 
     let lookup_entries_index = ARC_SAKURAI_HEADER_SIZE + lookup_offset as usize;
@@ -22,48 +22,107 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
         let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
         let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
         let name = String::from(util::parse_str(&data[string_table_index + string_offset as usize ..]).unwrap());
-        let mut section_data = SectionData::None;
-
-        if &name == "data" {
-            let header = arc_fighter_data(&data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize ..]);
-            let attributes = fighter_attributes(&data[ARC_SAKURAI_HEADER_SIZE + header.attribute_start as usize ..]);
-            let misc = misc_section::misc_section(&data[ARC_SAKURAI_HEADER_SIZE + header.misc_section_offset as usize ..], &data[ARC_SAKURAI_HEADER_SIZE ..]);
-            section_data = SectionData::FighterData { header, attributes, misc };
-        }
+        let section_data = if &name == "data" {
+            SectionData::FighterData(arc_fighter_data(&data[ARC_SAKURAI_HEADER_SIZE ..], &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize ..]))
+        } else {
+            SectionData::None
+        };
         sections.push(ArcSakuraiSection { data_offset, string_offset, name, data: section_data });
     }
 
     ArcSakurai { size, lookup_offset, lookup_entry_count, section_count, external_subroutine_count, sections }
 }
 
-fn arc_fighter_data(data: &[u8]) -> ArcFighterData {
+struct OffsetSizePair {
+    offset: usize,
+    size: usize,
+}
+
+fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
+    let mut pairs = vec!();
+    for i in 0..27 {
+        pairs.push(OffsetSizePair {
+            offset: (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize,
+            size: 0
+        });
+    }
+
+    pairs.sort_by_key(|x| x.offset);
+
+    for i in 0..26 {
+        pairs[i].size = pairs[i + 1].offset - pairs[i].offset;
+    }
+
+    pairs
+}
+
+fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
+    let sub_action_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
+    let model_visibility_start     = (&data[4..]).read_i32::<BigEndian>().unwrap();
+    let attribute_start            = (&data[8..]).read_i32::<BigEndian>().unwrap();
+    let sse_attribute_start        = (&data[12..]).read_i32::<BigEndian>().unwrap();
+    let misc_section_offset        = (&data[16..]).read_i32::<BigEndian>().unwrap();
+    let common_action_flags_start  = (&data[20..]).read_i32::<BigEndian>().unwrap();
+    let action_flags_start         = (&data[24..]).read_i32::<BigEndian>().unwrap();
+    let _unknown0                  = (&data[28..]).read_i32::<BigEndian>().unwrap();
+    let action_interrupts          = (&data[32..]).read_i32::<BigEndian>().unwrap();
+    let entry_actions_start        = (&data[36..]).read_i32::<BigEndian>().unwrap();
+    let exit_actions_start         = (&data[40..]).read_i32::<BigEndian>().unwrap();
+    let action_pre_start           = (&data[44..]).read_i32::<BigEndian>().unwrap();
+    let sub_action_main_start      = (&data[48..]).read_i32::<BigEndian>().unwrap();
+    let sub_action_gfx_start       = (&data[52..]).read_i32::<BigEndian>().unwrap();
+    let sub_action_sfx_start       = (&data[56..]).read_i32::<BigEndian>().unwrap();
+    let sub_action_other_start     = (&data[60..]).read_i32::<BigEndian>().unwrap();
+    let anchored_item_positions    = (&data[64..]).read_i32::<BigEndian>().unwrap();
+    let gooey_bomb_positions       = (&data[58..]).read_i32::<BigEndian>().unwrap();
+    let bone_ref1                  = (&data[72..]).read_i32::<BigEndian>().unwrap();
+    let bone_ref2                  = (&data[76..]).read_i32::<BigEndian>().unwrap();
+    let entry_action_overrides     = (&data[80..]).read_i32::<BigEndian>().unwrap();
+    let exit_action_overrides      = (&data[84..]).read_i32::<BigEndian>().unwrap();
+    let _unknown1                  = (&data[88..]).read_i32::<BigEndian>().unwrap();
+    let samus_arm_cannon_positions = (&data[92..]).read_i32::<BigEndian>().unwrap();
+    let _unknown2                  = (&data[96..]).read_i32::<BigEndian>().unwrap();
+    let static_articles_start      = (&data[100..]).read_i32::<BigEndian>().unwrap();
+    let entry_articles_start       = (&data[104..]).read_i32::<BigEndian>().unwrap();
+    let flags1                     = (&data[116..]).read_u32::<BigEndian>().unwrap();
+    let flags2                     = (&data[120..]).read_i32::<BigEndian>().unwrap();
+
+    let sizes = get_sizes(data);
+
+    let sub_action_flags_num = sizes.iter().find(|x| x.offset == sub_action_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
+    let sub_action_flags = sub_action_flags(parent_data, &parent_data[sub_action_flags_start as usize ..], sub_action_flags_num);
+    let action_flags_num = sizes.iter().find(|x| x.offset == action_flags_start as usize).unwrap().size / ACTION_FLAGS_SIZE;
+    let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
+    let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
+    let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);
+
     ArcFighterData {
-        subaction_flags_start:      (&data[0..]).read_i32::<BigEndian>().unwrap(),
-        model_visibility_start:     (&data[4..]).read_i32::<BigEndian>().unwrap(),
-        attribute_start:            (&data[8..]).read_i32::<BigEndian>().unwrap(),
-        sse_attribute_start:        (&data[12..]).read_i32::<BigEndian>().unwrap(),
-        misc_section_offset:        (&data[16..]).read_i32::<BigEndian>().unwrap(),
-        common_action_flags_start:  (&data[20..]).read_i32::<BigEndian>().unwrap(),
-        action_flags_start:         (&data[24..]).read_i32::<BigEndian>().unwrap(),
-        action_interrupts:          (&data[32..]).read_i32::<BigEndian>().unwrap(),
-        entry_actions_start:        (&data[36..]).read_i32::<BigEndian>().unwrap(),
-        exit_actions_start:         (&data[40..]).read_i32::<BigEndian>().unwrap(),
-        action_pre_start:           (&data[44..]).read_i32::<BigEndian>().unwrap(),
-        subaction_main_start:       (&data[48..]).read_i32::<BigEndian>().unwrap(),
-        subaction_gfx_start:        (&data[52..]).read_i32::<BigEndian>().unwrap(),
-        subaction_sfx_start:        (&data[56..]).read_i32::<BigEndian>().unwrap(),
-        subaction_other_start:      (&data[60..]).read_i32::<BigEndian>().unwrap(),
-        anchored_item_positions:    (&data[64..]).read_i32::<BigEndian>().unwrap(),
-        gooey_bomb_positions:       (&data[58..]).read_i32::<BigEndian>().unwrap(),
-        bone_ref1:                  (&data[72..]).read_i32::<BigEndian>().unwrap(),
-        bone_ref2:                  (&data[76..]).read_i32::<BigEndian>().unwrap(),
-        entry_action_overrides:     (&data[80..]).read_i32::<BigEndian>().unwrap(),
-        exit_action_overrides:      (&data[84..]).read_i32::<BigEndian>().unwrap(),
-        samus_arm_cannon_positions: (&data[92..]).read_i32::<BigEndian>().unwrap(),
-        static_articles_start:      (&data[100..]).read_i32::<BigEndian>().unwrap(),
-        entry_articles_start:       (&data[104..]).read_i32::<BigEndian>().unwrap(),
-        flags1:                     (&data[116..]).read_u32::<BigEndian>().unwrap(),
-        flags2:                     (&data[120..]).read_i32::<BigEndian>().unwrap(),
+        sub_action_flags,
+        attributes,
+        misc,
+        action_flags,
+        model_visibility_start,
+        sse_attribute_start,
+        common_action_flags_start,
+        action_interrupts,
+        entry_actions_start,
+        exit_actions_start,
+        action_pre_start,
+        sub_action_main_start,
+        sub_action_gfx_start,
+        sub_action_sfx_start,
+        sub_action_other_start,
+        anchored_item_positions,
+        gooey_bomb_positions,
+        bone_ref1,
+        bone_ref2,
+        entry_action_overrides,
+        exit_action_overrides,
+        samus_arm_cannon_positions,
+        static_articles_start,
+        entry_articles_start,
+        flags1,
+        flags2,
     }
 }
 
@@ -167,28 +226,28 @@ pub struct ArcSakuraiSection {
 
 #[derive(Debug)]
 pub enum SectionData {
-    FighterData { header: ArcFighterData, attributes: FighterAttributes, misc: MiscSection },
+    FighterData (ArcFighterData),
     None,
 }
 
 const _ARC_FIGHTER_DATA_HEADER_SIZE: usize = 0x7c;
 #[derive(Debug)]
 pub struct ArcFighterData {
-    subaction_flags_start: i32,
+    pub sub_action_flags: Vec<SubActionFlags>,
+    pub attributes: FighterAttributes,
+    pub misc: MiscSection,
+    pub action_flags: Vec<ActionFlags>,
     model_visibility_start: i32,
-    attribute_start: i32,
     sse_attribute_start: i32,
-    misc_section_offset: i32,
     common_action_flags_start: i32,
-    action_flags_start: i32,
     action_interrupts: i32,
     entry_actions_start: i32,
     exit_actions_start: i32,
     action_pre_start: i32,
-    subaction_main_start: i32,
-    subaction_gfx_start: i32,
-    subaction_sfx_start: i32,
-    subaction_other_start: i32,
+    sub_action_main_start: i32,
+    sub_action_gfx_start: i32,
+    sub_action_sfx_start: i32,
+    sub_action_other_start: i32,
     anchored_item_positions: i32,
     gooey_bomb_positions: i32,
     bone_ref1: i32,
@@ -280,7 +339,7 @@ pub struct FighterAttributes {
 }
 
 bitflags! {
-    pub struct AnimationFlags: u32 {
+    pub struct AnimationFlags: u8 {
         const NONE                      = 0x0;
         const NO_OUT_TRANSITION         = 0x1;
         const LOOP                      = 0x2;
@@ -293,18 +352,71 @@ bitflags! {
     }
 }
 
-struct SubActionFlags {
-    in_translation_time: u8,
-    animation_flags: AnimationFlags,
-    pad: u16,
-    string_offset: i32
+fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubActionFlags> {
+    let mut result = vec!();
+    let num = num + 1;
+    for i in 0..num {
+        let in_translation_time = data[i * SUB_ACTION_FLAGS_SIZE + 0];
+        let animation_flags_int = data[i * SUB_ACTION_FLAGS_SIZE + 1];
+        //  padding             (&data[i * SUB_ACTION_FLAGS_SIZE + 2..]).read_u16
+        let string_offset =     (&data[i * SUB_ACTION_FLAGS_SIZE + 4..]).read_i32::<BigEndian>().unwrap();
+
+        let animation_flags = AnimationFlags::from_bits(animation_flags_int).unwrap();
+        let name = if string_offset == 0 {
+            String::new()
+        } else {
+            util::parse_str(&parent_data[string_offset as usize ..]).unwrap().to_string()
+        };
+
+        result.push(SubActionFlags {
+            in_translation_time,
+            animation_flags,
+            name,
+        });
+    }
+    result
 }
 
-struct ActionFlags {
-    flag1: i32,
-    flag2: i32,
-    flag3: i32,
-    flag4: i32
+const SUB_ACTION_FLAGS_SIZE: usize = 0x8;
+#[derive(Debug)]
+pub struct SubActionFlags {
+    pub in_translation_time: u8,
+    pub animation_flags:     AnimationFlags,
+    pub name:                String,
 }
 
-// TODO: struct MoveDefActionFlagsNode // commented out but seems to be for CommonActionFlags
+// TODO: This is also a thing but I wont worry about it for now.
+// I think it will go in a top level mod script
+//struct SubActionEntry {
+//    animation_flags:     AnimationFlags,
+//    in_translation_time: u8,
+//    string_offset:       i32,
+//    main:                Script,
+//    sfx:                 Script,
+//    gfx:                 Script,
+//    other:               Script,
+//}
+//
+//struct Script { }
+
+fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {
+    let mut result = vec!();
+    for i in 0..num {
+        result.push(ActionFlags {
+            flag1: (&data[i * ACTION_FLAGS_SIZE + 0x0..]).read_u32::<BigEndian>().unwrap(),
+            flag2: (&data[i * ACTION_FLAGS_SIZE + 0x4..]).read_u32::<BigEndian>().unwrap(),
+            flag3: (&data[i * ACTION_FLAGS_SIZE + 0x8..]).read_u32::<BigEndian>().unwrap(),
+            flag4: (&data[i * ACTION_FLAGS_SIZE + 0xc..]).read_u32::<BigEndian>().unwrap(),
+        });
+    }
+    result
+}
+
+const ACTION_FLAGS_SIZE: usize = 0x10;
+#[derive(Debug)]
+pub struct ActionFlags {
+    pub flag1: u32,
+    pub flag2: u32,
+    pub flag3: u32,
+    pub flag4: u32,
+}
