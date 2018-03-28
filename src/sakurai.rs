@@ -1,8 +1,10 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use util;
 use misc_section::MiscSection;
 use misc_section;
+use script::Script;
+use script;
+use util;
 
 pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     let size                      = (&data[0x0..]).read_i32::<BigEndian>().unwrap();
@@ -41,17 +43,21 @@ struct OffsetSizePair {
 fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
     let mut pairs = vec!();
     for i in 0..27 {
-        pairs.push(OffsetSizePair {
-            offset: (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize,
-            size: 0
-        });
+        let offset = (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize;
+        if offset != 0 {
+            pairs.push(OffsetSizePair { offset, size: 0 });
+        }
     }
 
     pairs.sort_by_key(|x| x.offset);
 
-    for i in 0..26 {
-        pairs[i].size = pairs[i + 1].offset - pairs[i].offset;
+    // fill in size for most elements
+    for i in 0..pairs.len()-1 {
+        pairs[i].size = pairs[i + 1].offset - pairs[i].offset
     }
+
+    // Just pop the last element, so if we try to access it we get a panic
+    pairs.pop();
 
     pairs
 }
@@ -91,8 +97,20 @@ fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
 
     let sub_action_flags_num = sizes.iter().find(|x| x.offset == sub_action_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
     let sub_action_flags = sub_action_flags(parent_data, &parent_data[sub_action_flags_start as usize ..], sub_action_flags_num);
+
     let action_flags_num = sizes.iter().find(|x| x.offset == action_flags_start as usize).unwrap().size / ACTION_FLAGS_SIZE;
     let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
+
+    let entry_actions_num = sizes.iter().find(|x| x.offset == entry_actions_start as usize).unwrap().size / 4; // divide by integer size
+    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num);
+    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num);
+
+    let sub_action_main_num = sizes.iter().find(|x| x.offset == sub_action_main_start as usize).unwrap().size / 4; // divide by integer size
+    let sub_action_main = script::scripts(parent_data, &parent_data[sub_action_main_start as usize ..], sub_action_main_num);
+    let sub_action_gfx = script::scripts(parent_data, &parent_data[sub_action_gfx_start as usize ..], sub_action_main_num);
+    let sub_action_sfx = script::scripts(parent_data, &parent_data[sub_action_sfx_start as usize ..], sub_action_main_num);
+    let sub_action_other = script::scripts(parent_data, &parent_data[sub_action_other_start as usize ..], sub_action_main_num);
+
     let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
     let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);
 
@@ -101,17 +119,17 @@ fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
         attributes,
         misc,
         action_flags,
+        entry_actions,
+        exit_actions,
+        sub_action_main,
+        sub_action_gfx,
+        sub_action_sfx,
+        sub_action_other,
         model_visibility_start,
         sse_attribute_start,
         common_action_flags_start,
         action_interrupts,
-        entry_actions_start,
-        exit_actions_start,
         action_pre_start,
-        sub_action_main_start,
-        sub_action_gfx_start,
-        sub_action_sfx_start,
-        sub_action_other_start,
         anchored_item_positions,
         gooey_bomb_positions,
         bone_ref1,
@@ -237,17 +255,17 @@ pub struct ArcFighterData {
     pub attributes: FighterAttributes,
     pub misc: MiscSection,
     pub action_flags: Vec<ActionFlags>,
+    pub entry_actions: Vec<Script>,
+    pub exit_actions: Vec<Script>,
+    pub sub_action_main: Vec<Script>,
+    pub sub_action_gfx: Vec<Script>,
+    pub sub_action_sfx: Vec<Script>,
+    pub sub_action_other: Vec<Script>,
     model_visibility_start: i32,
     sse_attribute_start: i32,
     common_action_flags_start: i32,
     action_interrupts: i32,
-    entry_actions_start: i32,
-    exit_actions_start: i32,
     action_pre_start: i32,
-    sub_action_main_start: i32,
-    sub_action_gfx_start: i32,
-    sub_action_sfx_start: i32,
-    sub_action_other_start: i32,
     anchored_item_positions: i32,
     gooey_bomb_positions: i32,
     bone_ref1: i32,
@@ -384,20 +402,6 @@ pub struct SubActionFlags {
     pub animation_flags:     AnimationFlags,
     pub name:                String,
 }
-
-// TODO: This is also a thing but I wont worry about it for now.
-// I think it will go in a top level mod script
-//struct SubActionEntry {
-//    animation_flags:     AnimationFlags,
-//    in_translation_time: u8,
-//    string_offset:       i32,
-//    main:                Script,
-//    sfx:                 Script,
-//    gfx:                 Script,
-//    other:               Script,
-//}
-//
-//struct Script { }
 
 fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {
     let mut result = vec!();
