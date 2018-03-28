@@ -73,14 +73,14 @@ fn arguments(parent_data: &[u8], event_id: usize, argument_offset: usize, num_ar
     arguments
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Script {
     events: Vec<Event>
 }
 
 // Events are like lines of code in a script
 const EVENT_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Event {
     namespace: u8,
     code: u8,
@@ -89,15 +89,76 @@ pub struct Event {
 }
 
 impl Event {
-    pub fn id(&self) -> u32 {
+    pub fn raw_id(&self) -> u32 {
         let num_args = self.arguments.len();
         assert!(num_args < 0x100);
-        (self.namespace as u32) << 24 | (self.code as u32) << 16 | num_args as u32
+        (self.namespace as u32) << 24 | (self.code as u32) << 16 | (num_args as u32) << 8
+    }
+
+    // TODO: PRETTY SURE I HAVE TO PROCESS THIS AS I LOAD IT RATHER THEN LAZY,
+    //       THIS IS BECAUSE I DONT KNOW THE DATATYPE e.g. FLOAT/I32 UNTIL I KNOW THE EVENTID
+    pub fn id(&self) -> EventId {
+        let args = &self.arguments;
+        match (self.namespace, self.code, args.len()) {
+            (0x00, 0x01, 0x01) => EventId::SyncWait (args[0]),
+            (0x00, 0x02, 0x00) => EventId::Nop,
+            (0x00, 0x02, 0x01) => EventId::AsyncWait (args[0]),
+            (0x06, 0x00, 0x0D) => EventId::OffensiveCollision {
+                bone: 0,
+                damage: 0,
+                trajectory: 0,
+                weight_knockback: 0,
+                kbg: 0,
+                shield_damage: 0,
+                bkb: 0,
+                size: 0.0,
+                x_offset: 0.0,
+                y_offset: 0.0,
+                z_offset: 0.0,
+                tripping_rate: 0,
+                hitlag_mult: 0,
+                di_mult: 0,
+                flags: HitBoxFlags { },
+            },
+            _ => EventId::Unknown,
+        }
     }
 }
 
-const ARGUMENT_SIZE: usize = 0x8;
 #[derive(Debug)]
+pub enum EventId {
+    // #[EventType(namespace=0,code=1)]
+    SyncWait (i32),
+    Nop,
+    AsyncWait (i32),
+    SetLoop,
+    ExecuteLoop,
+    SubRoutine,
+    OffensiveCollision {
+        bone: i32,
+        damage: i32,
+        trajectory: i32,
+        weight_knockback: i16,
+        kbg: i16,
+        shield_damage: i16,
+        bkb: i16,
+        size: f32,
+        x_offset: f32,
+        y_offset: f32,
+        z_offset: f32,
+        tripping_rate: i32,
+        hitlag_mult: i32,
+        di_mult: i32,
+        flags: HitBoxFlags
+    },
+    Unknown,
+}
+
+#[derive(Debug)]
+pub struct HitBoxFlags { }
+
+const ARGUMENT_SIZE: usize = 0x8;
+#[derive(Clone, Debug)]
 pub enum Argument {
     HitBoxFlags (i32),
     SpecialHitboxFlags (i32),

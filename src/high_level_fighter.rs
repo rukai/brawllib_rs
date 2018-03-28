@@ -7,6 +7,7 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{SectionData, FighterAttributes, AnimationFlags};
+use script::Script;
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -166,11 +167,14 @@ impl HighLevelFighter {
                     // Need to take hitbox from previous frame and interpolate into this frame
                 }
 
+                let script = 0;
+
                 let action = HighLevelAction {
                     name: chr0.name.clone(),
                     iasa: 0,
                     frames,
-                    animation_flags
+                    animation_flags,
+                    script,
                 };
                 actions.push(action);
             }
@@ -217,6 +221,7 @@ pub struct HighLevelAction {
     pub iasa:            usize,
     pub frames:          Vec<HighLevelFrame>,
     pub animation_flags: AnimationFlags,
+    pub script:          Script,
 }
 
 #[derive(Clone, Debug)]
