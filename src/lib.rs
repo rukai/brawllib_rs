@@ -35,5 +35,6 @@ pub mod misc_section;
 pub mod resources;
 pub mod sakurai;
 pub mod script;
+pub mod script_ast;
 mod math;
 mod util;

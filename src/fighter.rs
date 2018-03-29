@@ -130,7 +130,10 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
     }
 
     if let Some(cased_name) = cased_name {
-        if cased_name != "ZakoBoy" && cased_name != "ZakoGirl" && cased_name != "ZakoChild" && cased_name != "ZakoBall" { // TODO: Figure out why these dont work
+        if cased_name == "ZakoBoy" || cased_name == "ZakoGirl" || cased_name == "ZakoChild" || cased_name == "ZakoBall" {
+            error!("Can't load: {} (unfixed bug)", cased_name);
+            None
+        } else {
             let mut data = HashMap::new();
             for data_path in fs::read_dir(&fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
@@ -139,9 +142,6 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
                 data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
             }
             Some(FighterData { cased_name, data })
-        } else {
-            error!("Cant load: {} (unfixed bug)", cased_name);
-            None
         }
     } else { None }
 }

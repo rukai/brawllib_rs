@@ -7,7 +7,8 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{SectionData, FighterAttributes, AnimationFlags};
-use script::Script;
+use script_ast::ScriptAst;
+use script_ast;
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -122,7 +123,7 @@ impl HighLevelFighter {
             for chr0 in chr0s {
                 // TODO: DELETE THIS
                 //if chr0.name == "AttackAirHi" {
-                if chr0.name == "AttackS4S" {
+                if chr0.name == "AttackS4S" && false {
                 //if chr0.name == "AttackAirB" {
                 //if chr0.name == "Wait1" {
                     //println!("{:#?}", chr0);
@@ -134,11 +135,24 @@ impl HighLevelFighter {
                     }
                 }
 
-                let animation_flags = if let Some(sub_action) = fighter_data.unwrap().sub_action_flags.iter().find(|x| x.name == chr0.name) {
-                    sub_action.animation_flags.clone()
-                } else {
-                    AnimationFlags::NONE
-                };
+                let mut animation_flags = None;
+                let mut scripts = None;
+                if let Some(fighter_data) = fighter_data {
+                    for i in 0..fighter_data.sub_action_main.len() {
+                        let sub_action_flags = &fighter_data.sub_action_flags[i];
+                        if sub_action_flags.name == chr0.name {
+                            animation_flags = Some(sub_action_flags.animation_flags.clone());
+                            scripts = Some(HighLevelScripts {
+                                script_main:  script_ast::script_ast(&fighter_data.sub_action_main[i].events),
+                                script_gfx:   script_ast::script_ast(&fighter_data.sub_action_gfx[i].events),
+                                script_sfx:   script_ast::script_ast(&fighter_data.sub_action_sfx[i].events),
+                                script_other: script_ast::script_ast(&fighter_data.sub_action_other[i].events),
+                            });
+                        }
+                    }
+                }
+                let animation_flags = animation_flags.unwrap_or(AnimationFlags::NONE);
+                println!("{:#?}", scripts);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_offset = None;
@@ -167,14 +181,12 @@ impl HighLevelFighter {
                     // Need to take hitbox from previous frame and interpolate into this frame
                 }
 
-                let script = 0;
-
                 let action = HighLevelAction {
                     name: chr0.name.clone(),
                     iasa: 0,
                     frames,
                     animation_flags,
-                    script,
+                    scripts,
                 };
                 actions.push(action);
             }
@@ -221,7 +233,15 @@ pub struct HighLevelAction {
     pub iasa:            usize,
     pub frames:          Vec<HighLevelFrame>,
     pub animation_flags: AnimationFlags,
-    pub script:          Script,
+    pub scripts:         Option<HighLevelScripts>,
+}
+
+#[derive(Clone, Debug)]
+pub struct HighLevelScripts {
+    pub script_main:  ScriptAst,
+    pub script_gfx:   ScriptAst,
+    pub script_sfx:   ScriptAst,
+    pub script_other: ScriptAst,
 }
 
 #[derive(Clone, Debug)]
