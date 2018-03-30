@@ -7,8 +7,9 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{SectionData, FighterAttributes, AnimationFlags};
-use script_ast::ScriptAst;
+use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments};
 use script_ast;
+use script_runner::ScriptRunner;
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -152,17 +153,17 @@ impl HighLevelFighter {
                     }
                 }
                 let animation_flags = animation_flags.unwrap_or(AnimationFlags::NONE);
-                println!("{:#?}", scripts);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_offset = None;
-                for frame in 0..chr0.num_frames {
+                let mut script_runner = ScriptRunner::new();
+                let mut iasa = None;
+                while (script_runner.frame_index as u16) < chr0.num_frames {
                     let mut first_bone = first_bone.clone();
-                    let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, frame as i32, animation_flags);
-                    let hurt_boxes = HighLevelHurtBox::gen_hurt_boxes(
-                        &first_bone,
-                        &fighter_data.unwrap().misc.hurt_boxes,
-                    );
+                    let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, script_runner.frame_index as i32, animation_flags);
+                    let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
+                    let hit_boxes  = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
+                    let special_hit_boxes  = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
                     let animation_velocity = match (prev_offset, next_offset) {
                         (Some(prev_offset), Some(next_offset)) => Some(next_offset - prev_offset),
                         (Some(_),           None)              => unreachable!(),
@@ -173,17 +174,24 @@ impl HighLevelFighter {
 
                     frames.push(HighLevelFrame {
                         hurt_boxes,
+                        hit_boxes,
+                        special_hit_boxes,
                         animation_velocity,
                     });
 
                     // TODO: Hitboxes
                     // Hitboxes are circle at the bone point (appear long because PM debug mode uses interpolation with the previous frames hitbox)
                     // Need to take hitbox from previous frame and interpolate into this frame
+                    if iasa.is_none() && script_runner.interruptible {
+                        iasa = Some(script_runner.frame_index)
+                    }
+
+                    script_runner.step(&scripts);
                 }
 
                 let action = HighLevelAction {
                     name: chr0.name.clone(),
-                    iasa: 0,
+                    iasa: iasa.unwrap_or_default() as usize,
                     frames,
                     animation_flags,
                     scripts,
@@ -247,6 +255,8 @@ pub struct HighLevelScripts {
 #[derive(Clone, Debug)]
 pub struct HighLevelFrame {
     pub hurt_boxes:         Vec<HighLevelHurtBox>,
+    pub hit_boxes:          Vec<HighLevelHitBox>,
+    pub special_hit_boxes:  Vec<HighLevelSpecialHitBox>,
     pub animation_velocity: Option<Vector3<f32>>,
 }
 
@@ -256,23 +266,71 @@ pub struct HighLevelHurtBox {
     pub hurt_box: HurtBox,
 }
 
-impl HighLevelHurtBox {
-    fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {
-        let mut hl_hurt_boxes = vec!();
-        for hurt_box in hurt_boxes {
-            if bone.index == hurt_box.bone_index as i32 {
-                hl_hurt_boxes.push(HighLevelHurtBox {
-                    bone_matrix: bone.transform,
-                    hurt_box: hurt_box.clone(),
-                });
-                break;
-            }
-        }
+#[derive(Clone, Debug)]
+pub struct HighLevelHitBox {
+    pub position: Vector3<f32>,
+    pub hit_box: HitBoxArguments,
+}
 
-        for child in bone.children.iter() {
-            hl_hurt_boxes.extend(HighLevelHurtBox::gen_hurt_boxes(child, hurt_boxes));
-        }
+#[derive(Clone, Debug)]
+pub struct HighLevelSpecialHitBox {
+    pub position: Vector3<f32>,
+    pub hit_box: SpecialHitBoxArguments,
+}
 
-        hl_hurt_boxes
+fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {
+    let mut hl_hurt_boxes = vec!();
+    for hurt_box in hurt_boxes {
+        if bone.index == hurt_box.bone_index as i32 {
+            hl_hurt_boxes.push(HighLevelHurtBox {
+                bone_matrix: bone.transform,
+                hurt_box: hurt_box.clone(),
+            });
+            break;
+        }
     }
+
+    for child in bone.children.iter() {
+        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes));
+    }
+
+    hl_hurt_boxes
+}
+
+fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<HighLevelHitBox> {
+    let mut hl_hit_boxes = vec!();
+    for hit_box in hit_boxes {
+        if bone.index == hit_box.bone_index as i32 {
+            hl_hit_boxes.push(HighLevelHitBox {
+                position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
+                hit_box: hit_box.clone(),
+            });
+            break;
+        }
+    }
+
+    for child in bone.children.iter() {
+        hl_hit_boxes.extend(gen_hit_boxes(child, hit_boxes));
+    }
+
+    hl_hit_boxes
+}
+
+fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<HighLevelSpecialHitBox> {
+    let mut hl_hit_boxes = vec!();
+    for hit_box in hit_boxes {
+        if bone.index == hit_box.hitbox_args.bone_index as i32 {
+            hl_hit_boxes.push(HighLevelSpecialHitBox {
+                position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
+                hit_box: hit_box.clone(),
+            });
+            break;
+        }
+    }
+
+    for child in bone.children.iter() {
+        hl_hit_boxes.extend(gen_special_hit_boxes(child, hit_boxes));
+    }
+
+    hl_hit_boxes
 }
