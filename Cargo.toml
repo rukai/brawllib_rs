@@ -8,3 +8,6 @@ byteorder = "1"
 bitflags = "1"
 cgmath = "0.16"
 log = "0.4"
+
+[dev-dependencies]
+getopts = "0.2"
