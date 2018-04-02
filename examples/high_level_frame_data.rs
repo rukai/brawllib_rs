@@ -122,6 +122,7 @@ fn main() {
                 }
 
                 let mut hl_fighter = HighLevelFighter::new(&fighter);
+
                 // filter by action
                 if let &Some(ref action_filter) = &action_filter {
                     let mut new_actions = vec!();

@@ -11,3 +11,6 @@ log = "0.4"
 
 [dev-dependencies]
 getopts = "0.2"
+
+[profile.release]
+debug = true

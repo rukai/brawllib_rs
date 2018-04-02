@@ -1,5 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::{Vector3, Matrix4};
+use std::iter::Iterator;
 
 use util;
 use resources;
@@ -261,34 +262,34 @@ impl Keyframe {
                 value
             }
             &Keyframe::Interpolated4(ref header) => {
-                let children: Vec<_> = header.children.iter().map(|child| {
+                let children = header.children.iter().map(|child| {
                     InterpolatedNEntry {
                         value: header.base + header.step * child.step() as f32,
                         frame_index: child.frame_index() as i32,
                         tangent: child.tangent() as f32
                     }
-                }).collect();
-                Keyframe::get_value_interpolated_n_entry(&children, loop_value, frame)
+                });
+                Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
             &Keyframe::Interpolated6(ref header) => {
-                let children: Vec<_> = header.children.iter().map(|child| {
+                let children = header.children.iter().map(|child| {
                     InterpolatedNEntry {
                         value: header.base + header.step * child.step as f32,
                         frame_index: child.frame_index(),
                         tangent: child.tangent() as f32
                     }
-                }).collect();
-                Keyframe::get_value_interpolated_n_entry(&children, loop_value, frame)
+                });
+                Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
             &Keyframe::Interpolated12(ref header) => {
-                let children: Vec<_> = header.children.iter().map(|child| {
+                let children = header.children.iter().map(|child| {
                     InterpolatedNEntry {
                         value:       child.value,
                         frame_index: child.frame_index as i32,
                         tangent:     child.tangent,
                     }
-                }).collect();
-                Keyframe::get_value_interpolated_n_entry(&children, loop_value, frame)
+                });
+                Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
             &Keyframe::Linear1(ref header) => {
                 // TODO: Pretty sure I need to interpolate these still to handle non integer frame indexes (currently frame is a usize though so lol)
@@ -315,51 +316,48 @@ impl Keyframe {
     }
 
     /// to be generic we take InterpolatedNEntry's as we can convert all other formats can be converted to this format
-    fn get_value_interpolated_n_entry(children: &[InterpolatedNEntry], loop_value: bool, frame: i32) -> f32 {
-        // NOTE: the loop flag is very rarely used (most looping actions such as run or wait dont even use it)
-        let mut prev_prev: Option<&InterpolatedNEntry> = None; // the keyframe before the keyframe before the current frame
-        let mut prev: Option<&InterpolatedNEntry> = None; // the keyframe before the current frame
-        let mut next: Option<&InterpolatedNEntry> = None; // the keyframe after the current frame
-        let mut next_next: Option<&InterpolatedNEntry> = None; // the keyframe after the keyframe after the current frame
+    fn get_value_interpolated_n_entry<I>(children: I, _loop_value: bool, frame: i32) -> f32 where I: Iterator<Item = InterpolatedNEntry> {
+        // TODO: the loop flag is very rarely used (most looping actions such as run or wait dont even use it)
+        //       But there is a seperate loop flag AnimationFlags which is used often. Maybe that should be used here?
+        let mut prev_prev: Option<InterpolatedNEntry> = None; // the keyframe before the keyframe before the current frame
+        let mut prev:      Option<InterpolatedNEntry> = None; // the keyframe before the current frame
+        let mut next:      Option<InterpolatedNEntry> = None; // the keyframe after the current frame
+        let mut next_next: Option<InterpolatedNEntry> = None; // the keyframe after the keyframe after the current frame
 
-        // find prev and next
         for child in children {
-            if child.frame_index <= frame && prev.map_or(true, |x| child.frame_index > x.frame_index) {
-                prev = Some(child);
-            }
-            if child.frame_index >= frame && next.map_or(true, |x| child.frame_index < x.frame_index) {
-                next = Some(child);
-            }
-        }
-
-        // find prev and next handling looping animations
-        // TODO: Might be broken, brawlbox seems more complicated
-        if loop_value {
-            if prev.is_none() {
-                prev = children.iter().max_by_key(|x| x.frame_index);
-            }
-            if next.is_none() {
-                next = children.iter().min_by_key(|x| x.frame_index);
-            }
-        }
-
-        // find prev_prev and next_next
-        for child in children {
-            if let Some(prev) = prev {
-                if child.frame_index <= prev.frame_index && prev as *const _ != child as *const _ && prev_prev.map_or(true, |x| child.frame_index > x.frame_index) {
-                    prev_prev = Some(child);
+            // The vanilla brawl files always have the children in order of frame_index but that is not true for some modded characters.
+            // All cases I have seen is with trailing children that have frame_index of 0.
+            // Maybe when the animation was modified the modding tool was not able to delete children yet?
+            // So I will just ignore these trailing frame_index == 0 children
+            if let &Some(ref prev) = &prev {
+                if child.frame_index < prev.frame_index {
+                    assert_eq!(child.frame_index, 0);
+                    break;
                 }
             }
-            if let Some(next) = next {
-                if child.frame_index >= next.frame_index && next as *const _ != child as *const _ && next_next.map_or(true, |x| child.frame_index < x.frame_index) {
-                    next_next = Some(child);
+
+            if child.frame_index >= frame {
+                if next.is_none() {
+                    next = Some(child.clone());
+                }
+                else if next_next.is_none() {
+                    next_next = Some(child.clone());
+                }
+            }
+            if child.frame_index <= frame {
+                if let Some(inner_prev) = prev {
+                    prev = Some(child);
+                    prev_prev = Some(inner_prev);
+                }
+                else {
+                    prev = Some(child)
                 }
             }
         }
 
         match (prev, next) {
             (Some(prev), Some(next)) => {
-                if prev as *const _ == next as *const _ { // TODO: Should this be prev.value == next.value
+                if prev.value == next.value && prev.frame_index == next.frame_index { // TODO: check with brawlbox
                     prev.value
                 } else {
                     let one_apart = next.frame_index == prev.frame_index + 1;
@@ -369,7 +367,7 @@ impl Keyframe {
                         false
                     };
                     let next_double = if let Some(next_next) = next_next {
-                        next_next.frame_index >= 0 && next_next.frame_index== next.frame_index + 1
+                        next_next.frame_index >= 0 && next_next.frame_index == next.frame_index + 1
                     } else {
                         false
                     };
@@ -472,7 +470,7 @@ pub struct Interpolated12Entry {
     pub tangent: f32,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct InterpolatedNEntry {
     pub frame_index: i32,
     pub value: f32,

@@ -37,5 +37,5 @@ pub mod sakurai;
 pub mod script;
 pub mod script_ast;
 pub mod script_runner;
-mod math;
+pub mod math;
 mod util;
