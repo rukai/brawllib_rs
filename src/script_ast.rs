@@ -21,21 +21,36 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
             (0x00, 0x0A, Some(&Requirement(v0)), Some(&Value(v1)),     None) => EventAst::IfValue (v0, v1),
             (0x00, 0x0A, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
                 if let Some(&EnumValue(v3)) = args.get(3) {
-                    EventAst::IfComparison (v0, v1, v2, v3)
+                    EventAst::IfComparison (v0, v1, ComparisonOperator::new(v2), v3)
                 } else {
                     EventAst::Unknown
                 }
             }
             (0x00, 0x0E, None,                   None,                 None) => EventAst::Else,
-            // TODO: ...
+            (0x00, 0x0B, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
+                if let Some(&EnumValue(v3)) = args.get(3) {
+                    EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
+                } else {
+                    EventAst::Unknown
+                }
+            }
+            (0x00, 0x0D, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
+                if let Some(&EnumValue(v3)) = args.get(3) {
+                    EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
+                } else {
+                    EventAst::Unknown
+                }
+            }
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
             (0x04, 0x00, Some(&Value(v0)),       Some(&Bool(v1)),      None) =>
                 if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
+            (0x04, 0x07, Some(&Scalar(v0)),      None,                 None) => EventAst::FrameSpeedModifier (v0),
+            (0x0c, 0x23, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::TimeManipulation (v0, v1),
+            (0x0e, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::SetAirGround (v0),
+            (0x08, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::SetEdgeSlide (EdgeSlide::new(v0)),
             (0x05, 0x00, None,                   None,                 None) => EventAst::ReverseDirection,
             (0x06, 0x04, None,                   None,                 None) => EventAst::RemoveAllHitBoxes,
-            // TODO: ...
             (0x64, 0x00, None,                   None,                 None) => EventAst::AllowInterrupt,
-            // TODO: ...
             (0x06, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
@@ -73,7 +88,6 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                     _ => EventAst::Unknown
                 }
             }
-            // TODO: ...
             (0x06, 0x15, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Value(v14))) => {
@@ -181,18 +195,87 @@ pub enum EventAst {
     Subroutine (i32),
     Return,
     Goto (i32),
-    If (i32),
+    If (i32), // TODO: I should probably combine all of these if variants into a higher level structure
     IfValue (i32, i32),
-    IfComparison (i32, i32, i32, i32),
+    IfComparison (i32, i32, ComparisonOperator, i32),
     Else,
+    AndComparison (i32, i32, ComparisonOperator, i32),
+    ElseIfComparison (i32, i32, ComparisonOperator, i32),
     AllowInterrupt,
     ChangeSubAction (i32),
     ChangeSubActionRestartFrame (i32),
+    FrameSpeedModifier (f32),
+    TimeManipulation (i32, i32),
+    SetAirGround (i32),
+    SetEdgeSlide (EdgeSlide),
     ReverseDirection,
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
     RemoveAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
     Unknown,
+}
+
+#[derive(Clone, Debug)]
+pub enum ComparisonOperator {
+    LessThan,
+    LessThanOrEqual,
+    Equal,
+    NotEqual,
+    GreaterThanOrEqual,
+    GreaterThan
+}
+
+impl ComparisonOperator {
+    fn new(value: i32) -> ComparisonOperator {
+        match value {
+            0 => ComparisonOperator::LessThan,
+            1 => ComparisonOperator::LessThanOrEqual,
+            2 => ComparisonOperator::Equal,
+            3 => ComparisonOperator::NotEqual,
+            4 => ComparisonOperator::GreaterThanOrEqual,
+            5 => ComparisonOperator::GreaterThan,
+            _ => panic!("UnknownOperator"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum EdgeSlide {
+    SlideOff,
+    StayOn,
+    Airbourne,
+    Unknown (i32)
+}
+
+impl EdgeSlide {
+    fn new(value: i32) -> EdgeSlide {
+        match value {
+            0 => EdgeSlide::SlideOff,
+            1 => EdgeSlide::StayOn,
+            5 => EdgeSlide::Airbourne,
+            v => EdgeSlide::Unknown (v)
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum AngleFlip {
+    AwayFromAttacker,
+    AttackerDir,
+    AttackerDirReverse,
+    FaceZaxis,
+}
+
+impl AngleFlip {
+    fn new(value: i32) -> AngleFlip {
+        match value {
+            0 | 2 | 5 => AngleFlip::AwayFromAttacker,
+            1 | 3     => AngleFlip::AttackerDir,
+            4         => AngleFlip::AttackerDirReverse,
+            6 | 7     => AngleFlip::FaceZaxis,
+            _ => unreachable!()
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -224,26 +307,6 @@ pub struct HitBoxArguments {
     pub unk4: bool,
     pub direct: bool,
     pub unk5: u8,
-}
-
-#[derive(Clone, Debug)]
-pub enum AngleFlip {
-    AwayFromAttacker,
-    AttackerDir,
-    AttackerDirReverse,
-    FaceZaxis,
-}
-
-impl AngleFlip {
-    fn new(value: i32) -> AngleFlip {
-        match value {
-            0 | 2 | 5 => AngleFlip::AwayFromAttacker,
-            1 | 3     => AngleFlip::AttackerDir,
-            4         => AngleFlip::AttackerDirReverse,
-            6 | 7     => AngleFlip::FaceZaxis,
-            _ => unreachable!()
-        }
-    }
 }
 
 #[derive(Clone, Debug)]

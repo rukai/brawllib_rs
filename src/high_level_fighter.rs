@@ -7,7 +7,7 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{SectionData, FighterAttributes, AnimationFlags};
-use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments};
+use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
 use script_ast;
 use script_runner::ScriptRunner;
 
@@ -177,6 +177,9 @@ impl HighLevelFighter {
                         hit_boxes,
                         special_hit_boxes,
                         animation_velocity,
+                        interruptible: script_runner.interruptible,
+                        edge_slide:    script_runner.edge_slide.clone(),
+                        airbourne:     script_runner.airbourne,
                     });
 
                     // TODO: Hitboxes
@@ -258,6 +261,9 @@ pub struct HighLevelFrame {
     pub hit_boxes:          Vec<HighLevelHitBox>,
     pub special_hit_boxes:  Vec<HighLevelSpecialHitBox>,
     pub animation_velocity: Option<Vector3<f32>>,
+    pub interruptible:      bool,
+    pub edge_slide:         EdgeSlide,
+    pub airbourne:          bool,
 }
 
 #[derive(Clone, Debug)]

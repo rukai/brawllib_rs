@@ -21,7 +21,7 @@ pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec
                 }
 
                 // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
-                // and brawlbox just skips arguments on events that have an Id of 0xFADEF00D
+                // and brawlbox just skips arguments on events that have one of these ID's
                 if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
                     let arguments = arguments(parent_data, argument_offset as usize, num_arguments as usize);
                     events.push(Event {

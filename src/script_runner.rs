@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use script_ast::{EventAst, HitBoxArguments, SpecialHitBoxArguments};
+use script_ast::{EventAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
 use high_level_fighter::HighLevelScripts;
 
 pub struct ScriptRunner {
@@ -10,6 +10,9 @@ pub struct ScriptRunner {
     pub interruptible: bool,
     pub hitboxes: Vec<HitBoxArguments>,
     pub special_hitboxes: Vec<SpecialHitBoxArguments>,
+    pub frame_speed_modifier: f32,
+    pub airbourne: bool,
+    pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
 }
 
 impl ScriptRunner {
@@ -22,11 +25,14 @@ impl ScriptRunner {
             interruptible: false,
             hitboxes: vec!(),
             special_hitboxes: vec!(),
+            frame_speed_modifier: 1.0,
+            airbourne: false,
+            edge_slide: EdgeSlide::SlideOff,
         }
     }
 
     pub fn step(&mut self, scripts: &Option<HighLevelScripts>) {
-        self.frame_index += 1.0;
+        self.frame_index += self.frame_speed_modifier;
 
         if let Some(wait_until) = self.wait_until {
             if self.frame_index >= wait_until {
@@ -64,8 +70,20 @@ impl ScriptRunner {
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }
                 &EventAst::Else => { }
+                &EventAst::AndComparison (_, _, _, _)=> { }
+                &EventAst::ElseIfComparison (_, _, _, _)=> { }
                 &EventAst::ChangeSubAction (_) => { }
                 &EventAst::ChangeSubActionRestartFrame (_) => { }
+                &EventAst::FrameSpeedModifier (v0) => {
+                    self.frame_speed_modifier = v0;
+                }
+                &EventAst::TimeManipulation (_, _) => { }
+                &EventAst::SetAirGround (v0) => {
+                    self.airbourne = v0 == 0; // TODO: Seems like brawlbox is incomplete here e.g 36
+                }
+                &EventAst::SetEdgeSlide (ref v0) => {
+                    self.edge_slide = v0.clone();
+                }
                 &EventAst::ReverseDirection => { }
                 &EventAst::CreateHitBox (ref args) => {
                     self.hitboxes.push(args.clone());
@@ -85,5 +103,3 @@ impl ScriptRunner {
         }
     }
 }
-
-pub struct HitBox { }
