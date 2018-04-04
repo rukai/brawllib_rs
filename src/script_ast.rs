@@ -44,6 +44,7 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
             (0x04, 0x00, Some(&Value(v0)),       Some(&Bool(v1)),      None) =>
                 if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
+            (0x06, 0x06, Some(&Scalar(v0)),      None,                 None) => EventAst::SetFrame (v0),
             (0x04, 0x07, Some(&Scalar(v0)),      None,                 None) => EventAst::FrameSpeedModifier (v0),
             (0x0c, 0x23, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::TimeManipulation (v0, v1),
             (0x0e, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::SetAirGround (v0),
@@ -204,6 +205,7 @@ pub enum EventAst {
     AllowInterrupt,
     ChangeSubAction (i32),
     ChangeSubActionRestartFrame (i32),
+    SetFrame (f32),
     FrameSpeedModifier (f32),
     TimeManipulation (i32, i32),
     SetAirGround (i32),

@@ -13,6 +13,14 @@ pub struct ScriptRunner {
     pub frame_speed_modifier: f32,
     pub airbourne: bool,
     pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
+    pub change_sub_action: ChangeSubAction,
+}
+
+pub enum ChangeSubAction {
+    Continue,
+    InfiniteLoop,
+    ChangeSubAction (i32),
+    ChangeSubActionRestartFrame (i32),
 }
 
 impl ScriptRunner {
@@ -28,6 +36,7 @@ impl ScriptRunner {
             frame_speed_modifier: 1.0,
             airbourne: false,
             edge_slide: EdgeSlide::SlideOff,
+            change_sub_action: ChangeSubAction::Continue,
         }
     }
 
@@ -44,6 +53,10 @@ impl ScriptRunner {
             if let &Some(ref scripts) = scripts {
                 self.step_recursive(&scripts.script_main.events);
             }
+        }
+
+        if self.frame_speed_modifier == 0.0 {
+            self.change_sub_action = ChangeSubAction::InfiniteLoop
         }
     }
 
@@ -72,8 +85,15 @@ impl ScriptRunner {
                 &EventAst::Else => { }
                 &EventAst::AndComparison (_, _, _, _)=> { }
                 &EventAst::ElseIfComparison (_, _, _, _)=> { }
-                &EventAst::ChangeSubAction (_) => { }
-                &EventAst::ChangeSubActionRestartFrame (_) => { }
+                &EventAst::ChangeSubAction (v0) => {
+                    self.change_sub_action = ChangeSubAction::ChangeSubAction (v0);
+                }
+                &EventAst::ChangeSubActionRestartFrame (v0) => {
+                    self.change_sub_action = ChangeSubAction::ChangeSubActionRestartFrame (v0);
+                }
+                &EventAst::SetFrame (v0) => {
+                    self.frame_index = v0;
+                }
                 &EventAst::FrameSpeedModifier (v0) => {
                     self.frame_speed_modifier = v0;
                 }

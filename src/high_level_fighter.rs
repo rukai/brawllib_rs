@@ -9,7 +9,7 @@ use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{SectionData, FighterAttributes, AnimationFlags};
 use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
 use script_ast;
-use script_runner::ScriptRunner;
+use script_runner::{ScriptRunner, ChangeSubAction};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -190,6 +190,8 @@ impl HighLevelFighter {
                     }
 
                     script_runner.step(&scripts);
+
+                    if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
                 }
 
                 let action = HighLevelAction {
