@@ -158,12 +158,54 @@ impl HighLevelFighter {
                 let mut prev_offset = None;
                 let mut script_runner = ScriptRunner::new();
                 let mut iasa = None;
+                let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
+                let mut prev_special_hit_boxes: Option<Vec<PositionSpecialHitBox>> = None;
                 while (script_runner.frame_index as u16) < chr0.num_frames {
                     let mut first_bone = first_bone.clone();
                     let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, script_runner.frame_index as i32, animation_flags);
                     let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
-                    let hit_boxes  = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
-                    let special_hit_boxes  = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
+                    let hit_boxes = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
+                    let mut hl_hit_boxes = vec!();
+                    for next in hit_boxes.iter() {
+                        let mut prev = None;
+                        let mut prev_args = None;
+                        if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
+                            for prev_hit_box in prev_hit_boxes {
+                                if prev_hit_box.args.hitbox_index == next.args.hitbox_index {
+                                    prev = Some(prev_hit_box.position);
+                                    prev_args = Some(prev_hit_box.args.clone());
+                                }
+                            }
+                        }
+                        hl_hit_boxes.push(HighLevelHitBox {
+                            prev,
+                            prev_args,
+                            next:      next.position,
+                            next_args: next.args.clone(),
+                        });
+                    }
+
+                    let special_hit_boxes = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
+                    let mut hl_special_hit_boxes = vec!();
+                    for next in special_hit_boxes.iter() {
+                        let mut prev = None;
+                        let mut prev_args = None;
+                        if let &Some(ref prev_hit_boxes) = &prev_special_hit_boxes {
+                            for prev_hit_box in prev_hit_boxes {
+                                if prev_hit_box.args.hitbox_args.hitbox_index == next.args.hitbox_args.hitbox_index {
+                                    prev = Some(prev_hit_box.position);
+                                    prev_args = Some(prev_hit_box.args.clone());
+                                }
+                            }
+                        }
+                        hl_special_hit_boxes.push(HighLevelSpecialHitBox {
+                            prev,
+                            prev_args,
+                            next:      next.position,
+                            next_args: next.args.clone(),
+                        });
+                    }
+
                     let animation_velocity = match (prev_offset, next_offset) {
                         (Some(prev_offset), Some(next_offset)) => Some(next_offset - prev_offset),
                         (Some(_),           None)              => unreachable!(),
@@ -174,22 +216,21 @@ impl HighLevelFighter {
 
                     frames.push(HighLevelFrame {
                         hurt_boxes,
-                        hit_boxes,
-                        special_hit_boxes,
+                        hit_boxes: hl_hit_boxes,
+                        special_hit_boxes: hl_special_hit_boxes,
                         animation_velocity,
                         interruptible: script_runner.interruptible,
                         edge_slide:    script_runner.edge_slide.clone(),
                         airbourne:     script_runner.airbourne,
                     });
 
-                    // TODO: Hitboxes
-                    // Hitboxes are circle at the bone point (appear long because PM debug mode uses interpolation with the previous frames hitbox)
-                    // Need to take hitbox from previous frame and interpolate into this frame
                     if iasa.is_none() && script_runner.interruptible {
                         iasa = Some(script_runner.frame_index)
                     }
 
                     script_runner.step(&scripts);
+                    prev_hit_boxes = Some(hit_boxes);
+                    prev_special_hit_boxes = Some(special_hit_boxes);
 
                     if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
                 }
@@ -275,15 +316,31 @@ pub struct HighLevelHurtBox {
 }
 
 #[derive(Clone, Debug)]
-pub struct HighLevelHitBox {
+struct PositionHitBox {
     pub position: Vector3<f32>,
-    pub hit_box: HitBoxArguments,
+    pub args:     HitBoxArguments,
+}
+
+#[derive(Clone, Debug)]
+struct PositionSpecialHitBox {
+    pub position: Vector3<f32>,
+    pub args:     SpecialHitBoxArguments,
+}
+
+#[derive(Clone, Debug)]
+pub struct HighLevelHitBox {
+    pub prev:      Option<Vector3<f32>>,
+    pub prev_args: Option<HitBoxArguments>,
+    pub next:      Vector3<f32>,
+    pub next_args: HitBoxArguments,
 }
 
 #[derive(Clone, Debug)]
 pub struct HighLevelSpecialHitBox {
-    pub position: Vector3<f32>,
-    pub hit_box: SpecialHitBoxArguments,
+    pub prev:      Option<Vector3<f32>>,
+    pub prev_args: Option<SpecialHitBoxArguments>,
+    pub next:      Vector3<f32>,
+    pub next_args: SpecialHitBoxArguments,
 }
 
 fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {
@@ -305,13 +362,13 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> 
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<HighLevelHitBox> {
+fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<PositionHitBox> {
     let mut hl_hit_boxes = vec!();
     for hit_box in hit_boxes {
         if bone.index == hit_box.bone_index as i32 {
-            hl_hit_boxes.push(HighLevelHitBox {
+            hl_hit_boxes.push(PositionHitBox {
                 position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
-                hit_box: hit_box.clone(),
+                args:     hit_box.clone(),
             });
             break;
         }
@@ -324,13 +381,13 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<HighLevelHit
     hl_hit_boxes
 }
 
-fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<HighLevelSpecialHitBox> {
+fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<PositionSpecialHitBox> {
     let mut hl_hit_boxes = vec!();
     for hit_box in hit_boxes {
         if bone.index == hit_box.hitbox_args.bone_index as i32 {
-            hl_hit_boxes.push(HighLevelSpecialHitBox {
+            hl_hit_boxes.push(PositionSpecialHitBox {
                 position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
-                hit_box: hit_box.clone(),
+                args:     hit_box.clone(),
             });
             break;
         }
