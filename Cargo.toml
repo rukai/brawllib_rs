@@ -6,11 +6,13 @@ authors = ["Rukai <rubickent@gmail.com>"]
 [dependencies]
 byteorder = "1"
 bitflags = "1"
-cgmath = "0.16"
+cgmath = { version = "0.16", features = ["mint"] }
 log = "0.4"
 
 [dev-dependencies]
 getopts = "0.2"
+three = "0.3"
+mint = "0.5"
 
 [profile.release]
 debug = true
