@@ -11,12 +11,22 @@ use three::{
     Window,
     Object,
     Geometry,
+};
+use three::material::{
+    Wireframe,
+    Phong,
     Material,
 };
-use three::material::basic::Basic;
+use three::controls::Key;
 
 use getopts::Options;
-use cgmath::{Matrix4, Zero, Quaternion, Rotation3};
+use cgmath::{
+    Matrix4,
+    Matrix3,
+    Quaternion,
+    Rotation3,
+    Zero,
+};
 
 use std::fs;
 use std::env;
@@ -96,41 +106,153 @@ fn main() {
 fn display_action(action: HighLevelAction, window_name: String) {
     let mut win = Window::new(window_name);
 
+    // setup camera
     let camera = win.factory.perspective_camera(40.0, 1.0 .. 1000.0);
-    camera.set_position([0.0, 15.0, 40.0]);
+    camera.set_position([0.0, 10.0, 60.0]);
 
-    let mut frame = 0;
+    // setup lighting
+    let light = win.factory.point_light(0xffff00, 0.9);
+    light.set_position([0.0, 25.0, 40.0]);
+    win.scene.add(light);
+
+    // setup text
+    let font = win.factory.load_font_karla();
+    let mut text = win.factory.ui_text(&font, "");
+    text.set_font_size(30.0);
+    win.scene.add(&text);
+
+    // state
+    let mut frame_index = 0;
     let mut angle = cgmath::Rad::zero();
+    let mut wireframe = false;
+    let mut wireframe_key = KeyState::None;
+    let mut step_key = KeyState::None;
+    let mut state = State::Play;
+
     while win.update() {
+        // process user input
         if let Some(diff) = win.input.timed(three::AXIS_LEFT_RIGHT) {
             angle -= cgmath::Rad(1.5 * diff);
         }
-        let hurt_box_group = win.factory.group();
 
-        frame += 1;
-        if frame >= action.frames.len() {
-            frame = 0;
+        wireframe_key.update(win.input.hit(Key::Key1));
+        if wireframe_key.is_pressed() {
+            wireframe = !wireframe;
         }
-        let frame = &action.frames[frame];
 
+        step_key.update(win.input.hit(Key::Space));
+        if step_key.is_pressed() {
+            state = State::Step;
+        }
+        if win.input.hit(Key::Return) {
+            state = State::Play;
+        }
+
+        // advance frame
+        if state.frame_advance() {
+            frame_index += 1;
+            if frame_index >= action.frames.len() {
+                frame_index = 0;
+            }
+            text.set_text(format!("frame: {}/{}", frame_index+1, action.frames.len()));
+        }
+        if let State::Step = state {
+            state = State::Pause;
+        }
+
+        // generate hurtboxes
+        let frame = &action.frames[frame_index];
+        let hurt_box_group = win.factory.group();
         for hurt_box in &frame.hurt_boxes {
-            let transform = hurt_box.bone_matrix * Matrix4::<f32>::from_translation(hurt_box.hurt_box.offset);
-
-            let msphere = {
-                let geometry = Geometry::uv_sphere(0.5, 5, 5);
-                let material = three::material::Wireframe { color: 0xFFFF00 };
-                //let material = Material::Basic (Basic {
-                //    color: 0xFFFF00,
-                //    map: None,
-                //});
+            let diameter = hurt_box.hurt_box.radius * 2.0;
+            let stretch = hurt_box.hurt_box.stretch;
+            let transform = hurt_box.bone_matrix * Matrix4::<f32>::from_translation(hurt_box.hurt_box.offset + stretch);
+            let object = {
+                // The cuboid is generated with [0, 0, 0] at the center
+                let geometry = Geometry::cuboid(diameter + stretch.x.abs(), diameter + stretch.y.abs(), diameter + stretch.z.abs());
+                let material: Material = if wireframe {
+                    Material::Wireframe (Wireframe { color: 0xFFFF00 })
+                } else {
+                    Material::Phong (Phong {
+                        color: 0xFFFF00,
+                        glossiness: 80.0,
+                    })
+                };
                 win.factory.mesh(geometry, material)
             };
-            msphere.set_position([transform.w.x, transform.w.y, transform.w.z]);
-            hurt_box_group.add(&msphere);
+
+            let transform3 = Matrix3::new(
+                hurt_box.bone_matrix.x.x,
+                hurt_box.bone_matrix.x.y,
+                hurt_box.bone_matrix.x.z,
+                hurt_box.bone_matrix.y.x,
+                hurt_box.bone_matrix.y.y,
+                hurt_box.bone_matrix.y.z,
+                hurt_box.bone_matrix.z.x,
+                hurt_box.bone_matrix.z.y,
+                hurt_box.bone_matrix.z.z,
+            );
+            let orientation: Quaternion<f32> = transform3.into();
+            object.set_orientation(orientation);
+            object.set_position([transform.w.x, transform.w.y, transform.w.z]);
+
+            hurt_box_group.add(&object);
         }
+
         hurt_box_group.set_orientation(Quaternion::from_angle_y(angle));
         win.scene.add(&hurt_box_group);
         win.render(&camera);
         win.scene.remove(hurt_box_group);
+    }
+}
+
+enum State {
+    Play,
+    Step,
+    Pause,
+}
+
+impl State {
+    fn frame_advance(&self) -> bool {
+        match self {
+            State::Play  => true,
+            State::Step  => true,
+            State::Pause => false,
+        }
+    }
+}
+
+enum KeyState {
+    Press,
+    Hold,
+    None,
+}
+
+impl KeyState {
+    fn update(&mut self, value: bool) {
+        *self = match self {
+            KeyState::Press | KeyState::Hold => {
+                if value {
+                    KeyState::Hold
+                } else {
+                    KeyState::None
+                }
+            }
+            KeyState::None => {
+                if value {
+                    KeyState::Press
+                } else {
+                    KeyState::None
+                }
+            }
+        }
+    }
+
+    fn is_pressed(&self) -> bool {
+        match self {
+            KeyState::Press => true,
+            KeyState::Hold  => false,
+            KeyState::None  => false,
+        }
     }
 }

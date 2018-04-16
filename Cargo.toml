@@ -11,7 +11,7 @@ log = "0.4"
 
 [dev-dependencies]
 getopts = "0.2"
-three = "0.3"
+three = { git = "https://github.com/rukai/three", branch = "default_font" }
 mint = "0.5"
 
 [profile.release]
