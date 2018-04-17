@@ -17,15 +17,13 @@ use three::material::{
     Phong,
     Material,
 };
-use three::controls::Key;
+use three::controls::{Key, Orbit};
 
 use getopts::Options;
 use cgmath::{
     Matrix4,
     Matrix3,
     Quaternion,
-    Rotation3,
-    Zero,
 };
 
 use std::fs;
@@ -106,14 +104,22 @@ fn main() {
 fn display_action(action: HighLevelAction, window_name: String) {
     let mut win = Window::new(window_name);
 
+    // setup orbit
+    let orbit_group = win.factory.group();
+    win.scene.add(&orbit_group);
+    let mut controls = Orbit::builder(&orbit_group)
+        .position([0.0, 0.0, 60.0])
+        .target([0.0, 10.0, 0.0])
+        .build();
+
     // setup camera
     let camera = win.factory.perspective_camera(40.0, 1.0 .. 1000.0);
-    camera.set_position([0.0, 10.0, 60.0]);
+    orbit_group.add(&camera);
 
     // setup lighting
     let light = win.factory.point_light(0xffff00, 0.9);
     light.set_position([0.0, 25.0, 40.0]);
-    win.scene.add(light);
+    orbit_group.add(&light);
 
     // setup text
     let font = win.factory.load_font_karla();
@@ -123,42 +129,62 @@ fn display_action(action: HighLevelAction, window_name: String) {
 
     // state
     let mut frame_index = 0;
-    let mut angle = cgmath::Rad::zero();
     let mut wireframe = false;
     let mut wireframe_key = KeyState::None;
-    let mut step_key = KeyState::None;
+    let mut reset_camera = KeyState::Press; // Need to intiailize the camera
+    let mut step_forward_key = KeyState::None;
+    let mut step_backward_key = KeyState::None;
     let mut state = State::Play;
 
     while win.update() {
-        // process user input
-        if let Some(diff) = win.input.timed(three::AXIS_LEFT_RIGHT) {
-            angle -= cgmath::Rad(1.5 * diff);
-        }
-
         wireframe_key.update(win.input.hit(Key::Key1));
+        reset_camera.update(win.input.hit(Key::Back));
+        step_forward_key.update(win.input.hit(Key::Space) || win.input.hit(Key::Right));
+        step_backward_key.update(win.input.hit(Key::Left));
         if wireframe_key.is_pressed() {
             wireframe = !wireframe;
         }
 
-        step_key.update(win.input.hit(Key::Space));
-        if step_key.is_pressed() {
-            state = State::Step;
+        if reset_camera.is_pressed() {
+            orbit.reset_position();
+        }
+        if step_forward_key.is_pressed() {
+            state = State::StepForward;
+        }
+        if step_backward_key.is_pressed() {
+            state = State::StepBackward;
         }
         if win.input.hit(Key::Return) {
             state = State::Play;
         }
 
         // advance frame
-        if state.frame_advance() {
-            frame_index += 1;
-            if frame_index >= action.frames.len() {
-                frame_index = 0;
+        match state {
+            State::StepForward | State::Play => {
+                frame_index += 1;
+                if frame_index >= action.frames.len() {
+                    frame_index = 0;
+                }
             }
-            text.set_text(format!("frame: {}/{}", frame_index+1, action.frames.len()));
+            State::StepBackward => {
+                if frame_index == 0 {
+                    frame_index = action.frames.len() - 1;
+                } else {
+                    frame_index -= 1
+                }
+            }
+            State::Pause => { }
         }
-        if let State::Step = state {
-            state = State::Pause;
+
+        // TODO: change to if let when stabilised
+        match state {
+            State::StepForward | State::StepBackward => {
+                state = State::Pause;
+            }
+            _ => { }
         }
+
+        text.set_text(format!("frame: {}/{}", frame_index+1, action.frames.len()));
 
         // generate hurtboxes
         let frame = &action.frames[frame_index];
@@ -199,8 +225,8 @@ fn display_action(action: HighLevelAction, window_name: String) {
             hurt_box_group.add(&object);
         }
 
-        hurt_box_group.set_orientation(Quaternion::from_angle_y(angle));
         win.scene.add(&hurt_box_group);
+        controls.update(&win.input);
         win.render(&camera);
         win.scene.remove(hurt_box_group);
     }
@@ -208,18 +234,9 @@ fn display_action(action: HighLevelAction, window_name: String) {
 
 enum State {
     Play,
-    Step,
+    StepForward,
+    StepBackward,
     Pause,
-}
-
-impl State {
-    fn frame_advance(&self) -> bool {
-        match self {
-            State::Play  => true,
-            State::Step  => true,
-            State::Pause => false,
-        }
-    }
 }
 
 enum KeyState {
