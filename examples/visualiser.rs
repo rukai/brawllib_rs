@@ -108,8 +108,8 @@ fn display_action(action: HighLevelAction, window_name: String) {
     let orbit_group = win.factory.group();
     win.scene.add(&orbit_group);
     let mut controls = Orbit::builder(&orbit_group)
-        .position([0.0, 0.0, 60.0])
-        .target([0.0, 10.0, 0.0])
+        .position([0.0, 10.0, 60.0])
+        .target([0.0, 10.01, 0.0])
         .build();
 
     // setup camera
@@ -117,9 +117,12 @@ fn display_action(action: HighLevelAction, window_name: String) {
     orbit_group.add(&camera);
 
     // setup lighting
-    let light = win.factory.point_light(0xffff00, 0.9);
-    light.set_position([0.0, 25.0, 40.0]);
-    orbit_group.add(&light);
+    let point_light = win.factory.point_light(0xffff00, 0.5);
+    point_light.set_position([0.0, 15.0, 0.0]);
+    orbit_group.add(&point_light);
+    let ambient_light = win.factory.ambient_light(0xffff00, 0.0); // TODO: even at 0 intensity its still creating light
+    ambient_light.set_position([0.0, -15.0, 0.0]); // TODO: Leaving this at [0,0,0] leaves a weird effect on marths leg. Which doesnt make sense, ambient light should be global.
+    win.scene.add(&ambient_light);
 
     // setup text
     let font = win.factory.load_font_karla();
@@ -146,7 +149,7 @@ fn display_action(action: HighLevelAction, window_name: String) {
         }
 
         if reset_camera.is_pressed() {
-            orbit.reset_position();
+            controls.reset();
         }
         if step_forward_key.is_pressed() {
             state = State::StepForward;
@@ -186,6 +189,9 @@ fn display_action(action: HighLevelAction, window_name: String) {
 
         text.set_text(format!("frame: {}/{}", frame_index+1, action.frames.len()));
 
+        // TODO: This will need to be heavily modified to display as rounded cubes.
+        //       Render 8 sphere corners then connect them together by planes the length of the stretch value
+        //       of that dimension.
         // generate hurtboxes
         let frame = &action.frames[frame_index];
         let hurt_box_group = win.factory.group();
