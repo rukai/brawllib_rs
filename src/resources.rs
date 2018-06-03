@@ -5,6 +5,7 @@ use util;
 pub(crate) fn resources(data: &[u8]) -> Vec<Resource> {
     let _total_size = (&data[..]).read_i32::<BigEndian>().unwrap();
     let num_children = (&data[4 ..]).read_i32::<BigEndian>().unwrap();
+    assert_eq!(_total_size, (num_children + 1) * RESOURCE_SIZE as i32 + RESOURCE_HEADER_SIZE as i32);
 
     let mut resources = vec!();
     for i in 1..=num_children { // the first child is a dummy so we skip it.

@@ -255,23 +255,28 @@ impl HighLevelFighter {
     }
 
     /// Modifies, in place, the matrices of the passed tree of bones, to follow that of the specified animation frame
-    /// Returns the MOVES_CHARACTER offset if enabled.
+    /// The resulting matrices are independent of its parent bones matrix.
+    /// Returns the MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
     fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> Option<Vector3<f32>> {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
-        bone.transform = parent_transform;
+        // by default the bones tpose transformation is used.
+        bone.transform = parent_transform * bone.gen_transform();
         let mut offset = None;
         for chr0_child in &chr0.children {
-            let transform = bone.transform * chr0_child.get_transform(chr0.loop_value, frame);
+            let transform = parent_transform * chr0_child.get_transform(chr0.loop_value, frame);
+            // in this case TransN is not part of the animation but instead used to move the character in game.
             if moves_character && bone.name == "TransN" {
                 offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
                 // TODO: Should this case modify bone.transform rot and scale?
             }
+            // the animation specifies a transform for this bone, USE IT!
             else if chr0_child.name == bone.name {
                 bone.transform = transform;
             }
         }
 
+        // do the same for all children bones
         for child in bone.children.iter_mut() {
             if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame, animation_flags) {
                 offset = Some(result);
