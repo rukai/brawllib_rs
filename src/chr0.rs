@@ -94,20 +94,6 @@ impl Chr0Child {
         let translation = self.translation.get_value(loop_value, frame, 0.0);
         math::gen_transform(scale, rot, translation)
     }
-
-    pub fn debug_string(&self, loop_value: bool, frames: i32) -> String {
-        let mut result = format!("bone name: {}\n", self.name);
-        for i in 0..frames {
-            if i != 0 {
-                result.push('\n');
-            }
-            result.push_str(&format!("frame: {}\n", i+1));
-            result.push_str(&format!("translation: {:?}\n", self.translation.get_value(loop_value, i, 0.0)));
-            result.push_str(&format!("rot: {:?}\n", self.rot.get_value(loop_value, i, 0.0)));
-            result.push_str(&format!("scale: {:?}\n", self.scale.get_value(loop_value, i, 1.0)));
-        }
-        result
-    }
 }
 
 #[derive(Debug)]
