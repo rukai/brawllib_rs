@@ -1,12 +1,10 @@
 use cgmath::{Vector3, Matrix4, SquareMatrix};
 
-use arc::ArcChildData;
-use bres::BresChildData;
 use chr0::Chr0;
 use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
-use sakurai::{SectionData, FighterAttributes, AnimationFlags};
+use sakurai::{FighterAttributes, AnimationFlags};
 use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
 use script_ast;
 use script_runner::{ScriptRunner, ChangeSubAction};
@@ -24,118 +22,10 @@ pub struct HighLevelFighter {
 impl HighLevelFighter {
     /// Processes data from an &Fighter and stores it in a HighLevelFighter
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
-        // locate fighter data
-        let mut fighter_data = None;
-        for sub_arc in &fighter.moveset.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai (ref data) => {
-                    for section in &data.sections {
-                        if let &SectionData::FighterData (ref fighter_data_ref) = &section.data {
-                            fighter_data = Some(fighter_data_ref);
-                        }
-                    }
-                }
-                _ => { }
-            }
-        }
-
-        // locate bones
-        let mut first_bone: Option<&Bone> = None;
-        if let Some(model) = fighter.models.get(0) {
-            for sub_arc in model.children.iter() {
-                match &sub_arc.data {
-                    &ArcChildData::Arc (_) => {
-                        panic!("Not expecting arc at this level")
-                    }
-                    &ArcChildData::Bres (ref bres) => {
-                        for bres_child in bres.children.iter() {
-                            match &bres_child.data {
-                                &BresChildData::Bres (ref model) => {
-                                    for model_child in model.children.iter() {
-                                        if model_child.name == format!("Fit{}00", fighter.cased_name) {
-                                            match &model_child.data {
-                                                &BresChildData::Mdl0 (ref model) => {
-                                                    first_bone = model.bones.as_ref();
-                                                }
-                                                _ => { }
-                                            }
-                                        }
-                                    }
-                                }
-                                &BresChildData::Mdl0 (_) => {
-                                    panic!("Not expecting Mdl at this level");
-                                }
-                                _ => { }
-                            }
-                        }
-                    }
-                    _ => { }
-                }
-            }
-        }
-
-        // locate animations
-        let mut chr0s: Vec<&Chr0> = vec!();
-        for sub_arc in &fighter.motion.children {
-            match &sub_arc.data {
-                &ArcChildData::Arc (ref arc) => {
-                    for sub_arc in &arc.children {
-                        match &sub_arc.data {
-                            &ArcChildData::Bres (ref bres) => {
-                                for bres_child in bres.children.iter() {
-                                    match &bres_child.data {
-                                        &BresChildData::Bres (ref bres) => {
-                                            for bres_child in bres.children.iter() {
-                                                match &bres_child.data {
-                                                    &BresChildData::Bres (_) => {
-                                                        panic!("Not expecting bres at this level");
-                                                    }
-                                                    &BresChildData::Chr0 (ref chr0) => {
-                                                        chr0s.push(chr0);
-                                                    }
-                                                    _ => { }
-                                                }
-                                            }
-                                        }
-                                        &BresChildData::Chr0 (_) => {
-                                            panic!("Not expecting Chr0 at this level");
-                                        }
-                                        _ => { }
-                                    }
-                                }
-                            }
-                            &ArcChildData::Arc (_) => {
-                                //panic!("Not expecting arc at this level"); // TODO: Whats here
-                            }
-                            _ => { }
-                        }
-                    }
-                }
-                &ArcChildData::Bres (_) => {
-                    panic!("Not expecting bres at this level");
-                }
-                _ => { }
-            }
-        }
-
-        // create fighter actions
+        let fighter_data = fighter.get_fighter_data();
         let mut actions = vec!();
-        if let Some(first_bone) = first_bone {
-            for chr0 in chr0s {
-                // TODO: DELETE THIS
-                //if chr0.name == "AttackAirHi" {
-                if chr0.name == "AttackS4S" && false {
-                //if chr0.name == "AttackAirB" {
-                //if chr0.name == "Wait1" {
-                    //println!("{:#?}", chr0);
-                    println!("animation name: {}", chr0.name);
-                    for child in &chr0.children {
-                        if child.name == "YRotN" {
-                            println!("{}", child.debug_string(chr0.loop_value, chr0.num_frames as i32));
-                        }
-                    }
-                }
-
+        if let Some(first_bone) = fighter.get_bones() {
+            for chr0 in fighter.get_animations() {
                 let mut animation_flags = None;
                 let mut scripts = None;
                 if let Some(fighter_data) = fighter_data {

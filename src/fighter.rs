@@ -4,8 +4,12 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use arc::Arc;
+use arc::{Arc, ArcChildData};
 use arc;
+use bres::BresChildData;
+use chr0::Chr0;
+use mdl0::bones::Bone;
+use sakurai::{SectionData, ArcFighterData};
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -72,6 +76,107 @@ impl Fighter {
             fighters.push(fighter);
         }
         fighters
+    }
+
+    /// retrieves the fighter data
+    pub fn get_fighter_data(&self) -> Option<&ArcFighterData> {
+        for sub_arc in &self.moveset.children {
+            match &sub_arc.data {
+                &ArcChildData::Sakurai (ref data) => {
+                    for section in &data.sections {
+                        if let &SectionData::FighterData (ref fighter_data_ref) = &section.data {
+                            return Some(fighter_data_ref);
+                        }
+                    }
+                }
+                _ => { }
+            }
+        }
+        None
+    }
+
+    /// retrieves the bones from a character model
+    pub fn get_bones(&self) -> Option<&Bone> {
+        if let Some(model) = self.models.get(0) {
+            for sub_arc in model.children.iter() {
+                match &sub_arc.data {
+                    &ArcChildData::Arc (_) => {
+                        panic!("Not expecting arc at this level")
+                    }
+                    &ArcChildData::Bres (ref bres) => {
+                        for bres_child in bres.children.iter() {
+                            match &bres_child.data {
+                                &BresChildData::Bres (ref model) => {
+                                    for model_child in model.children.iter() {
+                                        if model_child.name == format!("Fit{}00", self.cased_name) {
+                                            match &model_child.data {
+                                                &BresChildData::Mdl0 (ref model) => {
+                                                    return model.bones.as_ref();
+                                                }
+                                                _ => { }
+                                            }
+                                        }
+                                    }
+                                }
+                                &BresChildData::Mdl0 (_) => {
+                                    panic!("Not expecting Mdl at this level");
+                                }
+                                _ => { }
+                            }
+                        }
+                    }
+                    _ => { }
+                }
+            }
+        }
+        None
+    }
+
+    /// retrieves the animations for the character model
+    pub fn get_animations(&self) -> Vec<&Chr0> {
+        let mut chr0s: Vec<&Chr0> = vec!();
+        for sub_arc in &self.motion.children {
+            match &sub_arc.data {
+                &ArcChildData::Arc (ref arc) => {
+                    for sub_arc in &arc.children {
+                        match &sub_arc.data {
+                            &ArcChildData::Bres (ref bres) => {
+                                for bres_child in bres.children.iter() {
+                                    match &bres_child.data {
+                                        &BresChildData::Bres (ref bres) => {
+                                            for bres_child in bres.children.iter() {
+                                                match &bres_child.data {
+                                                    &BresChildData::Bres (_) => {
+                                                        panic!("Not expecting bres at this level");
+                                                    }
+                                                    &BresChildData::Chr0 (ref chr0) => {
+                                                        chr0s.push(chr0);
+                                                    }
+                                                    _ => { }
+                                                }
+                                            }
+                                        }
+                                        &BresChildData::Chr0 (_) => {
+                                            panic!("Not expecting Chr0 at this level");
+                                        }
+                                        _ => { }
+                                    }
+                                }
+                            }
+                            &ArcChildData::Arc (_) => {
+                                //panic!("Not expecting arc at this level"); // TODO: Whats here
+                            }
+                            _ => { }
+                        }
+                    }
+                }
+                &ArcChildData::Bres (_) => {
+                    panic!("Not expecting bres at this level");
+                }
+                _ => { }
+            }
+        }
+        chr0s
     }
 }
 
