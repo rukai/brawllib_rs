@@ -104,14 +104,28 @@ impl HighLevelFighter {
                     };
                     prev_offset = next_offset;
 
+                    // TODO: get these from the fighter data
+                    let min_width = 2.0;
+                    let min_height = 2.0;
+
+                    // TODO: figure out how exactly these min values are supposed to work.
+                    let ecb = ECB {
+                        left:   -min_width / 2.0,
+                        right:  min_width / 2.0,
+                        top:    min_height,
+                        bottom: if script_runner.airbourne { min_height } else { 0.0 }
+                    };
+                    let ecb = gen_ecb(&first_bone, &fighter_data.unwrap().misc.ecb_bones, ecb);
+
                     frames.push(HighLevelFrame {
-                        hurt_boxes,
-                        hit_boxes: hl_hit_boxes,
-                        special_hit_boxes: hl_special_hit_boxes,
+                        ecb,
                         animation_velocity,
-                        interruptible: script_runner.interruptible,
-                        edge_slide:    script_runner.edge_slide.clone(),
-                        airbourne:     script_runner.airbourne,
+                        hurt_boxes,
+                        hit_boxes:         hl_hit_boxes,
+                        special_hit_boxes: hl_special_hit_boxes,
+                        interruptible:     script_runner.interruptible,
+                        edge_slide:        script_runner.edge_slide.clone(),
+                        airbourne:         script_runner.airbourne,
                     });
 
                     if iasa.is_none() && script_runner.interruptible {
@@ -202,6 +216,7 @@ pub struct HighLevelFrame {
     pub interruptible:      bool,
     pub edge_slide:         EdgeSlide,
     pub airbourne:          bool,
+    pub ecb:                ECB,
 }
 
 #[derive(Clone, Debug)]
@@ -236,6 +251,41 @@ pub struct HighLevelSpecialHitBox {
     pub prev_args: Option<SpecialHitBoxArguments>,
     pub next:      Vector3<f32>,
     pub next_args: SpecialHitBoxArguments,
+}
+
+#[derive(Clone, Debug)]
+pub struct ECB {
+    pub left:   f32,
+    pub right:  f32,
+    pub top:    f32,
+    pub bottom: f32,
+}
+
+fn gen_ecb(bone: &Bone, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
+    for ecb_bone in ecb_bones {
+        if bone.index == *ecb_bone {
+            let x = bone.transform.w.z;
+            let y = bone.transform.w.y;
+
+            if x < ecb.left {
+                ecb.left = x;
+            }
+            if x > ecb.right {
+                ecb.right = x;
+            }
+            if y < ecb.bottom {
+                ecb.bottom = y;
+            }
+            if y > ecb.top {
+                ecb.top = y;
+            }
+        }
+    }
+
+    for child in bone.children.iter() {
+        ecb = gen_ecb(child, ecb_bones, ecb);
+    }
+    ecb
 }
 
 fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {

@@ -18,6 +18,24 @@ pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     let tether_offset         = (&data[0x44..]).read_i32::<BigEndian>().unwrap();
     let unk18_offset          = (&data[0x48..]).read_i32::<BigEndian>().unwrap();
 
+    // TODO
+    // Located at 0x1E50c in brawl FitPokeZeniGame.pac, there is supposed to be a struct something like this:
+    // struct ECBData {
+    //    bone_count: i32 // 0x00000006
+    //    min_width:  f32 // 0x40800000
+    //    min_height: f32 // 0x40800000
+    //}
+    // However I have no idea how to find that so I'm just going to calculate the length and hardcode the min_width + min_height
+
+    let ecb_offset = unk0_offset as usize + 0x20;
+    let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4;
+    let mut ecb_bones = vec!();
+    if ecb_total < 100 {
+        for i in 0..ecb_total {
+            ecb_bones.push((&parent_data[ecb_offset + i * 4 ..]).read_i32::<BigEndian>().unwrap());
+        }
+    }
+
     let mut final_smash_auras = vec!();
     for i in 0..final_smash_aura_list.count {
         let offset = final_smash_aura_list.start_offset as usize + i as usize * FINAL_SMASH_AURA_SIZE;
@@ -66,7 +84,7 @@ pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     };
 
     MiscSection {
-        unk0_offset,
+        ecb_bones,
         final_smash_auras,
         hurt_boxes,
         ledge_grabs,
@@ -169,7 +187,7 @@ fn unk7(data: &[u8]) -> Unk7 {
 
 #[derive(Debug)]
 pub struct MiscSection {
-    unk0_offset: i32,
+    pub ecb_bones: Vec<i32>,
     pub final_smash_auras: Vec<FinalSmashAura>,
     pub hurt_boxes: Vec<HurtBox>,
     pub ledge_grabs: Vec<LedgeGrab>,
