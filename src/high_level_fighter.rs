@@ -5,7 +5,7 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{FighterAttributes, AnimationFlags};
-use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
+use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
 use script_ast;
 use script_runner::{ScriptRunner, ChangeSubAction};
 
@@ -49,50 +49,29 @@ impl HighLevelFighter {
                 let mut script_runner = ScriptRunner::new();
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
-                let mut prev_special_hit_boxes: Option<Vec<PositionSpecialHitBox>> = None;
                 while (script_runner.frame_index as u16) < chr0.num_frames {
                     let mut first_bone = first_bone.clone();
                     let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, script_runner.frame_index as i32, animation_flags);
                     let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
                     let hit_boxes = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
+                    let special_hit_boxes = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
                     let mut hl_hit_boxes = vec!();
-                    for next in hit_boxes.iter() {
+                    for next in hit_boxes.iter().chain(special_hit_boxes.iter()) {
                         let mut prev = None;
-                        let mut prev_args = None;
+                        let mut prev_values = None;
                         if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
                             for prev_hit_box in prev_hit_boxes {
-                                if prev_hit_box.args.hitbox_index == next.args.hitbox_index {
+                                if prev_hit_box.values.hitbox_index == next.values.hitbox_index {
                                     prev = Some(prev_hit_box.position);
-                                    prev_args = Some(prev_hit_box.args.clone());
+                                    prev_values = Some(prev_hit_box.values.clone());
                                 }
                             }
                         }
                         hl_hit_boxes.push(HighLevelHitBox {
                             prev,
-                            prev_args,
-                            next:      next.position,
-                            next_args: next.args.clone(),
-                        });
-                    }
-
-                    let special_hit_boxes = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
-                    let mut hl_special_hit_boxes = vec!();
-                    for next in special_hit_boxes.iter() {
-                        let mut prev = None;
-                        let mut prev_args = None;
-                        if let &Some(ref prev_hit_boxes) = &prev_special_hit_boxes {
-                            for prev_hit_box in prev_hit_boxes {
-                                if prev_hit_box.args.hitbox_args.hitbox_index == next.args.hitbox_args.hitbox_index {
-                                    prev = Some(prev_hit_box.position);
-                                    prev_args = Some(prev_hit_box.args.clone());
-                                }
-                            }
-                        }
-                        hl_special_hit_boxes.push(HighLevelSpecialHitBox {
-                            prev,
-                            prev_args,
-                            next:      next.position,
-                            next_args: next.args.clone(),
+                            prev_values,
+                            next:        next.position,
+                            next_values: next.values.clone(),
                         });
                     }
 
@@ -122,7 +101,6 @@ impl HighLevelFighter {
                         animation_velocity,
                         hurt_boxes,
                         hit_boxes:         hl_hit_boxes,
-                        special_hit_boxes: hl_special_hit_boxes,
                         interruptible:     script_runner.interruptible,
                         edge_slide:        script_runner.edge_slide.clone(),
                         airbourne:         script_runner.airbourne,
@@ -134,7 +112,6 @@ impl HighLevelFighter {
 
                     script_runner.step(&scripts);
                     prev_hit_boxes = Some(hit_boxes);
-                    prev_special_hit_boxes = Some(special_hit_boxes);
 
                     if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
                 }
@@ -211,7 +188,6 @@ pub struct HighLevelScripts {
 pub struct HighLevelFrame {
     pub hurt_boxes:         Vec<HighLevelHurtBox>,
     pub hit_boxes:          Vec<HighLevelHitBox>,
-    pub special_hit_boxes:  Vec<HighLevelSpecialHitBox>,
     pub animation_velocity: Option<Vector3<f32>>,
     pub interruptible:      bool,
     pub edge_slide:         EdgeSlide,
@@ -226,31 +202,136 @@ pub struct HighLevelHurtBox {
 }
 
 #[derive(Clone, Debug)]
-struct PositionHitBox {
-    pub position: Vector3<f32>,
-    pub args:     HitBoxArguments,
+pub struct HitBoxValues {
+    pub hitbox_index:                   i16,
+    pub damage:                         i32,
+    pub trajectory:                     i32,
+    pub weight_knockback:               i16,
+    pub kbg:                            i16,
+    pub shield_damage:                  i16,
+    pub bkb:                            i16,
+    pub size:                           f32,
+    pub tripping_rate:                  f32,
+    pub hitlag_mult:                    f32,
+    pub di_mult:                        f32,
+    pub effect:                         Effect,
+    pub sound_level:                    u8,
+    pub ground:                         bool,
+    pub aerial:                         bool,
+    pub ty:                             u8,
+    pub clang:                          bool,
+    pub direct:                         bool,
+    pub rehit_rate:                     i32,
+    pub angle_flipping:                 AngleFlip,
+    pub stretches:                      bool,
+    pub can_hit_multiplayer_characters: bool,
+    pub can_hit_sse_enemies:            bool,
+    pub can_hit_damageable_ceilings:    bool,
+    pub can_hit_damageable_walls:       bool,
+    pub can_hit_damageable_floors:      bool,
+    pub enabled:                        bool,
+    pub can_be_shielded:                bool,
+    pub can_be_reflected:               bool,
+    pub can_be_absorbed:                bool,
+    pub can_hit_gripped_character:      bool,
+    pub ignore_invincibility:           bool,
+    pub freeze_frame_disable:           bool,
+    pub flinchless:                     bool,
+}
+
+impl HitBoxValues {
+    fn from_hitbox(args: &HitBoxArguments) -> HitBoxValues {
+        HitBoxValues {
+            hitbox_index:                   args.hitbox_index,
+            damage:                         args.damage,
+            trajectory:                     args.trajectory,
+            weight_knockback:               args.weight_knockback,
+            kbg:                            args.kbg,
+            shield_damage:                  args.shield_damage,
+            bkb:                            args.bkb,
+            size:                           args.size,
+            tripping_rate:                  args.tripping_rate,
+            hitlag_mult:                    args.hitlag_mult,
+            di_mult:                        args.di_mult,
+            effect:                         args.effect.clone(),
+            sound_level:                    args.sound_level,
+            ground:                         args.ground,
+            aerial:                         args.aerial,
+            ty:                             args.ty,
+            clang:                          args.clang,
+            direct:                         args.direct,
+            rehit_rate:                     0, // TODO: ?
+            angle_flipping:                 AngleFlip::AwayFromAttacker, // TODO: ?
+            stretches:                      false,
+            can_hit_multiplayer_characters: true,
+            can_hit_sse_enemies:            true,
+            can_hit_damageable_ceilings:    true,
+            can_hit_damageable_walls:       true,
+            can_hit_damageable_floors:      true,
+            enabled:                        true,
+            can_be_shielded:                true,
+            can_be_reflected:               false,
+            can_be_absorbed:                false,
+            can_hit_gripped_character:      true,
+            ignore_invincibility:           false,
+            freeze_frame_disable:           false,
+            flinchless:                     false,
+        }
+    }
+
+    fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> HitBoxValues {
+        let args = &special_args.hitbox_args;
+        HitBoxValues {
+            hitbox_index:                   args.hitbox_index,
+            damage:                         args.damage,
+            trajectory:                     args.trajectory,
+            weight_knockback:               args.weight_knockback,
+            kbg:                            args.kbg,
+            shield_damage:                  args.shield_damage,
+            bkb:                            args.bkb,
+            size:                           args.size,
+            tripping_rate:                  args.tripping_rate,
+            hitlag_mult:                    args.hitlag_mult,
+            di_mult:                        args.di_mult,
+            effect:                         args.effect.clone(),
+            sound_level:                    args.sound_level,
+            ground:                         args.ground,
+            aerial:                         args.aerial,
+            ty:                             args.ty,
+            clang:                          args.clang,
+            direct:                         args.direct,
+            rehit_rate:                     special_args.rehit_rate,
+            angle_flipping:                 special_args.angle_flipping.clone(),
+            stretches:                      special_args.stretches,
+            can_hit_multiplayer_characters: special_args.can_hit_multiplayer_characters,
+            can_hit_sse_enemies:            special_args.can_hit_sse_enemies,
+            can_hit_damageable_ceilings:    special_args.can_hit_damageable_ceilings,
+            can_hit_damageable_walls:       special_args.can_hit_damageable_walls,
+            can_hit_damageable_floors:      special_args.can_hit_damageable_floors,
+            enabled:                        special_args.enabled,
+            can_be_shielded:                special_args.can_be_shielded,
+            can_be_reflected:               special_args.can_be_reflected,
+            can_be_absorbed:                special_args.can_be_absorbed,
+            can_hit_gripped_character:      special_args.can_hit_gripped_character,
+            ignore_invincibility:           special_args.ignore_invincibility,
+            freeze_frame_disable:           special_args.freeze_frame_disable,
+            flinchless:                     special_args.flinchless,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
-struct PositionSpecialHitBox {
+struct PositionHitBox {
     pub position: Vector3<f32>,
-    pub args:     SpecialHitBoxArguments,
+    pub values:   HitBoxValues,
 }
 
 #[derive(Clone, Debug)]
 pub struct HighLevelHitBox {
-    pub prev:      Option<Vector3<f32>>,
-    pub prev_args: Option<HitBoxArguments>,
-    pub next:      Vector3<f32>,
-    pub next_args: HitBoxArguments,
-}
-
-#[derive(Clone, Debug)]
-pub struct HighLevelSpecialHitBox {
-    pub prev:      Option<Vector3<f32>>,
-    pub prev_args: Option<SpecialHitBoxArguments>,
-    pub next:      Vector3<f32>,
-    pub next_args: SpecialHitBoxArguments,
+    pub prev:        Option<Vector3<f32>>,
+    pub prev_values: Option<HitBoxValues>,
+    pub next:        Vector3<f32>,
+    pub next_values: HitBoxValues,
 }
 
 #[derive(Clone, Debug)]
@@ -311,9 +392,10 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<PositionHitB
     let mut hl_hit_boxes = vec!();
     for hit_box in hit_boxes {
         if bone.index == hit_box.bone_index as i32 {
+            let transform = bone.transform * Matrix4::from_translation(Vector3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset));
             hl_hit_boxes.push(PositionHitBox {
-                position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
-                args:     hit_box.clone(),
+                position: Vector3::new(transform.w.x, transform.w.y, transform.w.z),
+                values: HitBoxValues::from_hitbox(&hit_box),
             });
             break;
         }
@@ -326,13 +408,15 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<PositionHitB
     hl_hit_boxes
 }
 
-fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<PositionSpecialHitBox> {
+fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<PositionHitBox> {
     let mut hl_hit_boxes = vec!();
     for hit_box in hit_boxes {
-        if bone.index == hit_box.hitbox_args.bone_index as i32 {
-            hl_hit_boxes.push(PositionSpecialHitBox {
-                position: Vector3::new(bone.transform.w.x, bone.transform.w.y, bone.transform.w.z),
-                args:     hit_box.clone(),
+        let args = &hit_box.hitbox_args;
+        if bone.index == args.bone_index as i32 {
+            let transform = bone.transform * Matrix4::from_translation(Vector3::new(args.x_offset, args.y_offset, args.z_offset));
+            hl_hit_boxes.push(PositionHitBox {
+                position: Vector3::new(transform.w.x, transform.w.y, transform.w.z),
+                values: HitBoxValues::from_special_hitbox(&hit_box),
             });
             break;
         }
