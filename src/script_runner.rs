@@ -40,7 +40,7 @@ impl ScriptRunner {
         }
     }
 
-    pub fn step(&mut self, scripts: &Option<HighLevelScripts>) {
+    pub fn step(&mut self, scripts: &Option<HighLevelScripts>, action_name: &str) {
         self.frame_index += self.frame_speed_modifier;
 
         if let Some(wait_until) = self.wait_until {
@@ -51,7 +51,7 @@ impl ScriptRunner {
 
         if self.wait_until.is_none() {
             if let &Some(ref scripts) = scripts {
-                self.step_recursive(&scripts.script_main.events);
+                self.step_recursive(&scripts.script_main.events, action_name);
             }
         }
 
@@ -60,7 +60,7 @@ impl ScriptRunner {
         }
     }
 
-    fn step_recursive(&mut self, events: &Vec<EventAst>) {
+    fn step_recursive(&mut self, events: &Vec<EventAst>, action_name: &str) {
         let event_index = self.event_indexes.last_mut().unwrap();
         while let Some(event) = events.get(*event_index) {
             match event {
@@ -95,7 +95,9 @@ impl ScriptRunner {
                     self.frame_index = v0;
                 }
                 &EventAst::FrameSpeedModifier (v0) => {
-                    self.frame_speed_modifier = v0;
+                    if action_name != "LandingFallSpecial" { // TODO: Hack because scripts are setting this to all sorts of weird values in this action
+                        self.frame_speed_modifier = v0;
+                    }
                 }
                 &EventAst::TimeManipulation (_, _) => { }
                 &EventAst::SetAirGround (v0) => {

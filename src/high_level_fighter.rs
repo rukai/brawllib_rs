@@ -23,9 +23,11 @@ impl HighLevelFighter {
     /// Processes data from an &Fighter and stores it in a HighLevelFighter
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
         let fighter_data = fighter.get_fighter_data();
+        let attributes = fighter_data.unwrap().attributes.clone();
         let mut actions = vec!();
         if let Some(first_bone) = fighter.get_bones() {
             for chr0 in fighter.get_animations() {
+                let name = chr0.name.clone();
                 let mut animation_flags = None;
                 let mut scripts = None;
                 if let Some(fighter_data) = fighter_data {
@@ -49,9 +51,21 @@ impl HighLevelFighter {
                 let mut script_runner = ScriptRunner::new();
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
-                while (script_runner.frame_index as u16) < chr0.num_frames {
+
+                let num_frames = match name.as_ref() {
+                    "LandingAirN"  => attributes.nair_landing_lag,
+                    "LandingAirF"  => attributes.fair_landing_lag,
+                    "LandingAirB"  => attributes.bair_landing_lag,
+                    "LandingAirHi" => attributes.uair_landing_lag,
+                    "LandingAirLw" => attributes.dair_landing_lag,
+                    "LandingLight" => attributes.light_landing_lag,
+                    "LandingHeavy" => attributes.normal_landing_lag,
+                    _              => chr0.num_frames as f32
+                };
+                while script_runner.frame_index < num_frames {
                     let mut first_bone = first_bone.clone();
-                    let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, script_runner.frame_index as i32, animation_flags);
+                    let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
+                    let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, chr0_frame_index as i32, animation_flags);
                     let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
                     let hit_boxes = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
                     let special_hit_boxes = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
@@ -100,38 +114,44 @@ impl HighLevelFighter {
                         ecb,
                         animation_velocity,
                         hurt_boxes,
-                        hit_boxes:         hl_hit_boxes,
-                        interruptible:     script_runner.interruptible,
-                        edge_slide:        script_runner.edge_slide.clone(),
-                        airbourne:         script_runner.airbourne,
+                        hit_boxes:     hl_hit_boxes,
+                        interruptible: script_runner.interruptible,
+                        edge_slide:    script_runner.edge_slide.clone(),
+                        airbourne:     script_runner.airbourne,
                     });
 
                     if iasa.is_none() && script_runner.interruptible {
                         iasa = Some(script_runner.frame_index)
                     }
 
-                    script_runner.step(&scripts);
+                    script_runner.step(&scripts, name.as_ref());
                     prev_hit_boxes = Some(hit_boxes);
 
                     if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
                 }
 
-                let action = HighLevelAction {
-                    name: chr0.name.clone(),
-                    iasa: iasa.unwrap_or_default() as usize,
-                    frames,
-                    animation_flags,
-                    scripts,
-                };
-                actions.push(action);
+                let iasa = if let Some(iasa) = iasa {
+                    iasa
+                } else {
+                    match name.as_ref() {
+                        "LandingAirN"  | "LandingAirF" |
+                        "LandingAirB"  | "LandingAirHi" |
+                        "LandingAirLw" | "LandingLight" |
+                        "LandingHeavy" | "LandingFallSpecial"
+                            => script_runner.frame_index,
+                        _                    => 0.0
+                    }
+                } as usize;
+
+                actions.push(HighLevelAction { name, iasa, frames, animation_flags, scripts });
             }
         }
 
         HighLevelFighter {
             name: fighter.cased_name.clone(),
-            attributes: fighter_data.unwrap().attributes.clone(),
-            actions,
             ledge_grabs: fighter_data.unwrap().misc.ledge_grabs.clone(),
+            attributes,
+            actions,
         }
     }
 
