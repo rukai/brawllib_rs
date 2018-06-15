@@ -83,8 +83,8 @@ impl ScriptRunner {
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }
                 &EventAst::Else => { }
-                &EventAst::AndComparison (_, _, _, _)=> { }
-                &EventAst::ElseIfComparison (_, _, _, _)=> { }
+                &EventAst::AndComparison (_, _, _, _) => { }
+                &EventAst::ElseIfComparison (_, _, _, _) => { }
                 &EventAst::ChangeSubAction (v0) => {
                     self.change_sub_action = ChangeSubAction::ChangeSubAction (v0);
                 }
@@ -119,7 +119,22 @@ impl ScriptRunner {
                 &EventAst::AllowInterrupt => {
                     self.interruptible = true;
                 }
-                &EventAst::Unknown | &EventAst::Nop => { }
+                &EventAst::SoundEffect1 (_) => { }
+                &EventAst::SoundEffect2 (_) => { }
+                &EventAst::SoundEffectTransient (_) => { }
+                &EventAst::SoundEffectStop (_) => { }
+                &EventAst::SoundEffectVictory (_) => { }
+                &EventAst::SoundEffectUnk (_) => { }
+                &EventAst::SoundEffectOther1 (_) => { }
+                &EventAst::SoundEffectOther2 (_) => { }
+                &EventAst::SoundLowVoice => { }
+                &EventAst::SoundDamageVoice => { }
+                &EventAst::SoundOttottoVoice => { }
+                &EventAst::GraphicEffect (_) => { }
+                &EventAst::Unknown (ref event) => {
+                    info!("unknown event: {:#?}", event);
+                }
+                &EventAst::Nop => { }
             }
             *event_index += 1;
         }

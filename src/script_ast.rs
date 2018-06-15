@@ -23,7 +23,7 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                 if let Some(&EnumValue(v3)) = args.get(3) {
                     EventAst::IfComparison (v0, v1, ComparisonOperator::new(v2), v3)
                 } else {
-                    EventAst::Unknown
+                    EventAst::Unknown (event.clone())
                 }
             }
             (0x00, 0x0E, None,                   None,                 None) => EventAst::Else,
@@ -31,14 +31,14 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                 if let Some(&EnumValue(v3)) = args.get(3) {
                     EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
                 } else {
-                    EventAst::Unknown
+                    EventAst::Unknown (event.clone())
                 }
             }
             (0x00, 0x0D, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
                 if let Some(&EnumValue(v3)) = args.get(3) {
                     EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
                 } else {
-                    EventAst::Unknown
+                    EventAst::Unknown (event.clone())
                 }
             }
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
@@ -86,7 +86,7 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                             unk5:             ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                         })
                     }
-                    _ => EventAst::Unknown
+                    _ => EventAst::Unknown (event.clone())
                 }
             }
             (0x06, 0x15, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
@@ -155,10 +155,47 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                             flinchless:                     (v14u & 0b1000_0000_0000_0000_0000_0000_0000_0000) != 0,
                         })
                     }
-                    _ => EventAst::Unknown
+                    _ => EventAst::Unknown (event.clone())
                 }
             }
-            _ => EventAst::Unknown
+            (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
+            (0x0A, 0x01, Some(&Value(v0)), None, None) => EventAst::SoundEffect2 (v0),
+            (0x0A, 0x02, Some(&Value(v0)), None, None) => EventAst::SoundEffectTransient (v0),
+            (0x0A, 0x03, Some(&Value(v0)), None, None) => EventAst::SoundEffectStop (v0),
+            (0x0A, 0x05, Some(&Value(v0)), None, None) => EventAst::SoundEffectVictory (v0),
+            (0x0A, 0x07, Some(&Value(v0)), None, None) => EventAst::SoundEffectUnk (v0),
+            (0x0A, 0x09, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther1 (v0),
+            (0x0A, 0x0A, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther2 (v0),
+            (0x0B, 0x0B, None,             None, None) => EventAst::SoundLowVoice,
+            (0x0B, 0x19, None,             None, None) => EventAst::SoundDamageVoice,
+            (0x0B, 0x1D, None,             None, None) => EventAst::SoundOttottoVoice,
+            (0x11, 0x1A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) |
+            (0x11, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15)) {
+                    (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Scalar(v12)), Some(&Scalar(v13)), Some(&Scalar(v14)), Some(&Bool(v15))) => {
+                        EventAst::GraphicEffect (GraphicEffect {
+                            graphic:                  v0,
+                            bone:                     v1,
+                            x_offset:                 v4,
+                            y_offset:                 v3,
+                            z_offset:                 v2,
+                            x_rotation:               v7,
+                            y_rotation:               v6,
+                            z_rotation:               v5,
+                            scale:                    v8,
+                            random_x_offset:          v11,
+                            random_y_offset:          v10,
+                            random_z_offset:          v9,
+                            random_x_rotation:        v14,
+                            random_y_rotation:        v13,
+                            random_z_rotation:        v12,
+                            terminate_with_animation: v15
+                        })
+                    }
+                    _ => EventAst::Unknown (event.clone())
+                }
+            }
+            _ => EventAst::Unknown (event.clone())
         };
         // Brawlbox has some extra parameter types it uses to handle some special cases:
         // *    HitBoxFlags
@@ -214,7 +251,19 @@ pub enum EventAst {
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
     RemoveAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
-    Unknown,
+    SoundEffect1 (i32),
+    SoundEffect2 (i32),
+    SoundEffectTransient (i32),
+    SoundEffectStop (i32),
+    SoundEffectVictory (i32),
+    SoundEffectUnk (i32),
+    SoundEffectOther1 (i32),
+    SoundEffectOther2 (i32),
+    SoundLowVoice,
+    SoundDamageVoice,
+    SoundOttottoVoice,
+    GraphicEffect (GraphicEffect),
+    Unknown (Event)
 }
 
 #[derive(Clone, Debug)]
@@ -405,4 +454,24 @@ pub struct SpecialHitBoxArguments {
     pub freeze_frame_disable:           bool,
     pub unk5:                           bool,
     pub flinchless:                     bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct GraphicEffect {
+    graphic:                  i32,
+    bone:                     i32,
+    x_offset:                 f32,
+    y_offset:                 f32,
+    z_offset:                 f32,
+    x_rotation:               f32,
+    y_rotation:               f32,
+    z_rotation:               f32,
+    scale:                    f32,
+    random_x_offset:          f32,
+    random_y_offset:          f32,
+    random_z_offset:          f32,
+    random_x_rotation:        f32,
+    random_y_rotation:        f32,
+    random_z_rotation:        f32,
+    terminate_with_animation: bool
 }
