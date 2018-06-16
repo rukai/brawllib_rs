@@ -8,7 +8,7 @@ pub struct ScriptRunner {
     pub frame_index: f32,
     pub wait_until: Option<f32>,
     pub interruptible: bool,
-    pub hitboxes: [Option<ScriptHitBox>; 5],
+    pub hitboxes: [Option<ScriptHitBox>; 7],
     pub frame_speed_modifier: f32,
     pub airbourne: bool,
     pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
@@ -61,7 +61,7 @@ impl ScriptRunner {
             frame_index: 0.0,
             wait_until: None,
             interruptible: false,
-            hitboxes: [None, None, None, None, None],
+            hitboxes: [None, None, None, None, None, None, None],
             frame_speed_modifier: 1.0,
             airbourne: false,
             edge_slide: EdgeSlide::SlideOff,
@@ -137,10 +137,18 @@ impl ScriptRunner {
                 }
                 &EventAst::ReverseDirection => { }
                 &EventAst::CreateHitBox (ref args) => {
-                    self.hitboxes[args.hitbox_index as usize] = Some(ScriptHitBox::from_hitbox(args));
+                    if args.hitbox_index < self.hitboxes.len() as u8 {
+                        self.hitboxes[args.hitbox_index as usize] = Some(ScriptHitBox::from_hitbox(args));
+                    } else {
+                        error!("invalid hitbox index {} {}", args.hitbox_index, action_name);
+                    }
                 }
                 &EventAst::CreateSpecialHitBox (ref args) => {
-                    self.hitboxes[args.hitbox_args.hitbox_index as usize] = Some(ScriptHitBox::from_special_hitbox(args));
+                    if args.hitbox_args.hitbox_index < self.hitboxes.len() as u8 {
+                        self.hitboxes[args.hitbox_args.hitbox_index as usize] = Some(ScriptHitBox::from_special_hitbox(args));
+                    } else {
+                        error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_index, action_name);
+                    }
                 }
                 &EventAst::RemoveAllHitBoxes => {
                     for hitbox in self.hitboxes.iter_mut() {

@@ -16,7 +16,8 @@ pub struct Fighter {
     pub cased_name: String,
     pub moveset: Arc,
     pub motion: Arc,
-    pub models: Vec<Arc>
+    pub models: Vec<Arc>,
+    pub modded_by_psa: bool
 }
 
 impl Fighter {
@@ -40,6 +41,11 @@ impl Fighter {
                 error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
                 continue;
             };
+
+            let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
+            let modded_by_psa = fighter_data.data.get(&moveset_file_name)
+                .map(|a| a.windows(4).any(|b| b == psa_sequence))
+                .unwrap_or(false);
 
             let motion_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
             let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
@@ -72,6 +78,7 @@ impl Fighter {
                 moveset,
                 motion,
                 models,
+                modded_by_psa
             };
             fighters.push(fighter);
         }
