@@ -13,6 +13,7 @@ pub struct ScriptRunner {
     pub airbourne: bool,
     pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
     pub change_sub_action: ChangeSubAction,
+    pub hitlist_reset: bool,
 }
 
 pub enum ChangeSubAction {
@@ -66,6 +67,7 @@ impl ScriptRunner {
             airbourne: false,
             edge_slide: EdgeSlide::SlideOff,
             change_sub_action: ChangeSubAction::Continue,
+            hitlist_reset: false,
         }
     }
 
@@ -90,6 +92,7 @@ impl ScriptRunner {
     }
 
     fn step_recursive(&mut self, events: &Vec<EventAst>, action_name: &str) {
+        self.hitlist_reset = false;
         let event_index = self.event_indexes.last_mut().unwrap();
         while let Some(event) = events.get(*event_index) {
             match event {
@@ -138,14 +141,25 @@ impl ScriptRunner {
                 &EventAst::ReverseDirection => { }
                 &EventAst::CreateHitBox (ref args) => {
                     if args.hitbox_index < self.hitboxes.len() as u8 {
+                        if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_index as usize] {
+                            if args.rehit_hitbox_index > prev_hitbox.values.rehit_hitbox_index {
+                                self.hitlist_reset = true;
+                            }
+                        }
                         self.hitboxes[args.hitbox_index as usize] = Some(ScriptHitBox::from_hitbox(args));
                     } else {
                         error!("invalid hitbox index {} {}", args.hitbox_index, action_name);
                     }
                 }
                 &EventAst::CreateSpecialHitBox (ref args) => {
+                    let index = args.hitbox_args.hitbox_index as usize;
                     if args.hitbox_args.hitbox_index < self.hitboxes.len() as u8 {
-                        self.hitboxes[args.hitbox_args.hitbox_index as usize] = Some(ScriptHitBox::from_special_hitbox(args));
+                        if let Some(ref prev_hitbox) = self.hitboxes[index] {
+                            if args.hitbox_args.rehit_hitbox_index > prev_hitbox.values.rehit_hitbox_index {
+                                self.hitlist_reset = true;
+                            }
+                        }
+                        self.hitboxes[index] = Some(ScriptHitBox::from_special_hitbox(args));
                     } else {
                         error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_index, action_name);
                     }
@@ -154,6 +168,7 @@ impl ScriptRunner {
                     for hitbox in self.hitboxes.iter_mut() {
                         *hitbox = None;
                     }
+                    self.hitlist_reset = true;
                 }
                 &EventAst::MoveHitBox (ref move_hitbox) => {
                     if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {

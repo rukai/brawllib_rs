@@ -119,6 +119,7 @@ impl HighLevelFighter {
                         interruptible: script_runner.interruptible,
                         edge_slide:    script_runner.edge_slide.clone(),
                         airbourne:     script_runner.airbourne,
+                        hitlist_reset: script_runner.hitlist_reset,
                     });
 
                     if iasa.is_none() && script_runner.interruptible {
@@ -214,6 +215,7 @@ pub struct HighLevelFrame {
     pub edge_slide:         EdgeSlide,
     pub airbourne:          bool,
     pub ecb:                ECB,
+    pub hitlist_reset:      bool,
 }
 
 #[derive(Clone, Debug)]
