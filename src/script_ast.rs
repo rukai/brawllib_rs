@@ -57,21 +57,22 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
                         let v12u = v12 as u32;
                         EventAst::CreateHitBox (HitBoxArguments {
-                            bone_index: (v0 >> 16) as i16,
-                            hitbox_index: v0 as i16,
-                            damage: v1,
-                            trajectory: v2,
-                            weight_knockback: (v3 >> 16) as i16,
-                            kbg: v3 as i16,
-                            shield_damage: (v4 >> 16) as i16,
-                            bkb: v4 as i16,
-                            size: v5,
-                            x_offset: v6,
-                            y_offset: v7,
-                            z_offset: v8,
-                            tripping_rate: v9,
-                            hitlag_mult: v10,
-                            di_mult: v11,
+                            bone_index:         (v0 >> 16) as i16,
+                            rehit_hitbox_index: (v0 >> 8)  as u8,
+                            hitbox_index:        v0        as u8,
+                            damage:              v1,
+                            trajectory:          v2,
+                            weight_knockback:   (v3 >> 16) as i16,
+                            kbg:                 v3        as i16,
+                            shield_damage:      (v4 >> 16) as i16,
+                            bkb:                 v4        as i16,
+                            size:                v5,
+                            x_offset:            v6,
+                            y_offset:            v7,
+                            z_offset:            v8,
+                            tripping_rate:       v9,
+                            hitlag_mult:         v10,
+                            di_mult:             v11,
                             effect:  Effect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
                             unk1:               (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
                             sound_level:       ((v12 & 0b0000_0000_0000_0000_0011_1111_1100_0000) >> 6) as u8,
@@ -96,33 +97,34 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                         let v14u = v14 as u32;
                         EventAst::CreateSpecialHitBox (SpecialHitBoxArguments {
                             hitbox_args: HitBoxArguments {
-                                bone_index: (v0 >> 16) as i16,
-                                hitbox_index: v0 as i16,
-                                damage: v1,
-                                trajectory: v2,
-                                weight_knockback: (v3 >> 16) as i16,
-                                kbg: v3 as i16,
-                                shield_damage: (v4 >> 16) as i16,
-                                bkb: v4 as i16,
-                                size: v5,
-                                x_offset: v6,
-                                y_offset: v7,
-                                z_offset: v8,
-                                tripping_rate: v9,
-                                hitlag_mult: v10,
-                                di_mult: v11,
-                                effect: Effect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                                unk1:              (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                                sound_level:      ((v12 & 0b0000_0000_0000_0000_0011_1111_1100_0000) >> 6) as u8,
-                                unk2:             ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                                ground:            (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                                aerial:            (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                                unk3:             ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                                ty:               ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
-                                clang:             (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk4:              (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                direct:            (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk5:            ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                                bone_index:         (v0 >> 16) as i16,
+                                rehit_hitbox_index: (v0 >> 8)  as u8,
+                                hitbox_index:        v0        as u8,
+                                damage:              v1,
+                                trajectory:          v2,
+                                weight_knockback:   (v3 >> 16) as i16,
+                                kbg:                 v3        as i16,
+                                shield_damage:      (v4 >> 16) as i16,
+                                bkb:                 v4        as i16,
+                                size:                v5,
+                                x_offset:            v6,
+                                y_offset:            v7,
+                                z_offset:            v8,
+                                tripping_rate:       v9,
+                                hitlag_mult:         v10,
+                                di_mult:             v11,
+                                effect:  Effect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                                unk1:               (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                                sound_level:       ((v12 & 0b0000_0000_0000_0000_0011_1111_1100_0000) >> 6) as u8,
+                                unk2:              ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                                ground:             (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                                aerial:             (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                                unk3:              ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                                ty:                ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
+                                clang:              (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk4:               (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                direct:             (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk5:             ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                             },
                             rehit_rate: v13,
                             angle_flipping:    AngleFlip::new(v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
@@ -158,6 +160,24 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x06, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4))) = (args.get(3), args.get(4)) {
+                    EventAst::MoveHitBox (MoveHitBox {
+                        hitbox_id:    v0,
+                        new_bone:     v1,
+                        new_x_offset: v2,
+                        new_y_offset: v3,
+                        new_z_offset: v4,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x06, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: v0, new_damage: v1 },
+            (0x06, 0x02, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: v0, new_size:   v1 },
+            (0x06, 0x03, Some(&Value(v0)), None,             None) => EventAst::DeleteHitBox (v0),
+
+            // sound
             (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
             (0x0A, 0x01, Some(&Value(v0)), None, None) => EventAst::SoundEffect2 (v0),
             (0x0A, 0x02, Some(&Value(v0)), None, None) => EventAst::SoundEffectTransient (v0),
@@ -166,9 +186,12 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
             (0x0A, 0x07, Some(&Value(v0)), None, None) => EventAst::SoundEffectUnk (v0),
             (0x0A, 0x09, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther1 (v0),
             (0x0A, 0x0A, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther2 (v0),
-            (0x0B, 0x0B, None,             None, None) => EventAst::SoundLowVoice,
-            (0x0B, 0x19, None,             None, None) => EventAst::SoundDamageVoice,
-            (0x0B, 0x1D, None,             None, None) => EventAst::SoundOttottoVoice,
+            (0x0C, 0x0B, None,             None, None) => EventAst::SoundVoiceLow,
+            (0x0C, 0x19, None,             None, None) => EventAst::SoundVoiceDamage,
+            (0x0C, 0x1D, None,             None, None) => EventAst::SoundVoiceOttotto,
+            (0x0C, 0x1F, None,             None, None) => EventAst::SoundVoiceEating,
+
+            // graphics
             (0x11, 0x1A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) |
             (0x11, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15)) {
@@ -251,6 +274,10 @@ pub enum EventAst {
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
     RemoveAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
+    MoveHitBox (MoveHitBox),
+    ChangeHitBoxDamage { hitbox_id: i32, new_damage: i32 },
+    ChangeHitBoxSize   { hitbox_id: i32, new_size:   i32 },
+    DeleteHitBox (i32),
     SoundEffect1 (i32),
     SoundEffect2 (i32),
     SoundEffectTransient (i32),
@@ -259,9 +286,10 @@ pub enum EventAst {
     SoundEffectUnk (i32),
     SoundEffectOther1 (i32),
     SoundEffectOther2 (i32),
-    SoundLowVoice,
-    SoundDamageVoice,
-    SoundOttottoVoice,
+    SoundVoiceLow,
+    SoundVoiceDamage,
+    SoundVoiceOttotto,
+    SoundVoiceEating,
     GraphicEffect (GraphicEffect),
     Unknown (Event)
 }
@@ -273,7 +301,8 @@ pub enum ComparisonOperator {
     Equal,
     NotEqual,
     GreaterThanOrEqual,
-    GreaterThan
+    GreaterThan,
+    Unknown (i32)
 }
 
 impl ComparisonOperator {
@@ -285,7 +314,7 @@ impl ComparisonOperator {
             3 => ComparisonOperator::NotEqual,
             4 => ComparisonOperator::GreaterThanOrEqual,
             5 => ComparisonOperator::GreaterThan,
-            _ => panic!("UnknownOperator"),
+            v => ComparisonOperator::Unknown (v),
         }
     }
 }
@@ -315,6 +344,7 @@ pub enum AngleFlip {
     AttackerDir,
     AttackerDirReverse,
     FaceZaxis,
+    Unknown (i32)
 }
 
 impl AngleFlip {
@@ -324,7 +354,7 @@ impl AngleFlip {
             1 | 3     => AngleFlip::AttackerDir,
             4         => AngleFlip::AttackerDirReverse,
             6 | 7     => AngleFlip::FaceZaxis,
-            _ => unreachable!()
+            v         => AngleFlip::Unknown (v),
         }
     }
 }
@@ -355,7 +385,8 @@ pub enum Effect {
     Aura,
     Plunge,
     Down,
-    Flinchless
+    Flinchless,
+    Unknown (i32)
 }
 
 impl Effect {
@@ -386,40 +417,41 @@ impl Effect {
             22 => Effect::Plunge,
             23 => Effect::Down,
             24 => Effect::Flinchless,
-            _  => unreachable!()
+            v  => Effect::Unknown (v),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct HitBoxArguments {
-    pub bone_index:       i16,
-    pub hitbox_index:     i16,
-    pub damage:           i32,
-    pub trajectory:       i32,
-    pub weight_knockback: i16,
-    pub kbg:              i16,
-    pub shield_damage:    i16,
-    pub bkb:              i16,
-    pub size:             f32,
-    pub x_offset:         f32,
-    pub y_offset:         f32,
-    pub z_offset:         f32,
-    pub tripping_rate:    f32,
-    pub hitlag_mult:      f32,
-    pub di_mult:          f32,
-    pub effect:           Effect,
-    pub unk1:             bool,
-    pub sound_level:      u8,
-    pub unk2:             u8,
-    pub ground:           bool,
-    pub aerial:           bool,
-    pub unk3:             u8,
-    pub ty:               u8,
-    pub clang:            bool,
-    pub unk4:             bool,
-    pub direct:           bool,
-    pub unk5:             u8,
+    pub bone_index:         i16,
+    pub hitbox_index:       u8,
+    pub rehit_hitbox_index: u8,
+    pub damage:             i32,
+    pub trajectory:         i32,
+    pub weight_knockback:   i16,
+    pub kbg:                i16,
+    pub shield_damage:      i16,
+    pub bkb:                i16,
+    pub size:               f32,
+    pub x_offset:           f32,
+    pub y_offset:           f32,
+    pub z_offset:           f32,
+    pub tripping_rate:      f32,
+    pub hitlag_mult:        f32,
+    pub di_mult:            f32,
+    pub effect:             Effect,
+    pub unk1:               bool,
+    pub sound_level:        u8,
+    pub unk2:               u8,
+    pub ground:             bool,
+    pub aerial:             bool,
+    pub unk3:               u8,
+    pub ty:                 u8,
+    pub clang:              bool,
+    pub unk4:               bool,
+    pub direct:             bool,
+    pub unk5:               u8,
 }
 
 #[derive(Clone, Debug)]
@@ -457,21 +489,30 @@ pub struct SpecialHitBoxArguments {
 }
 
 #[derive(Clone, Debug)]
+pub struct MoveHitBox {
+    pub hitbox_id:    i32,
+    pub new_bone:     i32,
+    pub new_x_offset: f32,
+    pub new_y_offset: f32,
+    pub new_z_offset: f32,
+}
+
+#[derive(Clone, Debug)]
 pub struct GraphicEffect {
-    graphic:                  i32,
-    bone:                     i32,
-    x_offset:                 f32,
-    y_offset:                 f32,
-    z_offset:                 f32,
-    x_rotation:               f32,
-    y_rotation:               f32,
-    z_rotation:               f32,
-    scale:                    f32,
-    random_x_offset:          f32,
-    random_y_offset:          f32,
-    random_z_offset:          f32,
-    random_x_rotation:        f32,
-    random_y_rotation:        f32,
-    random_z_rotation:        f32,
-    terminate_with_animation: bool
+    pub graphic:                  i32,
+    pub bone:                     i32,
+    pub x_offset:                 f32,
+    pub y_offset:                 f32,
+    pub z_offset:                 f32,
+    pub x_rotation:               f32,
+    pub y_rotation:               f32,
+    pub z_rotation:               f32,
+    pub scale:                    f32,
+    pub random_x_offset:          f32,
+    pub random_y_offset:          f32,
+    pub random_z_offset:          f32,
+    pub random_x_rotation:        f32,
+    pub random_y_rotation:        f32,
+    pub random_z_rotation:        f32,
+    pub terminate_with_animation: bool
 }

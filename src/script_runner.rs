@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use script_ast::{EventAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
-use high_level_fighter::HighLevelScripts;
+use high_level_fighter::{HighLevelScripts, HitBoxValues};
 
 pub struct ScriptRunner {
     pub variables: HashMap<i32, i32>,
@@ -8,8 +8,7 @@ pub struct ScriptRunner {
     pub frame_index: f32,
     pub wait_until: Option<f32>,
     pub interruptible: bool,
-    pub hitboxes: Vec<HitBoxArguments>,
-    pub special_hitboxes: Vec<SpecialHitBoxArguments>,
+    pub hitboxes: [Option<ScriptHitBox>; 5],
     pub frame_speed_modifier: f32,
     pub airbourne: bool,
     pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
@@ -23,6 +22,37 @@ pub enum ChangeSubAction {
     ChangeSubActionRestartFrame (i32),
 }
 
+#[derive(Clone, Debug)]
+pub struct ScriptHitBox {
+    pub bone_index: i16,
+    pub x_offset:   f32,
+    pub y_offset:   f32,
+    pub z_offset:   f32,
+    pub values:     HitBoxValues
+}
+
+impl ScriptHitBox {
+    fn from_hitbox(args: &HitBoxArguments) -> ScriptHitBox {
+        ScriptHitBox {
+            bone_index: args.bone_index,
+            x_offset:   args.x_offset,
+            y_offset:   args.y_offset,
+            z_offset:   args.z_offset,
+            values:     HitBoxValues::from_hitbox(args)
+        }
+    }
+
+    fn from_special_hitbox(args: &SpecialHitBoxArguments) -> ScriptHitBox {
+        ScriptHitBox {
+            bone_index: args.hitbox_args.bone_index,
+            x_offset:   args.hitbox_args.x_offset,
+            y_offset:   args.hitbox_args.y_offset,
+            z_offset:   args.hitbox_args.z_offset,
+            values:     HitBoxValues::from_special_hitbox(args)
+        }
+    }
+}
+
 impl ScriptRunner {
     pub fn new() -> ScriptRunner {
         ScriptRunner {
@@ -31,8 +61,7 @@ impl ScriptRunner {
             frame_index: 0.0,
             wait_until: None,
             interruptible: false,
-            hitboxes: vec!(),
-            special_hitboxes: vec!(),
+            hitboxes: [None, None, None, None, None],
             frame_speed_modifier: 1.0,
             airbourne: false,
             edge_slide: EdgeSlide::SlideOff,
@@ -108,13 +137,36 @@ impl ScriptRunner {
                 }
                 &EventAst::ReverseDirection => { }
                 &EventAst::CreateHitBox (ref args) => {
-                    self.hitboxes.push(args.clone());
-                }
-                &EventAst::RemoveAllHitBoxes => {
-                    self.hitboxes.clear();
+                    self.hitboxes[args.hitbox_index as usize] = Some(ScriptHitBox::from_hitbox(args));
                 }
                 &EventAst::CreateSpecialHitBox (ref args) => {
-                    self.special_hitboxes.push(args.clone());
+                    self.hitboxes[args.hitbox_args.hitbox_index as usize] = Some(ScriptHitBox::from_special_hitbox(args));
+                }
+                &EventAst::RemoveAllHitBoxes => {
+                    for hitbox in self.hitboxes.iter_mut() {
+                        *hitbox = None;
+                    }
+                }
+                &EventAst::MoveHitBox (ref move_hitbox) => {
+                    if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
+                        hitbox.bone_index = move_hitbox.new_bone as i16;
+                        hitbox.x_offset = move_hitbox.new_x_offset;
+                        hitbox.y_offset = move_hitbox.new_y_offset;
+                        hitbox.z_offset = move_hitbox.new_z_offset;
+                    }
+                }
+                &EventAst::ChangeHitBoxDamage { hitbox_id, new_damage } => {
+                    if let Some(ref mut hitbox) = self.hitboxes[hitbox_id as usize] {
+                        hitbox.values.damage = new_damage;
+                    }
+                }
+                &EventAst::ChangeHitBoxSize { hitbox_id, new_size } => {
+                    if let Some(ref mut hitbox) = self.hitboxes[hitbox_id as usize] {
+                        hitbox.values.size = new_size as f32;
+                    }
+                }
+                &EventAst::DeleteHitBox (id) => {
+                    self.hitboxes[id as usize] = None;
                 }
                 &EventAst::AllowInterrupt => {
                     self.interruptible = true;
@@ -127,12 +179,13 @@ impl ScriptRunner {
                 &EventAst::SoundEffectUnk (_) => { }
                 &EventAst::SoundEffectOther1 (_) => { }
                 &EventAst::SoundEffectOther2 (_) => { }
-                &EventAst::SoundLowVoice => { }
-                &EventAst::SoundDamageVoice => { }
-                &EventAst::SoundOttottoVoice => { }
+                &EventAst::SoundVoiceLow => { }
+                &EventAst::SoundVoiceDamage => { }
+                &EventAst::SoundVoiceOttotto => { }
+                &EventAst::SoundVoiceEating => { }
                 &EventAst::GraphicEffect (_) => { }
                 &EventAst::Unknown (ref event) => {
-                    info!("unknown event: {:#?}", event);
+                    debug!("unknown event: {:#?}", event);
                 }
                 &EventAst::Nop => { }
             }

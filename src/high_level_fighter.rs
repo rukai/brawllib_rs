@@ -7,7 +7,7 @@ use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{FighterAttributes, AnimationFlags};
 use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
 use script_ast;
-use script_runner::{ScriptRunner, ChangeSubAction};
+use script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -22,6 +22,7 @@ pub struct HighLevelFighter {
 impl HighLevelFighter {
     /// Processes data from an &Fighter and stores it in a HighLevelFighter
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
+        info!("Generating HighLevelFighter for {}", fighter.cased_name);
         let fighter_data = fighter.get_fighter_data();
         let attributes = fighter_data.unwrap().attributes.clone();
         let mut actions = vec!();
@@ -67,10 +68,10 @@ impl HighLevelFighter {
                     let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                     let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, chr0_frame_index as i32, animation_flags);
                     let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
-                    let hit_boxes = gen_hit_boxes(&first_bone, &script_runner.hitboxes);
-                    let special_hit_boxes = gen_special_hit_boxes(&first_bone, &script_runner.special_hitboxes);
+                    let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
+                    let hit_boxes = gen_hit_boxes(&first_bone, &hit_boxes);
                     let mut hl_hit_boxes = vec!();
-                    for next in hit_boxes.iter().chain(special_hit_boxes.iter()) {
+                    for next in &hit_boxes {
                         let mut prev = None;
                         let mut prev_values = None;
                         if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
@@ -223,7 +224,8 @@ pub struct HighLevelHurtBox {
 
 #[derive(Clone, Debug)]
 pub struct HitBoxValues {
-    pub hitbox_index:                   i16,
+    pub hitbox_index:                   u8,
+    pub rehit_hitbox_index:             u8,
     pub damage:                         i32,
     pub trajectory:                     i32,
     pub weight_knockback:               i16,
@@ -260,9 +262,10 @@ pub struct HitBoxValues {
 }
 
 impl HitBoxValues {
-    fn from_hitbox(args: &HitBoxArguments) -> HitBoxValues {
+    pub fn from_hitbox(args: &HitBoxArguments) -> HitBoxValues {
         HitBoxValues {
             hitbox_index:                   args.hitbox_index,
+            rehit_hitbox_index:             args.rehit_hitbox_index,
             damage:                         args.damage,
             trajectory:                     args.trajectory,
             weight_knockback:               args.weight_knockback,
@@ -299,10 +302,11 @@ impl HitBoxValues {
         }
     }
 
-    fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> HitBoxValues {
+    pub fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> HitBoxValues {
         let args = &special_args.hitbox_args;
         HitBoxValues {
             hitbox_index:                   args.hitbox_index,
+            rehit_hitbox_index:             args.rehit_hitbox_index,
             damage:                         args.damage,
             trajectory:                     args.trajectory,
             weight_knockback:               args.weight_knockback,
@@ -397,7 +401,6 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> 
                 bone_matrix: bone.transform,
                 hurt_box: hurt_box.clone(),
             });
-            break;
         }
     }
 
@@ -408,42 +411,20 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> 
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &Bone, hit_boxes: &[HitBoxArguments]) -> Vec<PositionHitBox> {
+fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptHitBox]) -> Vec<PositionHitBox> {
     let mut hl_hit_boxes = vec!();
-    for hit_box in hit_boxes {
+    for hit_box in hit_boxes.iter() {
         if bone.index == hit_box.bone_index as i32 {
             let transform = bone.transform * Matrix4::from_translation(Vector3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset));
             hl_hit_boxes.push(PositionHitBox {
                 position: Vector3::new(transform.w.x, transform.w.y, transform.w.z),
-                values: HitBoxValues::from_hitbox(&hit_box),
+                values:   hit_box.values.clone()
             });
-            break;
         }
     }
 
     for child in bone.children.iter() {
         hl_hit_boxes.extend(gen_hit_boxes(child, hit_boxes));
-    }
-
-    hl_hit_boxes
-}
-
-fn gen_special_hit_boxes(bone: &Bone, hit_boxes: &[SpecialHitBoxArguments]) -> Vec<PositionHitBox> {
-    let mut hl_hit_boxes = vec!();
-    for hit_box in hit_boxes {
-        let args = &hit_box.hitbox_args;
-        if bone.index == args.bone_index as i32 {
-            let transform = bone.transform * Matrix4::from_translation(Vector3::new(args.x_offset, args.y_offset, args.z_offset));
-            hl_hit_boxes.push(PositionHitBox {
-                position: Vector3::new(transform.w.x, transform.w.y, transform.w.z),
-                values: HitBoxValues::from_special_hitbox(&hit_box),
-            });
-            break;
-        }
-    }
-
-    for child in bone.children.iter() {
-        hl_hit_boxes.extend(gen_special_hit_boxes(child, hit_boxes));
     }
 
     hl_hit_boxes
