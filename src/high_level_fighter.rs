@@ -132,6 +132,10 @@ impl HighLevelFighter {
                     if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
                 }
 
+                if name == String::from("LandingFallSpecial") { // TODO: This is interesting on fox, get these implemented before moving on
+                    info!("{:#?}", scripts);
+                }
+
                 let iasa = if let Some(iasa) = iasa {
                     iasa
                 } else {

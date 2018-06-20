@@ -1,46 +1,78 @@
-use script::Event;
+use script::{Event, Requirement};
+use std::iter::Iterator;
 
 pub fn script_ast(events: &[Event]) -> ScriptAst {
+    ScriptAst { events: script_ast_inner(&mut events.iter()) }
+}
+
+fn script_ast_inner(mut events: &mut Iterator<Item=&Event>) -> Vec<EventAst> {
     let mut event_asts = vec!();
-    for event in events {
+    while let Some(event) = events.next() {
         let args = &event.arguments;
         // TODO: For now just matching each variant of Argument enum individually.
         //       If it turns out that I need to be able to handle the same event ID with different argument types,
         //       then I can just match generically and then call a method on Argument to retrieve a sensible value
         use script::Argument::*;
         let event_ast = match (event.namespace, event.code, args.get(0), args.get(1), args.get(2)) {
-            (0x00, 0x01, Some(&Scalar(v0)),      None,                 None) => EventAst::SyncWait (v0),
-            (0x00, 0x02, None,                   None,                 None) => EventAst::Nop,
-            (0x00, 0x02, Some(&Scalar(v0)),      None,                 None) => EventAst::AsyncWait (v0),
-            (0x00, 0x04, Some(&Scalar(v0)),      None,                 None) => EventAst::SetLoop (v0),
-            (0x00, 0x05, None,                   None,                 None) => EventAst::ExecuteLoop,
-            (0x00, 0x07, Some(&File(v0)),        None,                 None) => EventAst::Subroutine (v0),
-            (0x00, 0x08, None,                   None,                 None) => EventAst::Return,
-            (0x00, 0x09, Some(&File(v0)),        None,                 None) => EventAst::Goto (v0),
-            (0x00, 0x0A, Some(&Requirement(v0)), None,                 None) => EventAst::If (v0),
-            (0x00, 0x0A, Some(&Requirement(v0)), Some(&Value(v1)),     None) => EventAst::IfValue (v0, v1),
-            (0x00, 0x0A, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
-                if let Some(&EnumValue(v3)) = args.get(3) {
-                    EventAst::IfComparison (v0, v1, ComparisonOperator::new(v2), v3)
+            (0x00, 0x01, Some(&Scalar(v0)),                   None,                None) => EventAst::SyncWait (v0),
+            (0x00, 0x02, None,                                None,                None) => EventAst::Nop,
+            (0x00, 0x02, Some(&Scalar(v0)),                   None,                None) => EventAst::AsyncWait (v0),
+            (0x00, 0x04, Some(&Scalar(v0)),                   None,                None) => EventAst::SetLoop (v0),
+            (0x00, 0x05, None,                                None,                None) => EventAst::ExecuteLoop,
+            (0x00, 0x07, Some(&File(v0)),                     None,                None) => EventAst::Subroutine (v0),
+            (0x00, 0x08, None,                                None,                None) => EventAst::Return,
+            (0x00, 0x09, Some(&File(v0)),                     None,                None) => EventAst::Goto (v0),
+            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), None,                None) => EventAst::IfStatement (
+                IfStatement {
+                    block: script_ast_inner(events),
+                    test: ty.clone(), // TODO: Include flip in test expression
+                    else_ifs: vec!(),
+                    else_block: None,
+                }
+            ),
+            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), Some(&Value(v1)), None) => EventAst::IfStatement (
+                IfStatement {
+                    block: script_ast_inner(events),
+                    test: ty.clone(), // TODO: Include flip in test expression
+                    else_ifs: vec!(),
+                    else_block: None,
+                }
+            ),
+            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => { // TODO: Maybe v1 is not guaranteed to be Variable
+                // TODO: When I get expression setup I need to handle both of these cases for rhs
+                //let rhs = match args.get(3) {
+                //    Some(&Scalar(v3))   => Some(v3),
+                //    Some(&Variable(v3)) => Some(v3),
+                //    None => None
+                //};
+
+                EventAst::IfStatement (IfStatement {
+                    block: script_ast_inner(events),
+                    test: ty.clone(), // TODO: Include flip in test expression
+                    else_ifs: vec!(),
+                    else_block: None,
+                })
+            }
+            (0x00, 0x0E, None, None, None) => EventAst::Else,
+            (0x00, 0x0B, Some(&Requirement { .. }), Some(&Variable(v1)), Some(&Value(v2))) => {
+                if let Some(&Variable(v3)) = args.get(3) {
+                    //EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
+                    EventAst::Unknown (event.clone())
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0E, None,                   None,                 None) => EventAst::Else,
-            (0x00, 0x0B, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
-                if let Some(&EnumValue(v3)) = args.get(3) {
-                    EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
+            (0x00, 0x0D, Some(&Requirement { .. }), Some(&Variable(v1)), Some(&Value(v2))) => {
+                if let Some(&Variable(v3)) = args.get(3) {
+                    //EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
+                    EventAst::Unknown (event.clone())
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0D, Some(&Requirement(v0)), Some(&EnumValue(v1)), Some(&Value(v2))) => {
-                if let Some(&EnumValue(v3)) = args.get(3) {
-                    EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
-                } else {
-                    EventAst::Unknown (event.clone())
-                }
-            }
+            (0x00, 0x0F, None, None, None) => { return event_asts; } // End if
+            (0x00, 0x10, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::Switch (v0, v1),
+            (0x00, 0x13, None,                   None,                 None) => EventAst::EndSwitch,
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
             (0x04, 0x00, Some(&Value(v0)),       Some(&Bool(v1)),      None) =>
                 if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
@@ -237,7 +269,7 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
         // TODO: Delete each comment when actually implemented
         event_asts.push(event_ast);
     }
-    ScriptAst { events: event_asts }
+    event_asts
 }
 
 /// An Abstract Syntax Tree representation of scripts
@@ -256,12 +288,14 @@ pub enum EventAst {
     Subroutine (i32),
     Return,
     Goto (i32),
-    If (i32), // TODO: I should probably combine all of these if variants into a higher level structure
+    IfStatement (IfStatement),
     IfValue (i32, i32),
     IfComparison (i32, i32, ComparisonOperator, i32),
     Else,
     AndComparison (i32, i32, ComparisonOperator, i32),
     ElseIfComparison (i32, i32, ComparisonOperator, i32),
+    Switch (i32, i32),
+    EndSwitch,
     AllowInterrupt,
     ChangeSubAction (i32),
     ChangeSubActionRestartFrame (i32),
@@ -292,6 +326,14 @@ pub enum EventAst {
     SoundVoiceEating,
     GraphicEffect (GraphicEffect),
     Unknown (Event)
+}
+
+#[derive(Clone, Debug)]
+pub struct IfStatement {
+    block: Vec<EventAst>,
+    test: Requirement, // TODO: Replace with Expression
+    else_ifs: Vec<IfStatement>,
+    else_block: Option<Vec<EventAst>>
 }
 
 #[derive(Clone, Debug)]

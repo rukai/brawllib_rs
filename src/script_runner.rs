@@ -111,12 +111,14 @@ impl ScriptRunner {
                 &EventAst::Subroutine (_) => { }
                 &EventAst::Return => { }
                 &EventAst::Goto (_) => { }
-                &EventAst::If (_) => { }
+                &EventAst::IfStatement (ref if_statement) => { }
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }
                 &EventAst::Else => { }
                 &EventAst::AndComparison (_, _, _, _) => { }
                 &EventAst::ElseIfComparison (_, _, _, _) => { }
+                &EventAst::Switch (_, _) => { }
+                &EventAst::EndSwitch => { }
                 &EventAst::ChangeSubAction (v0) => {
                     self.change_sub_action = ChangeSubAction::ChangeSubAction (v0);
                 }
