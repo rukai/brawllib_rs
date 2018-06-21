@@ -1,4 +1,5 @@
 use script::{Event, Requirement};
+use script;
 use std::iter::{Iterator, Peekable};
 use std::slice;
 
@@ -11,23 +12,7 @@ pub fn script_ast(events: &[Event]) -> ScriptAst {
     }
 }
 
-enum IfReadState {
-    If,
-    ElseIf (Requirement), // TODO: Replace with expression
-    Else,
-    End,
-}
-
-impl IfReadState {
-    fn continue_loop(&self) -> bool {
-        match self {
-            IfReadState::End => false,
-            _                => true,
-        }
-    }
-}
-
-fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock {
+fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock { // TODO: Ditch the peekable
     let mut event_asts = vec!();
     while let Some(event) = events.next() {
         let args = &event.arguments;
@@ -44,64 +29,83 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock {
             (0x00, 0x07, Some(&File(v0)),                     None,                None) => EventAst::Subroutine (v0),
             (0x00, 0x08, None,                                None,                None) => EventAst::Return,
             (0x00, 0x09, Some(&File(v0)),                     None,                None) => EventAst::Goto (v0),
-            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => {
-                info!("USE THESE {} {:?} {:?}", flip, v1, v2);
-                // TODO: match on ty to see if we need a single value or lhs + comparison + rhs
-                // TODO: When I get expression setup I need to handle both of these cases for rhs
-                //let rhs = match args.get(3) {
-                //    Some(&Scalar(v3))   => Some(v3),
-                //    Some(&Variable(v3)) => Some(v3),
-                //    None => None
-                //};
+            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
+                let test = match (v1, v2, args.get(3)) {
+                    (None, None, None) => {
+                        Expression::Nullary (ty.clone())
+                    }
+                    (Some(v1), None, None) => {
+                        let value = Box::new(match v1 {
+                            &Scalar(v1)   => Expression::Scalar(v1),
+                            &Variable(v1) => Expression::Variable(v1),
+                            &Value(v1)    => Expression::Value(v1),
+                            _ => {
+                                error!("Unhandled if statement case: value: {:?}", v1);
+                                continue;
+                            }
+                        });
+                        Expression::Unary (UnaryExpression { requirement: ty.clone(), value })
+                    }
+                    (Some(v1), Some(&Value(v2)), Some(v3)) => {
+                        let left = Box::new(match v1 {
+                            &Scalar(v1)   => Expression::Scalar(v1),
+                            &Variable(v1) => Expression::Variable(v1),
+                            &Value(v1)    => Expression::Value(v1),
+                            _ => {
+                                error!("Unhandled if statement case: left");
+                                continue;
+                            }
+                        });
+                        let right = Box::new(match v3 {
+                            &Scalar(v3)   => Expression::Scalar(v3),
+                            &Variable(v3) => Expression::Variable(v3),
+                            &Value(v3)    => Expression::Value(v3),
+                            _ => {
+                                error!("Unhandled if statement case: right");
+                                continue;
+                            }
+                        });
+                        if let script::Requirement::Comparison = ty {
+                            Expression::Binary (BinaryExpression { left, right, operator: ComparisonOperator::new(v2) })
+                        } else {
+                            error!("Unhandled if statement case: comparison");
+                            continue;
+                        }
+                    }
+                    (v1, v2, v3) => {
+                        error!("Unhandled if statement case: {:?} {:?} {:?}", v1, v2, v3);
+                        continue;
+                    }
+                };
+                let test = if flip { Expression::Not (Box::new(test)) } else { test };
 
-                let mut state = IfReadState::If;
-                let mut block = vec!();
-                let mut else_ifs = vec!();
-                let mut else_block = None;
-
-                while state.continue_loop() {
-                    let prev_events = match process_block(events) {
-                        ProcessedBlock::Finished (events) => {
-                            error!("IfStatement did not terminate");
-                            return ProcessedBlock::Finished(events);
-                        }
-                        ProcessedBlock::Else (prev_events) => {
-                            state = IfReadState::Else;
-                            prev_events
-                        }
-                        ProcessedBlock::ElseIf (prev_events, requirement) => {
-                            state = IfReadState::ElseIf (requirement);
-                            prev_events
-                        }
-                        ProcessedBlock::EndIf (prev_events) => {
-                            state = IfReadState::End;
-                            prev_events
-                        }
-                    };
-
-                    match &state {
-                        &IfReadState::If => {
-                            block = prev_events;
-                        }
-                        &IfReadState::ElseIf (ref requirement) => {
-                            else_ifs.push(IfStatement { // TODO: Refactor to seperate struct, remove else_ifs + else ALSO remove block + test from root If
-                                block: prev_events,
-                                test: requirement.clone(),
-                                else_ifs: vec!(),
-                                else_block: None
-                            });
-                        }
-                        &IfReadState::Else => {
-                            else_block = Some(prev_events);
-                        }
-                        &IfReadState::End => { }
+                match process_block(events) {
+                    ProcessedBlock::EndIf ( then_branch ) => {
+                        EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
+                    }
+                    ProcessedBlock::EndIfAndElse { then_branch, else_branch } => {
+                        EventAst::IfStatement (IfStatement { test, then_branch, else_branch }) // TODO: Maybe I can just return this in the first place, lol
+                    }
+                    _ => {
+                        error!("IfStatement did not terminate");
+                        EventAst::Unknown (event.clone())
                     }
                 }
-
-                EventAst::IfStatement (IfStatement { block, test: ty.clone(), else_ifs, else_block })
             }
-            (0x00, 0x0E, None, None, None) => EventAst::Else,
-            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => {
+            (0x00, 0x0E, None, None, None) => { // Else
+                match process_block(events) {
+                    ProcessedBlock::EndIf (else_branch) => {
+                        let then_branch = event_asts;
+                        let else_branch = Some(Box::new(EventAst::Block(else_branch)));
+                        return ProcessedBlock::EndIfAndElse { then_branch, else_branch }
+                    }
+                    _ => {
+                        error!("IfStatement did not terminate");
+                        EventAst::Unknown (event.clone()) // TODO: Maybe return ProcessedBlock::Error here
+                    }
+                }
+            }
+            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => { // And
                 if let Some(&Variable(v3)) = args.get(3) {
                     info!("USE THESE {:?} {} {:?} {:?} {}", ty, flip, v1, v2, v3);
                     //EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
@@ -110,14 +114,69 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0D, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), v2) => {
-                if let Some(&Variable(v3)) = args.get(3) {
-                    info!("USE THESE {:?} {} {:?} {:?} {}", ty, flip, v1, v2, v3);
-                    //EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
-                    EventAst::Unknown (event.clone())
-                } else {
-                    EventAst::Unknown (event.clone())
-                }
+            (0x00, 0x0D, Some(&Requirement { ref ty, flip }), v1, v2) => { // Else If
+                let test = match (v1, v2, args.get(3)) {
+                    (None, None, None) => {
+                        Expression::Nullary(ty.clone())
+                    }
+                    (Some(v1), None, None) => {
+                        let value = Box::new(match v1 {
+                            &Scalar(v1)   => Expression::Scalar(v1),
+                            &Variable(v1) => Expression::Variable(v1),
+                            &Value(v1)    => Expression::Value(v1),
+                            _ => {
+                                error!("Unhandled else if statement case: value: {:?}", v1);
+                                continue;
+                            }
+                        });
+                        Expression::Unary (UnaryExpression { requirement: ty.clone(), value })
+                    }
+                    (Some(v1), Some(&Value(v2)), Some(v3)) => {
+                        let left = Box::new(match v1 {
+                            &Scalar(v1)   => Expression::Scalar(v1),
+                            &Variable(v1) => Expression::Variable(v1),
+                            &Value(v1)    => Expression::Value(v1),
+                            _ => {
+                                error!("Unhandled else if statement case: left");
+                                continue;
+                            }
+                        });
+                        let right = Box::new(match v3 {
+                            &Scalar(v3)   => Expression::Scalar(v3),
+                            &Variable(v3) => Expression::Variable(v3),
+                            &Value(v3)    => Expression::Value(v3),
+                            _ => {
+                                error!("Unhandled else if statement case: right");
+                                continue;
+                            }
+                        });
+                        if let script::Requirement::Comparison = ty {
+                            Expression::Binary (BinaryExpression { left, right, operator: ComparisonOperator::new(v2) })
+                        } else {
+                            error!("Unhandled else if statement case: comparison");
+                            continue;
+                        }
+                    }
+                    (v1, v2, v3) => {
+                        error!("Unhandled else if statement case: {:?} {:?} {:?}", v1, v2, v3);
+                        continue;
+                    }
+                };
+                let test = if flip { Expression::Not (Box::new(test)) } else { test };
+
+                let event = match process_block(events) {
+                    ProcessedBlock::EndIf ( then_branch ) => {
+                        EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
+                    }
+                    ProcessedBlock::EndIfAndElse { then_branch, else_branch } => {
+                        EventAst::IfStatement (IfStatement { test, then_branch, else_branch })
+                    }
+                    _ => {
+                        error!("IfStatement did not terminate");
+                        EventAst::Unknown (event.clone())
+                    }
+                };
+                return ProcessedBlock::EndIfAndElse { then_branch: event_asts, else_branch: Some(Box::new(event)) }; // TODO: Need to think about this
             }
             (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf (event_asts) }
             (0x00, 0x10, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::Switch (v0, v1),
@@ -322,10 +381,9 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock {
 }
 
 enum ProcessedBlock {
-    Finished (Vec<EventAst>),
-    Else     (Vec<EventAst>), // contains previous block
-    ElseIf   (Vec<EventAst>, Requirement), // contains previous block
-    EndIf    (Vec<EventAst>), // contains previous block
+    Finished     (Vec<EventAst>),
+    EndIf        (Vec<EventAst>),
+    EndIfAndElse { then_branch: Vec<EventAst>, else_branch: Option<Box<EventAst>> }, // contains previous block
     //And      (Expression),
     //Or       (Expression),
 }
@@ -339,7 +397,7 @@ pub struct ScriptAst {
 
 #[derive(Clone, Debug)]
 pub enum EventAst {
-    Block (Vec<EventAst>)
+    Block (Vec<EventAst>),
     SyncWait (f32),
     Nop,
     AsyncWait (f32),
@@ -390,10 +448,34 @@ pub enum EventAst {
 
 #[derive(Clone, Debug)]
 pub struct IfStatement {
-    block: Vec<EventAst>,
-    test: Requirement, // TODO: Replace with Expression
-    else_ifs: Vec<IfStatement>,
-    else_block: Option<Vec<EventAst>>
+    test: Expression,
+    then_branch: Vec<EventAst>,
+    /// EventAst can only be IfStatement or Block
+    else_branch: Option<Box<EventAst>>
+}
+
+#[derive(Clone, Debug)]
+pub enum Expression {
+    Nullary  (Requirement),
+    Unary    (UnaryExpression),
+    Binary   (BinaryExpression),
+    Not      (Box<Expression>),
+    Variable (i32),
+    Value    (i32),
+    Scalar   (f32),
+}
+
+#[derive(Clone, Debug)]
+pub struct BinaryExpression {
+    left: Box<Expression>,
+    right: Box<Expression>,
+    operator: ComparisonOperator
+}
+
+#[derive(Clone, Debug)]
+pub struct UnaryExpression {
+    requirement: Requirement,
+    value: Box<Expression>,
 }
 
 #[derive(Clone, Debug)]

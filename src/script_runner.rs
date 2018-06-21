@@ -91,11 +91,17 @@ impl ScriptRunner {
         }
     }
 
-    fn step_recursive(&mut self, events: &Vec<EventAst>, action_name: &str) {
+    fn step_recursive(&mut self, events: &[EventAst], action_name: &str) {
         self.hitlist_reset = false;
         let event_index = self.event_indexes.last_mut().unwrap();
         while let Some(event) = events.get(*event_index) {
             match event {
+                &EventAst::Block (ref events) => {
+                    // TODO
+                    for event in events {
+                        debug!("{:?}", event);
+                    }
+                }
                 &EventAst::SyncWait (ref value) => {
                     self.wait_until = Some(self.frame_index + *value);
                     *event_index += 1;
@@ -112,6 +118,7 @@ impl ScriptRunner {
                 &EventAst::Return => { }
                 &EventAst::Goto (_) => { }
                 &EventAst::IfStatement (ref if_statement) => {
+                    debug!("{:?}", if_statement);
                 }
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }

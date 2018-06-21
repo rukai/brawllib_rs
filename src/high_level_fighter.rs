@@ -133,7 +133,7 @@ impl HighLevelFighter {
                 }
 
                 if name == String::from("LandingFallSpecial") { // TODO: This is interesting on fox, get these implemented before moving on
-                    info!("{:#?}", scripts);
+                    //info!("{:#?}", scripts);
                 }
 
                 let iasa = if let Some(iasa) = iasa {
