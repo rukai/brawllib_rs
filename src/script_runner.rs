@@ -111,7 +111,8 @@ impl ScriptRunner {
                 &EventAst::Subroutine (_) => { }
                 &EventAst::Return => { }
                 &EventAst::Goto (_) => { }
-                &EventAst::IfStatement (ref if_statement) => { }
+                &EventAst::IfStatement (ref if_statement) => {
+                }
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }
                 &EventAst::Else => { }

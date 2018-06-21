@@ -1,11 +1,33 @@
 use script::{Event, Requirement};
-use std::iter::Iterator;
+use std::iter::{Iterator, Peekable};
+use std::slice;
 
 pub fn script_ast(events: &[Event]) -> ScriptAst {
-    ScriptAst { events: script_ast_inner(&mut events.iter()) }
+    if let ProcessedBlock::Finished(events) = process_block(&mut events.iter().peekable()) {
+        ScriptAst { events }
+    } else {
+        error!("A block in the script did not terminate.");
+        ScriptAst { events: vec!() }
+    }
 }
 
-fn script_ast_inner(mut events: &mut Iterator<Item=&Event>) -> Vec<EventAst> {
+enum IfReadState {
+    If,
+    ElseIf (Requirement), // TODO: Replace with expression
+    Else,
+    End,
+}
+
+impl IfReadState {
+    fn continue_loop(&self) -> bool {
+        match self {
+            IfReadState::End => false,
+            _                => true,
+        }
+    }
+}
+
+fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock {
     let mut event_asts = vec!();
     while let Some(event) = events.next() {
         let args = &event.arguments;
@@ -22,23 +44,9 @@ fn script_ast_inner(mut events: &mut Iterator<Item=&Event>) -> Vec<EventAst> {
             (0x00, 0x07, Some(&File(v0)),                     None,                None) => EventAst::Subroutine (v0),
             (0x00, 0x08, None,                                None,                None) => EventAst::Return,
             (0x00, 0x09, Some(&File(v0)),                     None,                None) => EventAst::Goto (v0),
-            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), None,                None) => EventAst::IfStatement (
-                IfStatement {
-                    block: script_ast_inner(events),
-                    test: ty.clone(), // TODO: Include flip in test expression
-                    else_ifs: vec!(),
-                    else_block: None,
-                }
-            ),
-            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), Some(&Value(v1)), None) => EventAst::IfStatement (
-                IfStatement {
-                    block: script_ast_inner(events),
-                    test: ty.clone(), // TODO: Include flip in test expression
-                    else_ifs: vec!(),
-                    else_block: None,
-                }
-            ),
-            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => { // TODO: Maybe v1 is not guaranteed to be Variable
+            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => {
+                info!("USE THESE {} {:?} {:?}", flip, v1, v2);
+                // TODO: match on ty to see if we need a single value or lhs + comparison + rhs
                 // TODO: When I get expression setup I need to handle both of these cases for rhs
                 //let rhs = match args.get(3) {
                 //    Some(&Scalar(v3))   => Some(v3),
@@ -46,31 +54,72 @@ fn script_ast_inner(mut events: &mut Iterator<Item=&Event>) -> Vec<EventAst> {
                 //    None => None
                 //};
 
-                EventAst::IfStatement (IfStatement {
-                    block: script_ast_inner(events),
-                    test: ty.clone(), // TODO: Include flip in test expression
-                    else_ifs: vec!(),
-                    else_block: None,
-                })
+                let mut state = IfReadState::If;
+                let mut block = vec!();
+                let mut else_ifs = vec!();
+                let mut else_block = None;
+
+                while state.continue_loop() {
+                    let prev_events = match process_block(events) {
+                        ProcessedBlock::Finished (events) => {
+                            error!("IfStatement did not terminate");
+                            return ProcessedBlock::Finished(events);
+                        }
+                        ProcessedBlock::Else (prev_events) => {
+                            state = IfReadState::Else;
+                            prev_events
+                        }
+                        ProcessedBlock::ElseIf (prev_events, requirement) => {
+                            state = IfReadState::ElseIf (requirement);
+                            prev_events
+                        }
+                        ProcessedBlock::EndIf (prev_events) => {
+                            state = IfReadState::End;
+                            prev_events
+                        }
+                    };
+
+                    match &state {
+                        &IfReadState::If => {
+                            block = prev_events;
+                        }
+                        &IfReadState::ElseIf (ref requirement) => {
+                            else_ifs.push(IfStatement { // TODO: Refactor to seperate struct, remove else_ifs + else ALSO remove block + test from root If
+                                block: prev_events,
+                                test: requirement.clone(),
+                                else_ifs: vec!(),
+                                else_block: None
+                            });
+                        }
+                        &IfReadState::Else => {
+                            else_block = Some(prev_events);
+                        }
+                        &IfReadState::End => { }
+                    }
+                }
+
+                EventAst::IfStatement (IfStatement { block, test: ty.clone(), else_ifs, else_block })
             }
             (0x00, 0x0E, None, None, None) => EventAst::Else,
-            (0x00, 0x0B, Some(&Requirement { .. }), Some(&Variable(v1)), Some(&Value(v2))) => {
+            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => {
                 if let Some(&Variable(v3)) = args.get(3) {
+                    info!("USE THESE {:?} {} {:?} {:?} {}", ty, flip, v1, v2, v3);
                     //EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
                     EventAst::Unknown (event.clone())
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0D, Some(&Requirement { .. }), Some(&Variable(v1)), Some(&Value(v2))) => {
+            (0x00, 0x0D, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), v2) => {
                 if let Some(&Variable(v3)) = args.get(3) {
+                    info!("USE THESE {:?} {} {:?} {:?} {}", ty, flip, v1, v2, v3);
                     //EventAst::ElseIfComparison (v0, v1, ComparisonOperator::new(v2), v3)
                     EventAst::Unknown (event.clone())
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0F, None, None, None) => { return event_asts; } // End if
+            (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf (event_asts) }
             (0x00, 0x10, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::Switch (v0, v1),
             (0x00, 0x13, None,                   None,                 None) => EventAst::EndSwitch,
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
@@ -269,8 +318,18 @@ fn script_ast_inner(mut events: &mut Iterator<Item=&Event>) -> Vec<EventAst> {
         // TODO: Delete each comment when actually implemented
         event_asts.push(event_ast);
     }
-    event_asts
+    ProcessedBlock::Finished(event_asts)
 }
+
+enum ProcessedBlock {
+    Finished (Vec<EventAst>),
+    Else     (Vec<EventAst>), // contains previous block
+    ElseIf   (Vec<EventAst>, Requirement), // contains previous block
+    EndIf    (Vec<EventAst>), // contains previous block
+    //And      (Expression),
+    //Or       (Expression),
+}
+
 
 /// An Abstract Syntax Tree representation of scripts
 #[derive(Clone, Debug)]
@@ -280,6 +339,7 @@ pub struct ScriptAst {
 
 #[derive(Clone, Debug)]
 pub enum EventAst {
+    Block (Vec<EventAst>)
     SyncWait (f32),
     Nop,
     AsyncWait (f32),
