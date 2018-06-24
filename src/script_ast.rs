@@ -3,12 +3,12 @@ use script;
 use std::iter::{Iterator, Peekable};
 use std::slice;
 
-pub fn script_ast(events: &[Event]) -> ScriptAst {
+pub fn script_ast(events: &[Event]) -> Block {
     if let ProcessedBlock::Finished(events) = process_block(&mut events.iter().peekable()) {
-        ScriptAst { events }
+        events
     } else {
         error!("A block in the script did not terminate.");
-        ScriptAst { events: vec!() }
+        Block { events: vec!() }
     }
 }
 
@@ -95,17 +95,18 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock { 
             (0x00, 0x0E, None, None, None) => { // Else
                 match process_block(events) {
                     ProcessedBlock::EndIf (else_branch) => {
-                        let then_branch = event_asts;
-                        let else_branch = Some(Box::new(EventAst::Block(else_branch)));
+                        let then_branch = Block { events: event_asts };
+                        let else_branch = Some(Box::new(else_branch));
                         return ProcessedBlock::EndIfAndElse { then_branch, else_branch }
                     }
                     _ => {
                         error!("IfStatement did not terminate");
-                        EventAst::Unknown (event.clone()) // TODO: Maybe return ProcessedBlock::Error here
+                        EventAst::Unknown (event.clone())
                     }
                 }
             }
-            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), Some(&Variable(v1)), Some(&Value(v2))) => { // And
+            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), v1, v2) => { // And
+                println!("len: {}", event_asts.len());
                 if let Some(&Variable(v3)) = args.get(3) {
                     info!("USE THESE {:?} {} {:?} {:?} {}", ty, flip, v1, v2, v3);
                     //EventAst::AndComparison (v0, v1, ComparisonOperator::new(v2), v3)
@@ -173,12 +174,14 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock { 
                     }
                     _ => {
                         error!("IfStatement did not terminate");
-                        EventAst::Unknown (event.clone())
+                        return ProcessedBlock::Finished (Block { events: event_asts });
                     }
                 };
-                return ProcessedBlock::EndIfAndElse { then_branch: event_asts, else_branch: Some(Box::new(event)) }; // TODO: Need to think about this
+                let else_branch = Some(Box::new(Block { events: vec!(event)}));
+                let then_branch = Block { events: event_asts };
+                return ProcessedBlock::EndIfAndElse { then_branch, else_branch };
             }
-            (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf (event_asts) }
+            (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf (Block { events: event_asts }) }
             (0x00, 0x10, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::Switch (v0, v1),
             (0x00, 0x13, None,                   None,                 None) => EventAst::EndSwitch,
             (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
@@ -377,27 +380,17 @@ fn process_block(events: &mut Peekable<slice::Iter<Event>>) -> ProcessedBlock { 
         // TODO: Delete each comment when actually implemented
         event_asts.push(event_ast);
     }
-    ProcessedBlock::Finished(event_asts)
+    ProcessedBlock::Finished(Block { events: event_asts })
 }
 
 enum ProcessedBlock {
-    Finished     (Vec<EventAst>),
-    EndIf        (Vec<EventAst>),
-    EndIfAndElse { then_branch: Vec<EventAst>, else_branch: Option<Box<EventAst>> }, // contains previous block
-    //And      (Expression),
-    //Or       (Expression),
-}
-
-
-/// An Abstract Syntax Tree representation of scripts
-#[derive(Clone, Debug)]
-pub struct ScriptAst {
-    pub events: Vec<EventAst>
+    Finished     (Block),
+    EndIf        (Block),
+    EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>> },
 }
 
 #[derive(Clone, Debug)]
 pub enum EventAst {
-    Block (Vec<EventAst>),
     SyncWait (f32),
     Nop,
     AsyncWait (f32),
@@ -447,11 +440,15 @@ pub enum EventAst {
 }
 
 #[derive(Clone, Debug)]
+pub struct Block {
+    pub events: Vec<EventAst>
+}
+
+#[derive(Clone, Debug)]
 pub struct IfStatement {
-    test: Expression,
-    then_branch: Vec<EventAst>,
-    /// EventAst can only be IfStatement or Block
-    else_branch: Option<Box<EventAst>>
+    pub test: Expression,
+    pub then_branch: Block,
+    pub else_branch: Option<Box<Block>>
 }
 
 #[derive(Clone, Debug)]
@@ -467,15 +464,15 @@ pub enum Expression {
 
 #[derive(Clone, Debug)]
 pub struct BinaryExpression {
-    left: Box<Expression>,
-    right: Box<Expression>,
-    operator: ComparisonOperator
+    pub left: Box<Expression>,
+    pub right: Box<Expression>,
+    pub operator: ComparisonOperator
 }
 
 #[derive(Clone, Debug)]
 pub struct UnaryExpression {
-    requirement: Requirement,
-    value: Box<Expression>,
+    pub requirement: Requirement,
+    pub value: Box<Expression>,
 }
 
 #[derive(Clone, Debug)]

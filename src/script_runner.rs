@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use script_ast::{EventAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide};
+use script_ast::{Block, EventAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, Expression};
 use high_level_fighter::{HighLevelScripts, HitBoxValues};
 
 pub struct ScriptRunner {
     pub variables: HashMap<i32, i32>,
-    pub event_indexes: Vec<usize>,
+    pub callstack: Vec<(Block, usize)>,
     pub frame_index: f32,
     pub wait_until: Option<f32>,
     pub interruptible: bool,
@@ -58,7 +58,7 @@ impl ScriptRunner {
     pub fn new() -> ScriptRunner {
         ScriptRunner {
             variables: HashMap::new(),
-            event_indexes: vec!(0),
+            event_indices: vec!(0),
             frame_index: 0.0,
             wait_until: None,
             interruptible: false,
@@ -75,14 +75,14 @@ impl ScriptRunner {
         self.frame_index += self.frame_speed_modifier;
 
         if let Some(wait_until) = self.wait_until {
-            if self.frame_index >= wait_until {
+            if self.frame_index >= wait_until
                 self.wait_until = None;
             }
         }
 
         if self.wait_until.is_none() {
             if let &Some(ref scripts) = scripts {
-                self.step_recursive(&scripts.script_main.events, action_name);
+                self.step_block(&scripts.script_main, 0, action_name);
             }
         }
 
@@ -91,25 +91,22 @@ impl ScriptRunner {
         }
     }
 
-    fn step_recursive(&mut self, events: &[EventAst], action_name: &str) {
+    fn evaluate_expression(&mut self, expression: &Expression) -> bool {
+        info!("{:?}", expression);
+        false
+    }
+
+    fn step_block(&mut self, block: &Block, continue_index: usize, action_name: &str) {
         self.hitlist_reset = false;
-        let event_index = self.event_indexes.last_mut().unwrap();
-        while let Some(event) = events.get(*event_index) {
+        //let event_index = self.event_indices.last_mut().unwrap(); // TODO: DELETE
+        for event in block.events[continue_index..] {
             match event {
-                &EventAst::Block (ref events) => {
-                    // TODO
-                    for event in events {
-                        debug!("{:?}", event);
-                    }
-                }
                 &EventAst::SyncWait (ref value) => {
                     self.wait_until = Some(self.frame_index + *value);
-                    *event_index += 1;
                     return;
                 }
                 &EventAst::AsyncWait (ref value) => {
                     self.wait_until = Some(*value);
-                    *event_index += 1;
                     return;
                 }
                 &EventAst::SetLoop (_) => { }
@@ -118,7 +115,14 @@ impl ScriptRunner {
                 &EventAst::Return => { }
                 &EventAst::Goto (_) => { }
                 &EventAst::IfStatement (ref if_statement) => {
-                    debug!("{:?}", if_statement);
+                    if self.evaluate_expression(&if_statement.test) {
+                        self.step_block(&if_statement.then_branch, 0, action_name);
+                    }
+                    else {
+                        if let Some(else_branch) = &if_statement.else_branch {
+                            self.step_block(else_branch, 0, action_name);
+                        }
+                    }
                 }
                 &EventAst::IfValue (_, _) => { }
                 &EventAst::IfComparison (_, _, _, _) => { }
@@ -222,7 +226,6 @@ impl ScriptRunner {
                 }
                 &EventAst::Nop => { }
             }
-            *event_index += 1;
         }
     }
 }

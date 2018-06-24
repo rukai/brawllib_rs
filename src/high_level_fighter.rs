@@ -5,7 +5,7 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{FighterAttributes, AnimationFlags};
-use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
+use script_ast::{Block, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
 use script_ast;
 use script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
 
@@ -36,6 +36,7 @@ impl HighLevelFighter {
                         let sub_action_flags = &fighter_data.sub_action_flags[i];
                         if sub_action_flags.name == chr0.name {
                             animation_flags = Some(sub_action_flags.animation_flags.clone());
+                            //info!("{}", name);
                             scripts = Some(HighLevelScripts {
                                 script_main:  script_ast::script_ast(&fighter_data.sub_action_main[i].events),
                                 script_gfx:   script_ast::script_ast(&fighter_data.sub_action_gfx[i].events),
@@ -204,10 +205,10 @@ pub struct HighLevelAction {
 
 #[derive(Clone, Debug)]
 pub struct HighLevelScripts {
-    pub script_main:  ScriptAst,
-    pub script_gfx:   ScriptAst,
-    pub script_sfx:   ScriptAst,
-    pub script_other: ScriptAst,
+    pub script_main:  Block,
+    pub script_gfx:   Block,
+    pub script_sfx:   Block,
+    pub script_other: Block,
 }
 
 #[derive(Clone, Debug)]
