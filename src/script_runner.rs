@@ -1,6 +1,16 @@
-use std::collections::HashMap;
-use script_ast::{Block, EventAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, Expression};
 use high_level_fighter::HitBoxValues;
+use script::Requirement;
+use script_ast::{
+    Block,
+    EventAst,
+    HitBoxArguments,
+    SpecialHitBoxArguments,
+    EdgeSlide,
+    Expression,
+    ComparisonOperator
+};
+
+use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
     pub variables: HashMap<i32, i32>,
@@ -123,7 +133,61 @@ impl<'a> ScriptRunner<'a> {
 
     fn evaluate_expression(&mut self, expression: &Expression) -> bool {
         info!("{:?}", expression);
-        false
+        match expression {
+            &Expression::Nullary (ref requirement) => {
+                match requirement {
+                    Requirement::CharacterExists => true,
+                    Requirement::OnGround => true,
+                    Requirement::InAir => false,
+                    Requirement::FacingRight => true,
+                    Requirement::HasntTethered3Times => true,
+                    Requirement::IsNotInDamagingLens => true,
+                    _ => false
+                }
+            }
+            &Expression::Unary (ref unary) => {
+                match unary.requirement {
+                    Requirement::CharacterExists => true,
+                    Requirement::OnGround => true,
+                    Requirement::InAir => false,
+                    Requirement::FacingRight => true,
+                    Requirement::HasntTethered3Times => true,
+                    Requirement::IsNotInDamagingLens => true,
+                    _ => false
+                }
+            }
+            &Expression::Binary (ref binary) => {
+                let left = match &*binary.left {
+                    &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32, // TODO: Maybe this needs to be converted to be read as the same type as right, i.e. f32 or i32
+                    &Expression::Value    (ref value)   => *value as f32,
+                    &Expression::Scalar   (ref value)   => *value,
+                    _                  => 0.0
+                };
+                let right = match &*binary.right {
+                    &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32,
+                    &Expression::Value    (ref value)   => *value as f32,
+                    &Expression::Scalar   (ref value)   => *value,
+                    _                  => 0.0
+                };
+                match &binary.operator {
+                    &ComparisonOperator::LessThan           => left <  right,
+                    &ComparisonOperator::LessThanOrEqual    => left <= right,
+                    &ComparisonOperator::Equal              => left == right,
+                    &ComparisonOperator::NotEqual           => left != right,
+                    &ComparisonOperator::GreaterThanOrEqual => left >= right,
+                    &ComparisonOperator::GreaterThan        => left >  right,
+                    &ComparisonOperator::Unknown (_)        => false,
+                }
+            }
+            &Expression::Not (ref expression) => {
+                !self.evaluate_expression(expression)
+            }
+            &Expression::Variable (_) |
+            &Expression::Value (_) |
+            &Expression::Scalar (_) => {
+                false
+            }
+        }
     }
 
 

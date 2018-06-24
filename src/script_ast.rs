@@ -1,5 +1,6 @@
 use script::{Event, Requirement};
 use script;
+
 use std::iter::{Iterator, Peekable};
 use std::slice;
 
