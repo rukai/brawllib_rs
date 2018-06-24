@@ -46,11 +46,16 @@ impl HighLevelFighter {
                         }
                     }
                 }
+                let script_refs = if let &Some(ref scripts) = &scripts {
+                    vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other)
+                } else {
+                    vec!()
+                };
                 let animation_flags = animation_flags.unwrap_or(AnimationFlags::NONE);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_offset = None;
-                let mut script_runner = ScriptRunner::new();
+                let mut script_runner = ScriptRunner::new(&script_refs);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -127,7 +132,7 @@ impl HighLevelFighter {
                         iasa = Some(script_runner.frame_index)
                     }
 
-                    script_runner.step(&scripts, name.as_ref());
+                    script_runner.step(name.as_ref());
                     prev_hit_boxes = Some(hit_boxes);
 
                     if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }

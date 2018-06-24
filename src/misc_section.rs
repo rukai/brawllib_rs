@@ -28,11 +28,13 @@ pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     // However I have no idea how to find that so I'm just going to calculate the length and hardcode the min_width + min_height
 
     let ecb_offset = unk0_offset as usize + 0x20;
-    let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4;
     let mut ecb_bones = vec!();
-    if ecb_total < 100 {
-        for i in 0..ecb_total {
-            ecb_bones.push((&parent_data[ecb_offset + i * 4 ..]).read_i32::<BigEndian>().unwrap());
+    if hurt_box_list.start_offset != 0 {
+        let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4;
+        if ecb_total < 100 {
+            for i in 0..ecb_total {
+                ecb_bones.push((&parent_data[ecb_offset + i * 4 ..]).read_i32::<BigEndian>().unwrap());
+            }
         }
     }
 
