@@ -132,7 +132,6 @@ impl<'a> ScriptRunner<'a> {
     }
 
     fn evaluate_expression(&mut self, expression: &Expression) -> bool {
-        info!("{:?}", expression);
         match expression {
             &Expression::Nullary (ref requirement) => {
                 match requirement {
@@ -176,7 +175,9 @@ impl<'a> ScriptRunner<'a> {
                     &ComparisonOperator::NotEqual           => left != right,
                     &ComparisonOperator::GreaterThanOrEqual => left >= right,
                     &ComparisonOperator::GreaterThan        => left >  right,
-                    &ComparisonOperator::Unknown (_)        => false,
+                    &ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left) || self.evaluate_expression(&*binary.right),
+                    &ComparisonOperator::And                => self.evaluate_expression(&*binary.left) && self.evaluate_expression(&*binary.right),
+                    &ComparisonOperator::UnknownArg (_)     => false,
                 }
             }
             &Expression::Not (ref expression) => {
@@ -227,9 +228,7 @@ impl<'a> ScriptRunner<'a> {
                 self.frame_index = v0;
             }
             &EventAst::FrameSpeedModifier (v0) => {
-                if action_name != "LandingFallSpecial" { // TODO: Hack because scripts are setting this to all sorts of weird values in this action
-                    self.frame_speed_modifier = v0;
-                }
+                self.frame_speed_modifier = v0;
             }
             &EventAst::TimeManipulation (_, _) => { }
             &EventAst::SetAirGround (v0) => {
