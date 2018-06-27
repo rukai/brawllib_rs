@@ -1,6 +1,7 @@
 use high_level_fighter::HitBoxValues;
 use script::Requirement;
 use script_ast::{
+    ScriptAst,
     Block,
     EventAst,
     HitBoxArguments,
@@ -13,16 +14,20 @@ use script_ast::{
 use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
-    pub variables: HashMap<i32, i32>,
-    pub call_stacks: Vec<CallStack<'a>>,
-    pub frame_index: f32,
-    pub interruptible: bool,
-    pub hitboxes: [Option<ScriptHitBox>; 7],
+    pub variables:            HashMap<i32, i32>,
+    pub call_stacks:          Vec<CallStack<'a>>,
+    pub frame_index:          f32,
+    pub interruptible:        bool,
+    pub hitboxes:             [Option<ScriptHitBox>; 7],
     pub frame_speed_modifier: f32,
-    pub airbourne: bool,
-    pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
-    pub change_sub_action: ChangeSubAction,
-    pub hitlist_reset: bool,
+    pub airbourne:            bool,
+    pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
+    pub change_sub_action:    ChangeSubAction,
+    pub hitlist_reset:        bool,
+    pub slope_contour_stand:  Option<i32>,
+    pub slope_contour_full:   Option<(i32, i32)>,
+    pub rumble:               Option<(i32, i32)>,
+    pub rumble_loop:          Option<(i32, i32)>,
 }
 
 pub struct CallStack<'a> {
@@ -74,29 +79,34 @@ impl ScriptHitBox {
 }
 
 impl<'a> ScriptRunner<'a> {
-    pub fn new(scripts: &[&'a Block]) -> ScriptRunner<'a> {
+    pub fn new(scripts: &[&'a ScriptAst]) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
-        for block in scripts {
-            let calls = vec!(Call { block, index: 0 });
+        for script in scripts {
+            let calls = vec!(Call { block: &script.block, index: 0 });
             call_stacks.push(CallStack { calls, wait_until: -1.0 });
         }
 
         ScriptRunner {
-            variables: HashMap::new(),
             call_stacks,
-            frame_index: 0.0,
-            interruptible: false,
-            hitboxes: [None, None, None, None, None, None, None],
+            variables:            HashMap::new(),
+            frame_index:          0.0,
+            interruptible:        false,
+            hitboxes:             [None, None, None, None, None, None, None],
             frame_speed_modifier: 1.0,
-            airbourne: false,
-            edge_slide: EdgeSlide::SlideOff,
-            change_sub_action: ChangeSubAction::Continue,
-            hitlist_reset: false,
+            airbourne:            false,
+            edge_slide:           EdgeSlide::SlideOff,
+            change_sub_action:    ChangeSubAction::Continue,
+            hitlist_reset:        false,
+            slope_contour_stand:  None,
+            slope_contour_full:   None,
+            rumble:               None,
+            rumble_loop:          None,
         }
     }
 
     pub fn step(&mut self, action_name: &str) {
         self.hitlist_reset = false;
+        self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.frame_index += self.frame_speed_modifier;
 
         // run the main, gfx, sfx and other scripts
@@ -292,6 +302,28 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::AllowInterrupt => {
                 self.interruptible = true;
+            }
+            &EventAst::Rumble { unk1, unk2 } => {
+                self.rumble = Some((unk1, unk2))
+            }
+            &EventAst::RumbleLoop { unk1, unk2 } => {
+                self.rumble_loop = Some((unk1, unk2))
+            }
+            &EventAst::SlopeContourStand { leg_bone_parent } => {
+                if leg_bone_parent == 0 {
+                    self.slope_contour_stand = None;
+                }
+                else {
+                    self.slope_contour_stand = Some(leg_bone_parent);
+                }
+            }
+            &EventAst::SlopeContourFull { hip_n_or_top_n, trans_bone } => {
+                if hip_n_or_top_n == 0 && trans_bone == 0 {
+                    self.slope_contour_full = None;
+                }
+                else {
+                    self.slope_contour_full = Some((hip_n_or_top_n, trans_bone));
+                }
             }
             &EventAst::SoundEffect1 (_) => { }
             &EventAst::SoundEffect2 (_) => { }

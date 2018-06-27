@@ -1,15 +1,28 @@
-use script::{Event, Requirement, Argument};
+use script::{Script, Event, Requirement, Argument};
 use script;
 
 use std::iter::Iterator;
 use std::slice;
 
-pub fn script_ast(events: &[Event]) -> Block {
-    if let ProcessedBlock::Finished(events) = process_block(&mut events.iter()) {
-        events
-    } else {
-        error!("A block in the script did not terminate.");
-        Block { events: vec!() }
+#[derive(Clone, Debug)]
+pub struct ScriptAst {
+    pub block:  Block,
+    pub offset: u32,
+}
+
+impl ScriptAst {
+    pub fn new(script: &Script) -> ScriptAst {
+        let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter()) {
+            events
+        } else {
+            error!("A block in the script did not terminate.");
+            Block { events: vec!() }
+        };
+
+        ScriptAst {
+            block,
+            offset: script.offset
+        }
     }
 }
 
@@ -27,7 +40,7 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
             (0x00, 0x05, None,              None, None) => EventAst::ExecuteLoop,
             (0x00, 0x07, Some(&Offset(v0)), None, None) => EventAst::Subroutine (v0),
             (0x00, 0x08, None,              None, None) => EventAst::Return,
-            (0x00, 0x09, Some(&File(v0)),   None, None) => EventAst::Goto (v0),
+            (0x00, 0x09, Some(&Offset(v0)), None, None) => EventAst::Goto (v0),
             (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
                 if let Some(mut test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
                     match process_block(events) {
@@ -238,6 +251,10 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
             (0x06, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: v0, new_damage: v1 },
             (0x06, 0x02, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: v0, new_size:   v1 },
             (0x06, 0x03, Some(&Value(v0)), None,             None) => EventAst::DeleteHitBox (v0),
+            (0x07, 0x07, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::Rumble { unk1: v0, unk2: v1 },
+            (0x07, 0x0B, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
+            (0x18, 0x00, Some(&Value(v0)), None,             None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
+            (0x18, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
 
             // sound
             (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
@@ -408,6 +425,10 @@ pub enum EventAst {
     ChangeHitBoxDamage { hitbox_id: i32, new_damage: i32 },
     ChangeHitBoxSize   { hitbox_id: i32, new_size:   i32 },
     DeleteHitBox (i32),
+    Rumble { unk1: i32, unk2: i32 },
+    RumbleLoop { unk1: i32, unk2: i32 },
+    SlopeContourStand { leg_bone_parent: i32 },
+    SlopeContourFull { hip_n_or_top_n: i32, trans_bone: i32 },
     SoundEffect1 (i32),
     SoundEffect2 (i32),
     SoundEffectTransient (i32),

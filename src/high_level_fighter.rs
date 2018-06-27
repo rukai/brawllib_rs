@@ -5,8 +5,7 @@ use fighter::Fighter;
 use mdl0::bones::Bone;
 use misc_section::{LedgeGrab, HurtBox};
 use sakurai::{FighterAttributes, AnimationFlags};
-use script_ast::{Block, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
-use script_ast;
+use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
 use script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
@@ -16,7 +15,8 @@ pub struct HighLevelFighter {
     pub name: String,
     pub attributes: FighterAttributes,
     pub actions: Vec<HighLevelAction>,
-    pub ledge_grabs: Vec<LedgeGrab> // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
+    pub ledge_grabs: Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
+    pub fragment_scripts: Vec<ScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -38,10 +38,10 @@ impl HighLevelFighter {
                             animation_flags = Some(sub_action_flags.animation_flags.clone());
                             //info!("{}", name);
                             scripts = Some(HighLevelScripts {
-                                script_main:  script_ast::script_ast(&fighter_data.sub_action_main[i].events),
-                                script_gfx:   script_ast::script_ast(&fighter_data.sub_action_gfx[i].events),
-                                script_sfx:   script_ast::script_ast(&fighter_data.sub_action_sfx[i].events),
-                                script_other: script_ast::script_ast(&fighter_data.sub_action_other[i].events),
+                                script_main:  ScriptAst::new(&fighter_data.sub_action_main[i]),
+                                script_gfx:   ScriptAst::new(&fighter_data.sub_action_gfx[i]),
+                                script_sfx:   ScriptAst::new(&fighter_data.sub_action_sfx[i]),
+                                script_other: ScriptAst::new(&fighter_data.sub_action_other[i]),
                             });
                         }
                     }
@@ -121,11 +121,15 @@ impl HighLevelFighter {
                         ecb,
                         animation_velocity,
                         hurt_boxes,
-                        hit_boxes:     hl_hit_boxes,
-                        interruptible: script_runner.interruptible,
-                        edge_slide:    script_runner.edge_slide.clone(),
-                        airbourne:     script_runner.airbourne,
-                        hitlist_reset: script_runner.hitlist_reset,
+                        hit_boxes:           hl_hit_boxes,
+                        interruptible:       script_runner.interruptible,
+                        edge_slide:          script_runner.edge_slide.clone(),
+                        airbourne:           script_runner.airbourne,
+                        hitlist_reset:       script_runner.hitlist_reset,
+                        slope_contour_stand: script_runner.slope_contour_stand,
+                        slope_contour_full:  script_runner.slope_contour_full,
+                        rumble:              script_runner.rumble,
+                        rumble_loop:         script_runner.rumble_loop,
                     });
 
                     if iasa.is_none() && script_runner.interruptible {
@@ -155,9 +159,14 @@ impl HighLevelFighter {
             }
         }
 
+        // TODO: Delete this
+        let fragment_scripts: Vec<_> = fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        info!("fragment_scripts: {:#?}", fragment_scripts);
+
         HighLevelFighter {
-            name: fighter.cased_name.clone(),
-            ledge_grabs: fighter_data.unwrap().misc.ledge_grabs.clone(),
+            name:              fighter.cased_name.clone(),
+            ledge_grabs:       fighter_data.unwrap().misc.ledge_grabs.clone(),
+            fragment_scripts:  fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect(),
             attributes,
             actions,
         }
@@ -206,22 +215,26 @@ pub struct HighLevelAction {
 
 #[derive(Clone, Debug)]
 pub struct HighLevelScripts {
-    pub script_main:  Block,
-    pub script_gfx:   Block,
-    pub script_sfx:   Block,
-    pub script_other: Block,
+    pub script_main:  ScriptAst,
+    pub script_gfx:   ScriptAst,
+    pub script_sfx:   ScriptAst,
+    pub script_other: ScriptAst,
 }
 
 #[derive(Clone, Debug)]
 pub struct HighLevelFrame {
-    pub hurt_boxes:         Vec<HighLevelHurtBox>,
-    pub hit_boxes:          Vec<HighLevelHitBox>,
-    pub animation_velocity: Option<Vector3<f32>>,
-    pub interruptible:      bool,
-    pub edge_slide:         EdgeSlide,
-    pub airbourne:          bool,
-    pub ecb:                ECB,
-    pub hitlist_reset:      bool,
+    pub hurt_boxes:          Vec<HighLevelHurtBox>,
+    pub hit_boxes:           Vec<HighLevelHitBox>,
+    pub animation_velocity:  Option<Vector3<f32>>,
+    pub interruptible:       bool,
+    pub edge_slide:          EdgeSlide,
+    pub airbourne:           bool,
+    pub ecb:                 ECB,
+    pub hitlist_reset:       bool,
+    pub slope_contour_stand: Option<i32>,
+    pub slope_contour_full:  Option<(i32, i32)>,
+    pub rumble:              Option<(i32, i32)>,
+    pub rumble_loop:         Option<(i32, i32)>,
 }
 
 #[derive(Clone, Debug)]

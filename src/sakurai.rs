@@ -111,6 +111,9 @@ fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
     let sub_action_sfx = script::scripts(parent_data, &parent_data[sub_action_sfx_start as usize ..], sub_action_main_num);
     let sub_action_other = script::scripts(parent_data, &parent_data[sub_action_other_start as usize ..], sub_action_main_num);
 
+    let all_scripts: Vec<&[Script]> = vec!(&entry_actions, &exit_actions, &sub_action_main, &sub_action_gfx, &sub_action_sfx, &sub_action_other);
+    let fragment_scripts = script::fragment_scripts(parent_data, &all_scripts);
+
     let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
     let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);
 
@@ -125,6 +128,7 @@ fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
         sub_action_gfx,
         sub_action_sfx,
         sub_action_other,
+        fragment_scripts,
         model_visibility_start,
         sse_attribute_start,
         common_action_flags_start,
@@ -261,6 +265,7 @@ pub struct ArcFighterData {
     pub sub_action_gfx: Vec<Script>,
     pub sub_action_sfx: Vec<Script>,
     pub sub_action_other: Vec<Script>,
+    pub fragment_scripts: Vec<Script>,
     model_visibility_start: i32,
     sse_attribute_start: i32,
     common_action_flags_start: i32,

@@ -4,44 +4,68 @@ pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec
     let mut result = vec!();
     for i in 0..num {
         let offset = (&offset_data[i * 4..]).read_i32::<BigEndian>().unwrap() as usize;
-
-        let events = if offset > 0 {
-            let mut events = vec!();
-            let mut event_offset = offset;
-            loop {
-                let namespace       =   parent_data[event_offset];
-                let code            =   parent_data[event_offset + 1];
-                let num_arguments   =   parent_data[event_offset + 2];
-                let unk1            =   parent_data[event_offset + 3];
-                let argument_offset = (&parent_data[event_offset + 4 ..]).read_u32::<BigEndian>().unwrap();
-                let raw_id = (&parent_data[event_offset ..]).read_u32::<BigEndian>().unwrap();
-
-                if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
-                    break
-                }
-
-                // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
-                // and brawlbox just skips arguments on events that have one of these ID's
-                if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
-                    let arguments = arguments(parent_data, argument_offset as usize, num_arguments as usize);
-                    events.push(Event {
-                        namespace,
-                        code,
-                        unk1,
-                        arguments,
-                    });
-                }
-
-                event_offset += EVENT_SIZE;
-            }
-            events
-        } else {
-            vec!()
-        };
-        result.push(Script { events });
+        result.push(new_script(parent_data, offset));
     }
     result
 }
+
+/// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
+pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]]) -> Vec<Script> {
+    let mut fragments: Vec<Script> = vec!();
+    for scripts in action_scripts.iter() {
+        for script in scripts.iter() {
+            for event in &script.events {
+                if event.namespace == 0 && (event.code == 7 || event.code == 9) { // if the event is a subroutine or goto
+                    if let Some(Argument::Offset(offset)) = event.arguments.get(0) {
+                        let is_action = false; // TODO
+                        if !is_action && !fragments.iter().any(|x| x.offset == *offset as u32) {
+                            fragments.push(new_script(parent_data, *offset as usize));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    fragments
+}
+
+fn new_script(parent_data: &[u8], offset: usize) -> Script {
+    let events = if offset > 0 && offset < 0xFFFF { // TODO: I just arbitarily picked this maximum, why am I getting invalid offsets and/or how can I detect them
+        let mut events = vec!();
+        let mut event_offset = offset;
+        loop {
+            let namespace       =   parent_data[event_offset];
+            let code            =   parent_data[event_offset + 1];
+            let num_arguments   =   parent_data[event_offset + 2];
+            let unk1            =   parent_data[event_offset + 3];
+            let argument_offset = (&parent_data[event_offset + 4 ..]).read_u32::<BigEndian>().unwrap();
+            let raw_id = (&parent_data[event_offset ..]).read_u32::<BigEndian>().unwrap();
+
+            if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
+                break
+            }
+
+            // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
+            // and brawlbox just skips arguments on events that have one of these ID's
+            if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
+                let arguments = arguments(parent_data, argument_offset as usize, num_arguments as usize);
+                events.push(Event {
+                    namespace,
+                    code,
+                    unk1,
+                    arguments,
+                });
+            }
+
+            event_offset += EVENT_SIZE;
+        }
+        events
+    } else {
+        vec!()
+    };
+    Script { events, offset: offset as u32 }
+}
+
 
 fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -> Vec<Argument> {
     let mut arguments = vec!();
@@ -68,7 +92,8 @@ fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -
 
 #[derive(Clone, Debug)]
 pub struct Script {
-    pub events: Vec<Event>
+    pub events: Vec<Event>,
+    pub offset: u32
 }
 
 // Events are like lines of code in a script
