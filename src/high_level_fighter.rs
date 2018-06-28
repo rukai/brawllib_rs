@@ -26,27 +26,49 @@ impl HighLevelFighter {
         let fighter_data = fighter.get_fighter_data();
         let attributes = fighter_data.unwrap().attributes.clone();
         let mut actions = vec!();
+
+        let fragment_scripts: Vec<ScriptAst> = fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_main:  Vec<ScriptAst> = fighter_data.unwrap().sub_action_main .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_gfx:   Vec<ScriptAst> = fighter_data.unwrap().sub_action_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_sfx:   Vec<ScriptAst> = fighter_data.unwrap().sub_action_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_other: Vec<ScriptAst> = fighter_data.unwrap().sub_action_other.iter().map(|x| ScriptAst::new(x)).collect();
+        let entry_actions:    Vec<ScriptAst> = fighter_data.unwrap().entry_actions   .iter().map(|x| ScriptAst::new(x)).collect();
+        let exit_actions:     Vec<ScriptAst> = fighter_data.unwrap().exit_actions    .iter().map(|x| ScriptAst::new(x)).collect();
+
+        info!("fragment_scripts: {:#?}", fragment_scripts); // TODO: Delete this
+
+        let mut all_scripts = vec!();
+        for script in fragment_scripts.iter()
+            .chain(sub_action_main.iter())
+            .chain(sub_action_gfx.iter())
+            .chain(sub_action_sfx.iter())
+            .chain(sub_action_other.iter())
+            .chain(entry_actions.iter())
+            .chain(exit_actions.iter())
+        {
+            all_scripts.push(script);
+        }
+
         if let Some(first_bone) = fighter.get_bones() {
             for chr0 in fighter.get_animations() {
                 let name = chr0.name.clone();
                 let mut animation_flags = None;
                 let mut scripts = None;
                 if let Some(fighter_data) = fighter_data {
-                    for i in 0..fighter_data.sub_action_main.len() {
+                    for i in 0..sub_action_main.len() {
                         let sub_action_flags = &fighter_data.sub_action_flags[i];
                         if sub_action_flags.name == chr0.name {
                             animation_flags = Some(sub_action_flags.animation_flags.clone());
-                            //info!("{}", name);
                             scripts = Some(HighLevelScripts {
-                                script_main:  ScriptAst::new(&fighter_data.sub_action_main[i]),
-                                script_gfx:   ScriptAst::new(&fighter_data.sub_action_gfx[i]),
-                                script_sfx:   ScriptAst::new(&fighter_data.sub_action_sfx[i]),
-                                script_other: ScriptAst::new(&fighter_data.sub_action_other[i]),
+                                script_main:  sub_action_main[i].clone(),
+                                script_gfx:   sub_action_gfx[i].clone(),
+                                script_sfx:   sub_action_sfx[i].clone(),
+                                script_other: sub_action_other[i].clone(),
                             });
                         }
                     }
                 }
-                let script_refs = if let &Some(ref scripts) = &scripts {
+                let action_scripts = if let &Some(ref scripts) = &scripts {
                     vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other)
                 } else {
                     vec!()
@@ -55,7 +77,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_offset = None;
-                let mut script_runner = ScriptRunner::new(&script_refs);
+                let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -159,14 +181,10 @@ impl HighLevelFighter {
             }
         }
 
-        // TODO: Delete this
-        let fragment_scripts: Vec<_> = fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        info!("fragment_scripts: {:#?}", fragment_scripts);
-
         HighLevelFighter {
             name:              fighter.cased_name.clone(),
             ledge_grabs:       fighter_data.unwrap().misc.ledge_grabs.clone(),
-            fragment_scripts:  fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect(),
+            fragment_scripts,
             attributes,
             actions,
         }

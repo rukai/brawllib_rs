@@ -14,8 +14,10 @@ use script_ast::{
 use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
-    pub variables:            HashMap<i32, i32>,
     pub call_stacks:          Vec<CallStack<'a>>,
+    pub all_scripts:          &'a [&'a ScriptAst],
+    pub variables:            HashMap<i32, i32>,
+    pub visited_gotos:        Vec<u32>,
     pub frame_index:          f32,
     pub interruptible:        bool,
     pub hitboxes:             [Option<ScriptHitBox>; 7],
@@ -38,6 +40,7 @@ pub struct CallStack<'a> {
 pub struct Call<'a> {
     pub block: &'a Block,
     pub index: usize,
+    pub subroutine: bool,
 }
 
 pub enum ChangeSubAction {
@@ -79,16 +82,25 @@ impl ScriptHitBox {
 }
 
 impl<'a> ScriptRunner<'a> {
-    pub fn new(scripts: &[&'a ScriptAst]) -> ScriptRunner<'a> {
+    pub fn new(action_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst]) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
-        for script in scripts {
-            let calls = vec!(Call { block: &script.block, index: 0 });
-            call_stacks.push(CallStack { calls, wait_until: -1.0 });
+        for script in action_scripts {
+            let calls = vec!(Call {
+                block: &script.block,
+                index: 0,
+                subroutine: false
+            });
+            call_stacks.push(CallStack {
+                calls,
+                wait_until: -1.0
+            });
         }
 
         ScriptRunner {
             call_stacks,
+            all_scripts,
             variables:            HashMap::new(),
+            visited_gotos:        vec!(),
             frame_index:          0.0,
             interruptible:        false,
             hitboxes:             [None, None, None, None, None, None, None],
@@ -108,6 +120,7 @@ impl<'a> ScriptRunner<'a> {
         self.hitlist_reset = false;
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.frame_index += self.frame_speed_modifier;
+        self.visited_gotos.clear();
 
         // run the main, gfx, sfx and other scripts
         for i in 0..self.call_stacks.len() {
@@ -121,12 +134,25 @@ impl<'a> ScriptRunner<'a> {
                 let call = self.call_stacks[i].calls.last().unwrap();
                 if let Some(event) = call.block.events.get(call.index) {
                     self.call_stacks[i].calls.last_mut().unwrap().index += 1;
-                    match self.step_event(event, action_name) {
+                    match self.step_event(event, self.all_scripts, action_name) {
                         StepEventResult::WaitUntil (value) => {
                             self.call_stacks[i].wait_until = value;
                         }
                         StepEventResult::NewCall (block) => {
-                            self.call_stacks[i].calls.push(Call { block, index: 0 });
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
+                        }
+                        StepEventResult::Subroutine (block) => {
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: true });
+                        }
+                        StepEventResult::Return => {
+                            let mut run = false;
+                            while run {
+                                run = self.call_stacks[i].calls.pop().map(|x| !x.subroutine).unwrap_or(false);
+                            }
+                        }
+                        StepEventResult::Goto (block) => {
+                            self.call_stacks[i].calls.pop();
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
                         }
                         StepEventResult::None => { }
                     }
@@ -170,13 +196,13 @@ impl<'a> ScriptRunner<'a> {
                     &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32, // TODO: Maybe this needs to be converted to be read as the same type as right, i.e. f32 or i32
                     &Expression::Value    (ref value)   => *value as f32,
                     &Expression::Scalar   (ref value)   => *value,
-                    _                  => 0.0
+                    _                                   => 0.0
                 };
                 let right = match &*binary.right {
                     &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32,
                     &Expression::Value    (ref value)   => *value as f32,
                     &Expression::Scalar   (ref value)   => *value,
-                    _                  => 0.0
+                    _                                   => 0.0
                 };
                 match &binary.operator {
                     &ComparisonOperator::LessThan           => left <  right,
@@ -201,9 +227,8 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
-
     /// Returns the wait_until value
-    fn step_event<'b>(&mut self, event: &'b EventAst, action_name: &str) -> StepEventResult<'b> {
+    fn step_event<'b>(&mut self, event: &'b EventAst, all_scripts: &[&'b ScriptAst], action_name: &str) -> StepEventResult<'b> {
         match event {
             &EventAst::SyncWait (ref value) => {
                 return StepEventResult::WaitUntil (self.frame_index + *value);
@@ -213,9 +238,29 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::SetLoop (_) => { }
             &EventAst::ExecuteLoop => { }
-            &EventAst::Subroutine (_) => { }
-            &EventAst::Return => { }
-            &EventAst::Goto (_) => { }
+            &EventAst::Subroutine (offset) => {
+                for script in all_scripts.iter() {
+                    if script.offset == offset as u32 {
+                        return StepEventResult::Subroutine (&script.block);
+                    }
+                }
+                error!("Couldnt find Subroutine offset");
+            }
+            &EventAst::Return => {
+                return StepEventResult::Return;
+            }
+            &EventAst::Goto (offset) => {
+                if !self.visited_gotos.iter().any(|x| *x == offset as u32)  {
+                    self.visited_gotos.push(offset as u32);
+                    for script in all_scripts.iter() {
+                        if script.offset == offset as u32 {
+                            return StepEventResult::Goto (&script.block);
+                        }
+                    }
+                    error!("Couldnt find Goto offset");
+                }
+                error!("Avoided Goto infinite loop");
+            }
             &EventAst::IfStatement (ref if_statement) => {
                 if self.evaluate_expression(&if_statement.test) {
                     return StepEventResult::NewCall (&if_statement.then_branch);
@@ -348,7 +393,10 @@ impl<'a> ScriptRunner<'a> {
 }
 
 enum StepEventResult<'a> {
-    WaitUntil (f32),
-    NewCall (&'a Block),
+    WaitUntil  (f32),
+    NewCall    (&'a Block),
+    Goto       (&'a Block),
+    Subroutine (&'a Block),
+    Return,
     None
 }

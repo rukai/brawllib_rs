@@ -30,7 +30,7 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]])
 }
 
 fn new_script(parent_data: &[u8], offset: usize) -> Script {
-    let events = if offset > 0 && offset < 0xFFFF { // TODO: I just arbitarily picked this maximum, why am I getting invalid offsets and/or how can I detect them
+    let events = if offset > 0 && offset < parent_data.len() {
         let mut events = vec!();
         let mut event_offset = offset;
         loop {
@@ -38,7 +38,6 @@ fn new_script(parent_data: &[u8], offset: usize) -> Script {
             let code            =   parent_data[event_offset + 1];
             let num_arguments   =   parent_data[event_offset + 2];
             let unk1            =   parent_data[event_offset + 3];
-            let argument_offset = (&parent_data[event_offset + 4 ..]).read_u32::<BigEndian>().unwrap();
             let raw_id = (&parent_data[event_offset ..]).read_u32::<BigEndian>().unwrap();
 
             if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
@@ -48,6 +47,14 @@ fn new_script(parent_data: &[u8], offset: usize) -> Script {
             // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
             // and brawlbox just skips arguments on events that have one of these ID's
             if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
+                let argument_offset = (&parent_data[event_offset + 4 ..]).read_u32::<BigEndian>().unwrap();
+                // TODO: This only occurs when called by fragment_scripts triggered by subroutines
+                //       Track down which subroutines are pointing at weird data
+                //       Looks like the data is offset by 4 bytes, we are getting an argument_offset of 0xFADEF00D, 0x0b000200, 0x60a0800 which are valid events
+                if argument_offset as usize >= parent_data.len() {
+                    debug!("(raw_id, argument_offset) = (0x{:08x}, 0x{:08x})", raw_id, argument_offset);
+                    break
+                }
                 let arguments = arguments(parent_data, argument_offset as usize, num_arguments as usize);
                 events.push(Event {
                     namespace,
