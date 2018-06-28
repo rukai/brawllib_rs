@@ -271,6 +271,8 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
             (0x0C, 0x1F, None,             None, None) => EventAst::SoundVoiceEating,
 
             // graphics
+            (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 1, switch_index: v0, bone_group_index: v1 },
+            (0x0B, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 2, switch_index: v0, bone_group_index: v1 },
             (0x11, 0x1A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) |
             (0x11, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15)) {
@@ -297,6 +299,27 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x14, 0x07, Some(&Value(v0)), Some(&Scalar(v1)), Some(&Scalar(v2))) => {
+                match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9)) {
+                    (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Value(v9))) => {
+                        EventAst::AestheticWindEffect (AestheticWindEffect {
+                            unk1:    v0,
+                            unk2:    v1,
+                            stength: v2,
+                            speed:   v3,
+                            size:    v4,
+                            unk3:    v5,
+                            unk4:    v6,
+                            unk5:    v7,
+                            unk6:    v8,
+                            unk7:    v8,
+                            unk8:    v9,
+                        })
+                    }
+                    _ => EventAst::Unknown (event.clone())
+                }
+            }
+            (0x1A, 0x00, Some(&Value(v0)), None, None) => EventAst::ScreenShake { magnitude: v0 },
             _ => EventAst::Unknown (event.clone())
         };
         // Brawlbox has some extra parameter types it uses to handle some special cases:
@@ -442,6 +465,9 @@ pub enum EventAst {
     SoundVoiceOttotto,
     SoundVoiceEating,
     GraphicEffect (GraphicEffect),
+    AestheticWindEffect (AestheticWindEffect),
+    ScreenShake { magnitude: i32 },
+    ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
     Unknown (Event)
 }
 
@@ -704,4 +730,19 @@ pub struct GraphicEffect {
     pub random_y_rotation:        f32,
     pub random_z_rotation:        f32,
     pub terminate_with_animation: bool
+}
+
+#[derive(Clone, Debug)]
+pub struct AestheticWindEffect {
+    unk1:    i32,
+    unk2:    f32,
+    stength: f32,
+    speed:   f32,
+    size:    f32,
+    unk3:    f32,
+    unk4:    f32,
+    unk5:    f32,
+    unk6:    f32,
+    unk7:    f32,
+    unk8:    i32,
 }

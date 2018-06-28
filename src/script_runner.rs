@@ -383,6 +383,9 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SoundVoiceOttotto => { }
             &EventAst::SoundVoiceEating => { }
             &EventAst::GraphicEffect (_) => { }
+            &EventAst::AestheticWindEffect (_) => { }
+            &EventAst::ScreenShake { .. } => { }
+            &EventAst::ModelChanger { .. } => { }
             &EventAst::Unknown (ref event) => {
                 debug!("unknown event: {:#?}", event);
             }
