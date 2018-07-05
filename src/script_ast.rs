@@ -4,7 +4,7 @@ use script;
 use std::iter::Iterator;
 use std::slice;
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ScriptAst {
     pub block:  Block,
     pub offset: u32,
@@ -419,7 +419,7 @@ enum ProcessedBlock {
     EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>>, boolean_expressions: Vec<AppendBooleanExpression> },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum EventAst {
     SyncWait (f32),
     Nop,
@@ -471,19 +471,19 @@ pub enum EventAst {
     Unknown (Event)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Block {
     pub events: Vec<EventAst>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct IfStatement {
     pub test: Expression,
     pub then_branch: Block,
     pub else_branch: Option<Box<Block>>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum Expression {
     Nullary  (Requirement),
     Unary    (UnaryExpression),
@@ -494,20 +494,20 @@ pub enum Expression {
     Scalar   (f32),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct BinaryExpression {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub operator: ComparisonOperator
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct UnaryExpression {
     pub requirement: Requirement,
     pub value: Box<Expression>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum ComparisonOperator {
     LessThan,
     LessThanOrEqual,
@@ -534,7 +534,7 @@ impl ComparisonOperator {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum EdgeSlide {
     SlideOff,
     StayOn,
@@ -553,7 +553,7 @@ impl EdgeSlide {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum AngleFlip {
     AwayFromAttacker,
     AttackerDir,
@@ -574,7 +574,7 @@ impl AngleFlip {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum Effect {
     Normal,
     None,
@@ -637,7 +637,7 @@ impl Effect {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HitBoxArguments {
     pub bone_index:         i16,
     pub hitbox_index:       u8,
@@ -669,7 +669,7 @@ pub struct HitBoxArguments {
     pub unk5:               u8,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct SpecialHitBoxArguments {
     pub hitbox_args:                    HitBoxArguments,
     pub rehit_rate:                     i32,
@@ -703,7 +703,7 @@ pub struct SpecialHitBoxArguments {
     pub flinchless:                     bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct MoveHitBox {
     pub hitbox_id:    i32,
     pub new_bone:     i32,
@@ -712,7 +712,7 @@ pub struct MoveHitBox {
     pub new_z_offset: f32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct GraphicEffect {
     pub graphic:                  i32,
     pub bone:                     i32,
@@ -732,7 +732,7 @@ pub struct GraphicEffect {
     pub terminate_with_animation: bool
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct AestheticWindEffect {
     unk1:    i32,
     unk2:    f32,

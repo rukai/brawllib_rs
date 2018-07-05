@@ -284,7 +284,7 @@ pub struct ArcFighterData {
     flags2: i32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct FighterAttributes {
     pub walk_init_vel: f32,
     pub walk_acc: f32,
@@ -362,6 +362,7 @@ pub struct FighterAttributes {
 }
 
 bitflags! {
+    #[derive(Serialize)]
     pub struct AnimationFlags: u8 {
         const NONE                      = 0x0;
         const NO_OUT_TRANSITION         = 0x1;

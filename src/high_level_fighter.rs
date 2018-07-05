@@ -10,7 +10,7 @@ use script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFighter {
     pub name: String,
     pub attributes: FighterAttributes,
@@ -222,7 +222,7 @@ impl HighLevelFighter {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelAction {
     pub name:            String,
     pub iasa:            usize,
@@ -231,7 +231,7 @@ pub struct HighLevelAction {
     pub scripts:         Option<HighLevelScripts>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelScripts {
     pub script_main:  ScriptAst,
     pub script_gfx:   ScriptAst,
@@ -239,7 +239,7 @@ pub struct HighLevelScripts {
     pub script_other: ScriptAst,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFrame {
     pub hurt_boxes:          Vec<HighLevelHurtBox>,
     pub hit_boxes:           Vec<HighLevelHitBox>,
@@ -255,13 +255,13 @@ pub struct HighLevelFrame {
     pub rumble_loop:         Option<(i32, i32)>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelHurtBox {
     pub bone_matrix: Matrix4<f32>,
     pub hurt_box: HurtBox,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HitBoxValues {
     pub hitbox_index:                   u8,
     pub rehit_hitbox_index:             u8,
@@ -389,7 +389,7 @@ struct PositionHitBox {
     pub values:   HitBoxValues,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelHitBox {
     pub prev:        Option<Vector3<f32>>,
     pub prev_values: Option<HitBoxValues>,
@@ -397,7 +397,7 @@ pub struct HighLevelHitBox {
     pub next_values: HitBoxValues,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct ECB {
     pub left:   f32,
     pub right:  f32,

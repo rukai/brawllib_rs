@@ -223,7 +223,7 @@ pub struct FinalSmashAura {
 }
 
 pub const HURTBOX_SIZE: usize = 0x20;
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct HurtBox {
     pub offset: Vector3<f32>,
     pub stretch: Vector3<f32>,
@@ -235,7 +235,7 @@ pub struct HurtBox {
     pub bone_index: u16,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum HurtBoxZone {
     Low,
     Middle,
@@ -243,7 +243,7 @@ pub enum HurtBoxZone {
 }
 
 pub const LEDGE_GRAB_SIZE: usize = 0x10;
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct LedgeGrab {
     pub x: f32,
     pub y: f32,

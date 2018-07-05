@@ -105,7 +105,7 @@ pub struct Script {
 
 // Events are like lines of code in a script
 const EVENT_SIZE: usize = 0x8;
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct Event {
     pub namespace: u8,
     pub code: u8,
@@ -122,7 +122,7 @@ impl Event {
 }
 
 const ARGUMENT_SIZE: usize = 0x8;
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum Argument {
     Scalar (f32),
     Bool (bool),
@@ -134,7 +134,7 @@ pub enum Argument {
     Unknown (i32, i32)
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum Requirement {
     CharacterExists,
     AnimationEnd,
