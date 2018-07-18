@@ -341,31 +341,34 @@ impl Keyframe {
             }
         }
 
-        match (prev, next) {
+        let result = match (prev, next) {
             (Some(prev), Some(next)) => {
-                if prev.value == next.value && prev.frame_index == next.frame_index { // TODO: check with brawlbox
-                    prev.value
+                let one_apart = next.frame_index == prev.frame_index + 1;
+                let prev_double = if let Some(prev_prev) = prev_prev {
+                    prev_prev.frame_index >= 0 && prev_prev.frame_index == prev.frame_index - 1
                 } else {
-                    let one_apart = next.frame_index == prev.frame_index + 1;
-                    let prev_double = if let Some(prev_prev) = prev_prev {
-                        prev_prev.frame_index >= 0 && prev_prev.frame_index == prev.frame_index - 1
-                    } else {
-                        false
-                    };
-                    let next_double = if let Some(next_next) = next_next {
-                        next_next.frame_index >= 0 && next_next.frame_index == next.frame_index + 1
-                    } else {
-                        false
-                    };
+                    false
+                };
+                let next_double = if let Some(next_next) = next_next {
+                    next_next.frame_index >= 0 && next_next.frame_index == next.frame_index + 1
+                } else {
+                    false
+                };
 
-                    let double_value = (next.value - prev.value) / (next.frame_index - prev.frame_index) as f32;
-                    let prev_tangent = if one_apart || prev_double { double_value } else { prev.tangent };
-                    let next_tangent = if one_apart || next_double { double_value } else { next.tangent };
+                let double_value = (next.value - prev.value) / (next.frame_index - prev.frame_index) as f32;
+                let prev_tangent = if one_apart || prev_double { double_value } else { prev.tangent };
+                let next_tangent = if one_apart || next_double { double_value } else { next.tangent };
 
-                    // Interpolate using a hermite curve
-                    let value_diff = next.value - prev.value;
-                    let span = next.frame_index - prev.frame_index;
-                    let offset = frame - prev.frame_index;
+                // Interpolate using a hermite curve
+                let value_diff = next.value - prev.value;
+                let span = next.frame_index - prev.frame_index;
+                let offset = frame - prev.frame_index;
+
+                if offset == 0 {
+                    prev.value
+                } else if offset == span {
+                    next.value
+                } else {
                     let time = offset as f32 / span as f32;
                     let time_inv = time - 1.0;
                     let result = prev.value
@@ -379,7 +382,9 @@ impl Keyframe {
                 child.value
             }
             (None, None) => unreachable!()
-        }
+        };
+        debug_assert!(result.is_finite());
+        result
     }
 }
 
