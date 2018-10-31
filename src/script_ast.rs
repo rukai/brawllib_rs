@@ -1,5 +1,5 @@
-use script::{Script, Event, Requirement, Argument};
-use script;
+use crate::script::{Script, Event, Requirement, Argument};
+use crate::script;
 
 use std::iter::Iterator;
 use std::slice;
@@ -31,7 +31,7 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
     let mut boolean_expressions = vec!();
     while let Some(event) = events.next() {
         let args = &event.arguments;
-        use script::Argument::*;
+        use crate::script::Argument::*;
         let event_ast = match (event.namespace, event.code, args.get(0), args.get(1), args.get(2)) {
             (0x00, 0x01, Some(&Scalar(v0)), None, None) => EventAst::SyncWait (v0),
             (0x00, 0x02, None,              None, None) => EventAst::Nop,

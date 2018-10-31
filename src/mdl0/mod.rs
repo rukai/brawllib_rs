@@ -2,11 +2,11 @@ pub mod bones;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use resources::*;
-use resources;
-use mdl0::bones::Bone;
-use mbox::MBox;
-use mbox;
+use crate::resources::*;
+use crate::resources;
+use crate::mdl0::bones::Bone;
+use crate::mbox::MBox;
+use crate::mbox;
 
 pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let _size        = (&data[0x4..]).read_i32::<BigEndian>().unwrap();

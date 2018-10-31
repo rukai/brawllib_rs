@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use bres::*;
-use util;
-use sakurai;
-use sakurai::ArcSakurai;
+use crate::bres::*;
+use crate::util;
+use crate::sakurai;
+use crate::sakurai::ArcSakurai;
 
 pub(crate) fn arc(data: &[u8]) -> Arc {
     //read the main header

@@ -2,6 +2,7 @@
 name = "brawllib_rs"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 bitflags = "1"

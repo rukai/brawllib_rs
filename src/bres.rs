@@ -1,9 +1,9 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use util;
-use resources;
-use chr0::*;
-use mdl0::*;
+use crate::util;
+use crate::resources;
+use crate::chr0::*;
+use crate::mdl0::*;
 
 pub(crate) fn bres(data: &[u8]) -> Bres {
     let root_offset = (&data[0xc..0xe]).read_u16::<BigEndian>().unwrap();

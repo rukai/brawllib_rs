@@ -1,6 +1,6 @@
-use high_level_fighter::HitBoxValues;
-use script::Requirement;
-use script_ast::{
+use crate::high_level_fighter::HitBoxValues;
+use crate::script::Requirement;
+use crate::script_ast::{
     ScriptAst,
     Block,
     EventAst,

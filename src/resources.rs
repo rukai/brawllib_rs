@@ -1,6 +1,6 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use util;
+use crate::util;
 
 pub(crate) fn resources(data: &[u8]) -> Vec<Resource> {
     let _total_size = (&data[..]).read_i32::<BigEndian>().unwrap();

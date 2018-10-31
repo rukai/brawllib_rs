@@ -1,12 +1,12 @@
 use cgmath::{Vector3, Matrix4, SquareMatrix};
 
-use chr0::Chr0;
-use fighter::Fighter;
-use mdl0::bones::Bone;
-use misc_section::{LedgeGrab, HurtBox};
-use sakurai::{FighterAttributes, AnimationFlags};
-use script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
-use script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
+use crate::chr0::Chr0;
+use crate::fighter::Fighter;
+use crate::mdl0::bones::Bone;
+use crate::misc_section::{LedgeGrab, HurtBox};
+use crate::sakurai::{FighterAttributes, AnimationFlags};
+use crate::script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
+use crate::script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.

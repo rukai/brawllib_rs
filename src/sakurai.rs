@@ -1,10 +1,10 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-use misc_section::MiscSection;
-use misc_section;
-use script::Script;
-use script;
-use util;
+use crate::misc_section::MiscSection;
+use crate::misc_section;
+use crate::script::Script;
+use crate::script;
+use crate::util;
 
 pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     let size                      = (&data[0x0..]).read_i32::<BigEndian>().unwrap();

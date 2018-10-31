@@ -2,9 +2,9 @@ use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::{Vector3, Matrix4};
 use std::iter::Iterator;
 
-use util;
-use resources;
-use math;
+use crate::util;
+use crate::resources;
+use crate::math;
 
 pub(crate) fn chr0(data: &[u8]) -> Chr0 {
     let size             = (&data[0x4..]).read_i32::<BigEndian>().unwrap();

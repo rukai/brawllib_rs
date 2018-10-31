@@ -1,11 +1,11 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::{Vector3, Matrix4};
 
-use mbox::MBox;
-use mbox;
-use resources::Resource;
-use util;
-use math;
+use crate::mbox::MBox;
+use crate::mbox;
+use crate::resources::Resource;
+use crate::util;
+use crate::math;
 
 pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bone {
     bone_siblings(&data[resources[0].data_offset as usize ..]).pop().unwrap()

@@ -4,12 +4,12 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-use arc::{Arc, ArcChildData};
-use arc;
-use bres::BresChildData;
-use chr0::Chr0;
-use mdl0::bones::Bone;
-use sakurai::{SectionData, ArcFighterData};
+use crate::arc::{Arc, ArcChildData};
+use crate::arc;
+use crate::bres::BresChildData;
+use crate::chr0::Chr0;
+use crate::mdl0::bones::Bone;
+use crate::sakurai::{SectionData, ArcFighterData};
 
 #[derive(Debug)]
 pub struct Fighter {
