@@ -239,9 +239,16 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SetLoop (_) => { }
             &EventAst::ExecuteLoop => { }
             &EventAst::Subroutine (offset) => {
+                // TODO: Maybe I should implement a protection similar to visited_gotos for subroutines.
+                // If that turns out to be a bad idea document why.
                 for script in all_scripts.iter() {
                     if script.offset == offset as u32 {
-                        return StepEventResult::Subroutine (&script.block);
+                        if script.block.events.len() > 0 && &script.block.events[0] as *const _ == event as *const _ {
+                            error!("Avoided hard Subroutine infinite loop (attempted to jump to the same location)");
+                        }
+                        else {
+                            return StepEventResult::Subroutine (&script.block);
+                        }
                     }
                 }
                 error!("Couldnt find Subroutine offset");
@@ -250,7 +257,7 @@ impl<'a> ScriptRunner<'a> {
                 return StepEventResult::Return;
             }
             &EventAst::Goto (offset) => {
-                if !self.visited_gotos.iter().any(|x| *x == offset as u32)  {
+                if !self.visited_gotos.iter().any(|x| *x == offset as u32) {
                     self.visited_gotos.push(offset as u32);
                     for script in all_scripts.iter() {
                         if script.offset == offset as u32 {
