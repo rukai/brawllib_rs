@@ -1,0 +1,21 @@
+language: rust
+rust:
+  - stable
+  - nightly
+
+# Install ALSA development libraries before compiling on Linux.
+addons:
+  apt:
+    packages:
+      - libasound2-dev
+
+script:
+  - cargo test
+  - cargo test --release
+  - cd examples
+  - cargo build
+  - cargo build --release
+
+branches:
+  only:
+    - master
