@@ -1,6 +1,3 @@
-extern crate brawllib_rs;
-extern crate getopts;
-
 use brawllib_rs::fighter::Fighter;
 use brawllib_rs::high_level_fighter::HighLevelFighter;
 
