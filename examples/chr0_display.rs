@@ -69,7 +69,7 @@ fn main() {
             }
             println!("Action name: {}", chr0.name);
 
-            let mut frames_to_display: Box<Iterator<Item=i32>> = if let Some(frame_filter) = frame_filter {
+            let frames_to_display: Box<Iterator<Item=i32>> = if let Some(frame_filter) = frame_filter {
                 if frame_filter < chr0.num_frames as i32 {
                     Box::new(iter::once(frame_filter))
                 } else {

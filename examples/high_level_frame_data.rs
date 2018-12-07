@@ -91,7 +91,7 @@ fn main() {
                 }
                 println!("Fighter name: {}", fighter.cased_name);
 
-                let mut hl_fighter = HighLevelFighter::new(&fighter);
+                let hl_fighter = HighLevelFighter::new(&fighter);
                 for mut action in hl_fighter.actions {
                     if let &Some(ref action_filter) = &action_filter {
                         if action.name.to_lowercase() != action_filter.to_lowercase() {
