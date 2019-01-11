@@ -1,8 +1,13 @@
 [package]
 name = "brawllib_rs"
+edition = "2018"
 version = "0.1.0"
 authors = ["Rukai <rubickent@gmail.com>"]
-edition = "2018"
+description = "Brawl character file parser, based on brawlbox/brawllib"
+license = "MIT"
+repository = "https://github.com/rukai/brawllib_rs"
+keywords = ["super", "smash", "bros", "brawl", "lib"]
+categories = ["games", "game-engines"]
 
 [dependencies]
 bitflags = "1"
@@ -14,7 +19,7 @@ serde_derive = "1"
 
 [dev-dependencies]
 getopts = "0.2"
-three = { git = "https://github.com/three-rs/three" }
+three = "0.4"
 mint = "0.5"
 
 [profile.release]
