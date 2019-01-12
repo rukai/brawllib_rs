@@ -35,8 +35,6 @@ impl HighLevelFighter {
         let entry_actions:    Vec<ScriptAst> = fighter_data.unwrap().entry_actions   .iter().map(|x| ScriptAst::new(x)).collect();
         let exit_actions:     Vec<ScriptAst> = fighter_data.unwrap().exit_actions    .iter().map(|x| ScriptAst::new(x)).collect();
 
-        info!("fragment_scripts: {:#?}", fragment_scripts); // TODO: Delete this
-
         let mut all_scripts = vec!();
         for script in fragment_scripts.iter()
             .chain(sub_action_main.iter())
