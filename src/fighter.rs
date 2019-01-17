@@ -4,6 +4,8 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
+use rayon::prelude::*;
+
 use crate::arc::{Arc, ArcChildData};
 use crate::arc;
 use crate::bres::BresChildData;
@@ -31,58 +33,64 @@ impl Fighter {
     /// If single_model is true then only one model for each fighter is loaded, otherwise all models are loaded.
     /// It's much faster to only process one model so set this to true if you only need one.
     pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, single_model: bool) -> Vec<Fighter> {
-        let mut fighters = vec!();
-        for fighter_data in fighter_datas(brawl_fighter_dir, mod_fighter_dir) {
-            info!("Parsing fighter: {}", fighter_data.cased_name);
-            let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
-            let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
-                arc::arc(data)
-            } else {
-                error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
-                continue;
-            };
+        // TODO: Could probably make this faster by beginning processing of a fighter_data immediately after it is read from disk.
+        // However it might actually slow things down because all the threads are reading from disk at once.
+        // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
+        // Will need to benchmark any such changes.
+        fighter_datas(brawl_fighter_dir, mod_fighter_dir)
+            .into_par_iter()
+            .filter_map(|x| Fighter::load_single(x, single_model))
+            .collect()
+    }
 
-            let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
-            let modded_by_psa = fighter_data.data.get(&moveset_file_name)
-                .map(|a| a.windows(4).any(|b| b == psa_sequence))
-                .unwrap_or(false);
+    fn load_single(fighter_data: FighterData, single_model: bool) -> Option<Fighter> {
+        info!("Parsing fighter: {}", fighter_data.cased_name);
+        let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
+        let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
+            arc::arc(data)
+        } else {
+            error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
+            return None;
+        };
 
-            let motion_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
-            let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
-                arc::arc(data)
-            } else {
-                // TODO: This is being hit because some fighters just use another fighters motion file
-                //       Handle this in the FighterFolder by duplicating the file in each special case.
-                // TODO: This is being hit because some fighters dont have a MotionEtc file.
-                //       instead they have seperate Motion and Etc files.
-                //       Need to investigate if I can handle this by just reading the Motion file instead of the MotionEtc file
-                error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_file_name);
-                continue;
-            };
+        let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
+        let modded_by_psa = fighter_data.data.get(&moveset_file_name)
+            .map(|a| a.windows(4).any(|b| b == psa_sequence))
+            .unwrap_or(false);
 
-            let mut models = vec!();
-            for i in 0..100 {
-                if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
-                    models.push(arc::arc(&model_data));
-                    if single_model {
-                        break;
-                    }
-                }
-                else {
+        let motion_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
+        let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
+            arc::arc(data)
+        } else {
+            // TODO: This is being hit because some fighters just use another fighters motion file
+            //       Handle this in the FighterFolder by duplicating the file in each special case.
+            // TODO: This is being hit because some fighters dont have a MotionEtc file.
+            //       instead they have seperate Motion and Etc files.
+            //       Need to investigate if I can handle this by just reading the Motion file instead of the MotionEtc file
+            error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_file_name);
+            return None;
+        };
+
+        let mut models = vec!();
+        for i in 0..100 {
+            if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
+                models.push(arc::arc(&model_data));
+                if single_model {
                     break;
                 }
             }
-
-            let fighter = Fighter {
-                cased_name: fighter_data.cased_name,
-                moveset,
-                motion,
-                models,
-                modded_by_psa
-            };
-            fighters.push(fighter);
+            else {
+                break;
+            }
         }
-        fighters
+
+        Some(Fighter {
+            cased_name: fighter_data.cased_name,
+            moveset,
+            motion,
+            models,
+            modded_by_psa
+        })
     }
 
     /// retrieves the fighter data

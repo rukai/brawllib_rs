@@ -1,4 +1,5 @@
 use cgmath::{Vector3, Matrix4, SquareMatrix};
+use rayon::prelude::*;
 
 use crate::chr0::Chr0;
 use crate::fighter::Fighter;
@@ -21,11 +22,14 @@ pub struct HighLevelFighter {
 
 impl HighLevelFighter {
     /// Processes data from an &Fighter and stores it in a HighLevelFighter
+    // TODO: Maybe expose a `multithreaded` argument so caller can disable multithread and run its own multithreading on the entire `HighLevelFighter::new`.
+    // Because rayon uses a threadpool we arent at risk of it hammering the system by spawning too many threads.
+    // However it may be ineffecient due to overhead of spawning threads for every action.
+    // Will need to benchmark any such changes.
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
         info!("Generating HighLevelFighter for {}", fighter.cased_name);
         let fighter_data = fighter.get_fighter_data();
         let attributes = fighter_data.unwrap().attributes.clone();
-        let mut actions = vec!();
 
         let fragment_scripts: Vec<ScriptAst> = fighter_data.unwrap().fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
         let sub_action_main:  Vec<ScriptAst> = fighter_data.unwrap().sub_action_main .iter().map(|x| ScriptAst::new(x)).collect();
@@ -46,9 +50,8 @@ impl HighLevelFighter {
         {
             all_scripts.push(script);
         }
-
-        if let Some(first_bone) = fighter.get_bones() {
-            for chr0 in fighter.get_animations() {
+        let actions = if let Some(first_bone) = fighter.get_bones() {
+            fighter.get_animations().par_iter().map(|chr0| {
                 let name = chr0.name.clone();
                 let mut animation_flags = None;
                 let mut scripts = None;
@@ -170,18 +173,20 @@ impl HighLevelFighter {
                         "LandingAirB"  | "LandingAirHi" |
                         "LandingAirLw" | "LandingLight" |
                         "LandingHeavy" | "LandingFallSpecial"
-                            => script_runner.frame_index,
-                        _                    => 0.0
+                          => script_runner.frame_index,
+                        _ => 0.0
                     }
                 } as usize;
 
-                actions.push(HighLevelAction { name, iasa, frames, animation_flags, scripts });
-            }
-        }
+                HighLevelAction { name, iasa, frames, animation_flags, scripts }
+            }).collect()
+        } else {
+            vec!()
+        };
 
         HighLevelFighter {
-            name:              fighter.cased_name.clone(),
-            ledge_grabs:       fighter_data.unwrap().misc.ledge_grabs.clone(),
+            name:            fighter.cased_name.clone(),
+            ledge_grabs:     fighter_data.unwrap().misc.ledge_grabs.clone(),
             fragment_scripts,
             attributes,
             actions,
