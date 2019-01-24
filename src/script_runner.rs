@@ -6,9 +6,13 @@ use crate::script_ast::{
     EventAst,
     HitBoxArguments,
     SpecialHitBoxArguments,
+    HurtBoxState,
+    LedgeGrabEnable,
+    ArmorType,
+    DisableMovement,
     EdgeSlide,
     Expression,
-    ComparisonOperator
+    ComparisonOperator,
 };
 
 use std::collections::HashMap;
@@ -21,7 +25,19 @@ pub struct ScriptRunner<'a> {
     pub frame_index:          f32,
     pub interruptible:        bool,
     pub hitboxes:             [Option<ScriptHitBox>; 7],
+    pub hurtbox_state_all:    HurtBoxState,
+    pub hurtbox_states:       HashMap<i32, HurtBoxState>,
+    pub ledge_grab_enable:    LedgeGrabEnable,
     pub frame_speed_modifier: f32,
+    pub tag_display:          bool,
+    pub x:                    f32,
+    pub y:                    f32,
+    pub x_vel:                f32,
+    pub y_vel:                f32,
+    pub disable_movement:     DisableMovement,
+    pub armor_type:           ArmorType,
+    pub armor_tolerance:      f32,
+    pub damage:               f32,
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
     pub change_sub_action:    ChangeSubAction,
@@ -82,6 +98,8 @@ impl ScriptHitBox {
 }
 
 impl<'a> ScriptRunner<'a> {
+    /// Runs the action main, gfx, sfx and other scripts in action_scripts.
+    /// all_scripts contains any functions that the action scripts need to call into.
     pub fn new(action_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst]) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in action_scripts {
@@ -104,7 +122,19 @@ impl<'a> ScriptRunner<'a> {
             frame_index:          0.0,
             interruptible:        false,
             hitboxes:             [None, None, None, None, None, None, None],
+            hurtbox_state_all:    HurtBoxState::Normal,
+            hurtbox_states:       HashMap::new(),
+            ledge_grab_enable:    LedgeGrabEnable::Disable,
             frame_speed_modifier: 1.0,
+            tag_display:          true,
+            x:                    0.0,
+            y:                    0.0,
+            x_vel:                0.0,
+            y_vel:                0.0,
+            disable_movement:     DisableMovement::Enable,
+            armor_type:           ArmorType::None,
+            armor_tolerance:      0.0,
+            damage:               0.0,
             airbourne:            false,
             edge_slide:           EdgeSlide::SlideOff,
             change_sub_action:    ChangeSubAction::Continue,
@@ -116,11 +146,26 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
+    /// Steps the main, gfx, sfx and other scripts by 1 game frame
     pub fn step(&mut self, action_name: &str) {
         self.hitlist_reset = false;
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.frame_index += self.frame_speed_modifier;
         self.visited_gotos.clear();
+
+        match self.disable_movement {
+            DisableMovement::Enable => {
+                self.x += self.x_vel;
+                self.y += self.y_vel;
+            }
+            DisableMovement::DisableVertical => {
+                self.x += self.x_vel;
+            }
+            DisableMovement::DisableHorizontal => {
+                self.y += self.y_vel;
+            }
+            _ => error!("Unknown DisableMovement value"),
+        }
 
         // run the main, gfx, sfx and other scripts
         for i in 0..self.call_stacks.len() {
@@ -278,14 +323,25 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::Switch (_, _) => { }
+            &EventAst::Switch (_, _) => { } // TODO
             &EventAst::EndSwitch => { }
+            &EventAst::Case (_) => { }
+            &EventAst::DefaultCase => { }
+            &EventAst::LoopRest => { error!("LoopRest: This means the code is expected to infinite loop") } // TODO: Handle infinite loops better
+            &EventAst::EnableActionStatusID (_) => { } // TODO
+            &EventAst::ChangeActionStatus { .. } => { } // TODO
+            &EventAst::ChangeAction { .. } => { } // TODO
+            &EventAst::AllowInterrupt => {
+                self.interruptible = true;
+            }
             &EventAst::ChangeSubAction (v0) => {
                 self.change_sub_action = ChangeSubAction::ChangeSubAction (v0);
             }
             &EventAst::ChangeSubActionRestartFrame (v0) => {
                 self.change_sub_action = ChangeSubAction::ChangeSubActionRestartFrame (v0);
             }
+
+            // timing
             &EventAst::SetFrame (v0) => {
                 self.frame_index = v0;
             }
@@ -293,6 +349,8 @@ impl<'a> ScriptRunner<'a> {
                 self.frame_speed_modifier = v0;
             }
             &EventAst::TimeManipulation (_, _) => { }
+
+            // misc state
             &EventAst::SetAirGround (v0) => {
                 self.airbourne = v0 == 0; // TODO: Seems like brawlbox is incomplete here e.g 36
             }
@@ -300,6 +358,8 @@ impl<'a> ScriptRunner<'a> {
                 self.edge_slide = v0.clone();
             }
             &EventAst::ReverseDirection => { }
+
+            // hitboxes
             &EventAst::CreateHitBox (ref args) => {
                 if args.hitbox_index < self.hitboxes.len() as u8 {
                     if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_index as usize] {
@@ -352,9 +412,19 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::DeleteHitBox (id) => {
                 self.hitboxes[id as usize] = None;
             }
-            &EventAst::AllowInterrupt => {
-                self.interruptible = true;
+
+            // hurtboxes
+            &EventAst::ChangeHurtBoxStateAll { ref state } => {
+                self.hurtbox_state_all = state.clone();
             }
+            &EventAst::ChangeHurtBoxStateSpecific { bone, ref state } => {
+                self.hurtbox_states.insert(bone, state.clone());
+            }
+            &EventAst::UnchangeHurtBoxStateSpecific => {
+                self.hurtbox_states.clear();
+            }
+
+            // misc
             &EventAst::Rumble { unk1, unk2 } => {
                 self.rumble = Some((unk1, unk2))
             }
@@ -377,6 +447,61 @@ impl<'a> ScriptRunner<'a> {
                     self.slope_contour_full = Some((hip_n_or_top_n, trans_bone));
                 }
             }
+            &EventAst::GenerateArticle { .. } => { }
+            &EventAst::ArticleEvent (_) => { }
+            &EventAst::ArticleAnimation (_) => { }
+            &EventAst::ArticleRemove (_) => { }
+            &EventAst::ArticleVisibility { .. } => { }
+            &EventAst::FinalSmashEnter => { }
+            &EventAst::FinalSmashExit => { }
+            &EventAst::TerminateSelf => { }
+            &EventAst::LedgeGrabEnable (ref enable) => {
+                self.ledge_grab_enable = enable.clone();
+            }
+            &EventAst::TagDisplay (display) => {
+                self.tag_display = display;
+            }
+            &EventAst::Armor { ref armor_type, tolerance } => {
+                self.armor_type = armor_type.clone();
+                self.armor_tolerance = tolerance;
+            }
+            &EventAst::AddDamage (damage) => {
+                self.damage += damage;
+            }
+            &EventAst::SetOrAddVelocity (ref values) => {
+                if values.x_set {
+                    self.x_vel = values.x_vel
+                }
+                else {
+                    self.x_vel += values.x_vel
+                }
+
+                if values.y_set {
+                    self.y_vel = values.y_vel
+                }
+                else {
+                    self.y_vel += values.y_vel
+                }
+            }
+            &EventAst::SetVelocity { x_vel, y_vel } => {
+                self.x_vel = x_vel;
+                self.y_vel = y_vel;
+            }
+            &EventAst::AddVelocity { x_vel, y_vel } => {
+                self.x_vel += x_vel;
+                self.y_vel += y_vel;
+            }
+            &EventAst::DisableMovement (ref disable_movement) => {
+                self.disable_movement = disable_movement.clone();
+            }
+            &EventAst::DisableMovement2 (_) => { } // TODO: What!?!?
+            &EventAst::ResetVerticalVelocityAndAcceleration (reset) => {
+                if reset {
+                    self.y_vel = 0.0;
+                }
+            }
+
+            // sound
             &EventAst::SoundEffect1 (_) => { }
             &EventAst::SoundEffect2 (_) => { }
             &EventAst::SoundEffectTransient (_) => { }
@@ -389,7 +514,58 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SoundVoiceDamage => { }
             &EventAst::SoundVoiceOttotto => { }
             &EventAst::SoundVoiceEating => { }
+
+            // variables
+            &EventAst::IntVariableSet { value, variable } => {
+                self.variables.insert(variable, value);
+            }
+            &EventAst::IntVariableAdd { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                self.variables.insert(variable, old_value + value);
+            }
+            &EventAst::IntVariableSubtract { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                self.variables.insert(variable, old_value - value);
+            }
+            &EventAst::IntVariableIncrement { variable } => {
+                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                self.variables.insert(variable, old_value + 1);
+            }
+            &EventAst::IntVariableDecrement { variable } => {
+                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                self.variables.insert(variable, old_value - 1);
+            }
+            &EventAst::FloatVariableSet { value, variable } => {
+                self.variables.insert(variable, value as i32); // TODO: Should these be cast bitwise? Or an enum VariableType { Int(i32), Float(f32) } ?
+            }
+            &EventAst::FloatVariableAdd { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                self.variables.insert(variable, (old_value + value) as i32);
+            }
+            &EventAst::FloatVariableSubtract { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                self.variables.insert(variable, (old_value - value) as i32);
+            }
+            &EventAst::FloatVariableMultiply { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                self.variables.insert(variable, (old_value * value) as i32);
+            }
+            &EventAst::FloatVariableDivide { value, variable } => {
+                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                self.variables.insert(variable, (old_value / value) as i32);
+            }
+            &EventAst::BoolVariableSetTrue { variable } => {
+                self.variables.insert(variable, 1);
+            }
+            &EventAst::BoolVariableSetFalse { variable } => {
+                self.variables.insert(variable, 0);
+            }
+
+            // graphics
             &EventAst::GraphicEffect (_) => { }
+            &EventAst::LimitedScreenTint (_) => { }
+            &EventAst::UnlimitedScreenTint (_) => { }
+            &EventAst::EndUnlimitedScreenTint { .. } => { }
             &EventAst::AestheticWindEffect (_) => { }
             &EventAst::ScreenShake { .. } => { }
             &EventAst::ModelChanger { .. } => { }

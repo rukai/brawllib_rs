@@ -12,7 +12,7 @@ pub struct ScriptAst {
 
 impl ScriptAst {
     pub fn new(script: &Script) -> ScriptAst {
-        let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter()) {
+        let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter().peekable()) {
             events
         } else {
             error!("A block in the script did not terminate.");
@@ -26,7 +26,7 @@ impl ScriptAst {
     }
 }
 
-fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
+fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> ProcessedBlock {
     let mut event_asts = vec!();
     let mut boolean_expressions = vec!();
     while let Some(event) = events.next() {
@@ -106,7 +106,7 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
                             return ProcessedBlock::Finished (Block { events: event_asts });
                         }
                     };
-                    let else_branch = Some(Box::new(Block { events: vec!(event)}));
+                    let else_branch = Some(Box::new(Block { events: vec!(event) }));
                     let then_branch = Block { events: event_asts };
                     return ProcessedBlock::EndIfAndElse { then_branch, else_branch, boolean_expressions };
                 } else {
@@ -114,19 +114,67 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
                 }
             }
             (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts }, boolean_expressions } }
-            (0x00, 0x10, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::Switch (v0, v1),
-            (0x00, 0x13, None,                   None,                 None) => EventAst::EndSwitch,
-            (0x04, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
-            (0x04, 0x00, Some(&Value(v0)),       Some(&Bool(v1)),      None) =>
-                if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
-            (0x06, 0x06, Some(&Scalar(v0)),      None,                 None) => EventAst::SetFrame (v0),
-            (0x04, 0x07, Some(&Scalar(v0)),      None,                 None) => EventAst::FrameSpeedModifier (v0),
-            (0x0c, 0x23, Some(&Value(v0)),       Some(&Value(v1)),     None) => EventAst::TimeManipulation (v0, v1),
-            (0x0e, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::SetAirGround (v0),
-            (0x08, 0x00, Some(&Value(v0)),       None,                 None) => EventAst::SetEdgeSlide (EdgeSlide::new(v0)),
-            (0x05, 0x00, None,                   None,                 None) => EventAst::ReverseDirection,
-            (0x06, 0x04, None,                   None,                 None) => EventAst::RemoveAllHitBoxes,
-            (0x64, 0x00, None,                   None,                 None) => EventAst::AllowInterrupt,
+            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::Switch (v0, v1),
+            (0x00, 0x11, Some(&Value(v0)), None,             None) => EventAst::Case (v0),
+            (0x00, 0x11, None,             None,             None) => EventAst::DefaultCase,
+            (0x00, 0x13, None,             None,             None) => EventAst::EndSwitch,
+            (0x01, 0x01, None,             None,             None) => EventAst::LoopRest,
+
+            // change action
+            (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
+            (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip }))
+             => EventAst::ChangeActionStatus { status_id: v0, action: v1, requirement: ty.clone(), flip },
+            (0x02, 0x01, Some(&Value(v0)), Some(&Requirement { ref ty, flip }), v2) => {
+                if let Some(mut test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
+                    // Additional Change Action Requirements can be added in the next events
+                    while let Some(peek_event) = events.peek() {
+                        if peek_event.namespace == 0x02 && peek_event.code == 0x04 {
+                            let args = &peek_event.arguments;
+                            if let Some(&Requirement { ref ty, flip }) = args.get(0) {
+                                if let Some(right) = Expression::from_args(ty, flip, args.get(1), args.get(2), args.get(3)) {
+                                    test = Expression::Binary(BinaryExpression { left: Box::new(test), right: Box::new(right), operator: ComparisonOperator::And });
+                                    events.next();
+                                }
+                                else {
+                                    error!("Invalid Additional Change Action Requirement: Expression::from_args failed");
+                                    return ProcessedBlock::Finished (Block { events: event_asts });
+                                }
+                            }
+                            else {
+                                error!("Invalid Additional Change Action Requirement: args.get(0) is not a requirement");
+                                return ProcessedBlock::Finished (Block { events: event_asts });
+                            }
+                        }
+                        else {
+                            break;
+                        }
+                    }
+
+                    EventAst::ChangeAction { action: v0, test }
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x02, 0x04, _,  _, _) => {
+                error!("Additional Change Action Requirement without a previous Change Action");
+                return ProcessedBlock::Finished (Block { events: event_asts });
+            }
+            (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
+            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
+            (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
+
+            // timing
+            (0x06, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
+            (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier (v0),
+            (0x0c, 0x23, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::TimeManipulation (v0, v1),
+
+            // misc state
+            (0x0e, 0x00, Some(&Value(v0)), None, None) => EventAst::SetAirGround (v0),
+            (0x08, 0x00, Some(&Value(v0)), None, None) => EventAst::SetEdgeSlide (EdgeSlide::new(v0)),
+            (0x05, 0x00, None,             None, None) => EventAst::ReverseDirection,
+
+            // hitboxes
+            (0x06, 0x04, None,             None,             None) => EventAst::RemoveAllHitBoxes,
             (0x06, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
@@ -251,10 +299,55 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
             (0x06, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: v0, new_damage: v1 },
             (0x06, 0x02, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: v0, new_size:   v1 },
             (0x06, 0x03, Some(&Value(v0)), None,             None) => EventAst::DeleteHitBox (v0),
-            (0x07, 0x07, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::Rumble { unk1: v0, unk2: v1 },
-            (0x07, 0x0B, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
-            (0x18, 0x00, Some(&Value(v0)), None,             None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
-            (0x18, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
+            //(0x06, 0x0A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar)) => EventAst::DeleteHitBox (v0),
+
+
+            // hurtboxes
+            (0x06, 0x05, Some(&Value(v0)), None,             None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(v0) },
+            (0x06, 0x08, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHurtBoxStateSpecific { bone: v0, state: HurtBoxState::new(v1) },
+            (0x06, 0x06, Some(&Value(v0)), None,             None) => {
+                if v0 != 0 {
+                    error!("Unsual UnchangeHurtBoxStateSpecific argument: All known cases of this event have an argument of 0")
+                }
+                EventAst::UnchangeHurtBoxStateSpecific
+            }
+
+            // misc
+            (0x07, 0x07, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::Rumble { unk1: v0, unk2: v1 },
+            (0x07, 0x0B, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
+            (0x18, 0x00, Some(&Value(v0)),  None,              None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
+            (0x18, 0x01, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
+            (0x10, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),   None) => EventAst::GenerateArticle { article_id: v0, subaction_only: v1 },
+            (0x10, 0x01, Some(&Value(v0)),  None,              None) => EventAst::ArticleEvent (v0),
+            (0x10, 0x02, Some(&Value(v0)),  None,              None) => EventAst::ArticleAnimation (v0),
+            (0x10, 0x03, Some(&Value(v0)),  None,              None) => EventAst::ArticleRemove (v0),
+            (0x10, 0x05, Some(&Value(v0)),  Some(&Bool(v1)),   None) => EventAst::ArticleVisibility { article_id: v0, visibility: v1 },
+            (0x0C, 0x06, None,              None,              None) => EventAst::FinalSmashEnter,
+            (0x0C, 0x07, None,              None,              None) => EventAst::FinalSmashExit,
+            (0x0C, 0x08, None,              None,              None) => EventAst::TerminateSelf,
+            (0x0C, 0x09, Some(&Value(v0)),  None,              None) => EventAst::LedgeGrabEnable (LedgeGrabEnable::new(v0)),
+            (0x0C, 0x25, Some(&Bool(v0)),   None,              None) => EventAst::TagDisplay (v0),
+            (0x1E, 0x00, Some(&Value(v0)),  Some(&Scalar(v1)), None) => EventAst::Armor { armor_type: ArmorType::new(v0), tolerance: v1 },
+            (0x1E, 0x03, Some(&Scalar(v0)), None,              None) => EventAst::AddDamage (v0),
+
+            // movement
+            (0x0E, 0x08, Some(&Scalar(v0)), Some(&Scalar(v1)), Some(&Value(v2))) => {
+                if let Some(&Value(v3)) = args.get(3) {
+                    EventAst::SetOrAddVelocity (SetOrAddVelocity {
+                        x_vel: v0,
+                        y_vel: v1,
+                        x_set: v2 != 0,
+                        y_set: v3 != 0,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x0E, 0x08, Some(&Scalar(v0)), Some(&Scalar(v1)), None) => EventAst::SetVelocity { x_vel: v0, y_vel: v1 },
+            (0x0E, 0x01, Some(&Scalar(v0)), Some(&Scalar(v1)), None) => EventAst::AddVelocity { x_vel: v0, y_vel: v1 },
+            (0x0E, 0x06, Some(&Value(v0)),  None,              None) => EventAst::DisableMovement (DisableMovement::new(v0)),
+            (0x0E, 0x07, Some(&Value(v0)),  None,              None) => EventAst::DisableMovement2 (DisableMovement::new(v0)),
+            (0x0E, 0x02, Some(&Value(v0)),  None,              None) => EventAst::ResetVerticalVelocityAndAcceleration (v0 == 1),
 
             // sound
             (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
@@ -269,6 +362,20 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
             (0x0C, 0x19, None,             None, None) => EventAst::SoundVoiceDamage,
             (0x0C, 0x1D, None,             None, None) => EventAst::SoundVoiceOttotto,
             (0x0C, 0x1F, None,             None, None) => EventAst::SoundVoiceEating,
+
+            // Modify variables
+            (0x12, 0x00, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableSet { value: v0, variable: v1 },
+            (0x12, 0x01, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableAdd { value: v0, variable: v1 },
+            (0x12, 0x02, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableSubtract { value: v0, variable: v1 },
+            (0x12, 0x03, Some(&Variable(v0)), None,                None) => EventAst::IntVariableIncrement { variable: v0 },
+            (0x12, 0x04, Some(&Variable(v0)), None,                None) => EventAst::IntVariableDecrement { variable: v0 },
+            (0x12, 0x06, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableSet { value: v0, variable: v1 },
+            (0x12, 0x07, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableAdd { value: v0, variable: v1 },
+            (0x12, 0x08, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableSubtract { value: v0, variable: v1 },
+            (0x12, 0x0F, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableMultiply { value: v0, variable: v1 },
+            (0x12, 0x10, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableDivide { value: v0, variable: v1 },
+            (0x12, 0x0A, Some(&Variable(v0)), None,                None) => EventAst::BoolVariableSetTrue { variable: v0 },
+            (0x12, 0x0B, Some(&Variable(v0)), None,                None) => EventAst::BoolVariableSetFalse { variable: v0 },
 
             // graphics
             (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 1, switch_index: v0, bone_group_index: v1 },
@@ -299,6 +406,33 @@ fn process_block(events: &mut slice::Iter<Event>) -> ProcessedBlock {
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x11, 0x17, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                match (args.get(3), args.get(4), args.get(5), args.get(6)) {
+                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), Some(&Value(v6))) => {
+                        EventAst::LimitedScreenTint (LimitedScreenTint {
+                            transition_in_time: v0,
+                            red: v1,
+                            green: v2,
+                            blue: v3,
+                            alpha: v4,
+                            frame_count: v5,
+                            transition_out_time: v6,
+                        })
+                    }
+                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), None) => {
+                        EventAst::UnlimitedScreenTint (UnlimitedScreenTint {
+                            tint_id: v0,
+                            transition_in_time: v1,
+                            red: v2,
+                            green: v3,
+                            blue: v4,
+                            alpha: v5,
+                        })
+                    }
+                    _ => EventAst::Unknown (event.clone())
+                }
+            }
+            (0x11, 0x18, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::EndUnlimitedScreenTint { tint_id: v0, transition_out_time: v1 },
             (0x14, 0x07, Some(&Value(v0)), Some(&Scalar(v1)), Some(&Scalar(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9)) {
                     (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Value(v9))) => {
@@ -421,53 +555,185 @@ enum ProcessedBlock {
 
 #[derive(Serialize, Clone, Debug)]
 pub enum EventAst {
+    ///Pause the current flow of events until the set time is reached. Synchronous timers count down when they are reached in the code.
     SyncWait (f32),
+    /// Does nothing.
     Nop,
+    /// Pause the current flow of events until the set time is reached. Asynchronous Timers start counting from the beginning of the animation.
     AsyncWait (f32),
+    /// Set a loop for X iterations.
     SetLoop (f32),
+    /// Execute the the previously set loop.
     ExecuteLoop,
+    /// Enter the event routine specified and return after ending.
     Subroutine (i32),
+    /// Return from a Subroutine.
     Return,
+    /// Goto the event location specified and execute.
     Goto (i32),
+    /// An expression decides which block of code to execute.
     IfStatement (IfStatement),
+    /// Begin a multiple case Switch block.
     Switch (i32, i32),
+    /// Handler for if the variable in the switch statement equals the specified value.
+    Case (i32),
+    /// The case chosen if none of the others are executed.
+    DefaultCase,
+    /// End a Switch block.
     EndSwitch,
+    /// Briefly return execution back to the system to prevent crashes during infinite loops.
+    LoopRest,
+    /// Enables the given Status ID
+    EnableActionStatusID (i32),
+    /// Change the current action upon the specified requirement being met. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
+    ChangeActionStatus { status_id: i32, action: i32, requirement: Requirement, flip: bool },
+    /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
+    ChangeAction { action: i32, test: Expression },
+    /// Allow the current action to be interrupted by another action.
     AllowInterrupt,
+    /// Change the current subaction.
     ChangeSubAction (i32),
+    /// Change the current subaction, restarting the frame count.
     ChangeSubActionRestartFrame (i32),
+    /// Changes the current frame of the animation. Does not change the frame of the subaction (i.e. timers and such are unaffected).
     SetFrame (f32),
+    /// Dictates the frame speed of the subaction. Example: setting to 2 makes the animation and timers occur twice as fast.
     FrameSpeedModifier (f32),
+    /// Change the speed of time for various parts of the environment.
     TimeManipulation (i32, i32),
+    /// Specify whether the character is on or off the ground.
     SetAirGround (i32),
+    /// Determines whether or not the character will slide off the edge.
     SetEdgeSlide (EdgeSlide),
+    /// Reverse the direction the character is facing after the animation ends.
     ReverseDirection,
+    /// Create a hitbox with the specified parameters.
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
+    /// Remove all currently present hitboxes.
     RemoveAllHitBoxes, // brawlbox calls this "Terminate Collisions"
+    /// Create a hitbox with the even more parameters.
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
+    /// Repositions an already-existing hitbox.
     MoveHitBox (MoveHitBox),
+    /// Changes a specific hitbox's damage to the new amount. Only guaranteed to work on Offensive Collisions.
     ChangeHitBoxDamage { hitbox_id: i32, new_damage: i32 },
-    ChangeHitBoxSize   { hitbox_id: i32, new_size:   i32 },
+    /// Changes a specific hitbox's size to the new amount. Only guaranteed to work on Offensive Collisions.
+    ChangeHitBoxSize { hitbox_id: i32, new_size: i32 },
+    /// Deletes a hitbox of the specified ID. Only guaranteed to work on Offensive Collisions.
     DeleteHitBox (i32),
+    /// Set the state of all of the characters hurtboxes.
+    ChangeHurtBoxStateAll { state: HurtBoxState },
+    /// Sets the state of a characters specific hurtbox.
+    ChangeHurtBoxStateSpecific { bone: i32, state: HurtBoxState },
+    /// Sets the state of a characters specific hurtbox to the global value.
+    UnchangeHurtBoxStateSpecific,
+    /// Undefined. Affects the rumble feature of the controller.
     Rumble { unk1: i32, unk2: i32 },
+    /// Creates a rumble loop on the controller.
     RumbleLoop { unk1: i32, unk2: i32 },
+    /// Moves the character's feet if on sloped ground.
     SlopeContourStand { leg_bone_parent: i32 },
+    /// Moves entire character to match sloped ground.
     SlopeContourFull { hip_n_or_top_n: i32, trans_bone: i32 },
+    /// Generate a pre-made prop effect from the prop library.
+    GenerateArticle { article_id: i32, subaction_only: bool },
+    /// Makes the article preform an animation when set to 1.
+    ArticleEvent (i32),
+    /// Article Animation.
+    ArticleAnimation (i32),
+    /// Removes an article.
+    ArticleRemove (i32),
+    /// Makes an article visible or invisible.
+    ArticleVisibility { article_id: i32, visibility: bool },
+    /// Allows use of Final Smash locked articles, variables, etc. Highly unstable.
+    FinalSmashEnter,
+    /// Exit Final Smash state
+    FinalSmashExit,
+    /// Used by certain article instances to remove themselves.
+    TerminateSelf,
+    /// Allow or disallow grabbing ledges during the current subaction.
+    LedgeGrabEnable (LedgeGrabEnable),
+    /// Disables or enables tag display for the current subaction.
+    TagDisplay (bool),
+    /// Begins super armor or heavy armor. Set parameters to None and 0 to end the armor.
+    Armor { armor_type: ArmorType, tolerance: f32 },
+    /// Adds the specified amount of damage to the character's current percentage.
+    AddDamage (f32),
+    /// Will either set or add the velocity amounts depending on the set_ flags.
+    SetOrAddVelocity (SetOrAddVelocity),
+    /// Sets the character's current velocity.
+    SetVelocity { x_vel: f32, y_vel: f32 },
+    /// Adds to the character's current velocity.
+    AddVelocity { x_vel: f32, y_vel: f32 },
+    /// Does not allow the specified type of movement.
+    DisableMovement (DisableMovement),
+    /// This must be set to the same value as DisableMovement to work.
+    DisableMovement2 (DisableMovement),
+    /// When set to 1, vertical speed and acceleration are reset back to 0.",
+    ResetVerticalVelocityAndAcceleration (bool),
+    /// Play a specified sound effect.
     SoundEffect1 (i32),
+    /// Play a specified sound effect.
     SoundEffect2 (i32),
+    /// Play a specified sound effect. The sound effect ends with the animation.
     SoundEffectTransient (i32),
+    /// Stops the specified sound effect immediately.
     SoundEffectStop (i32),
+    /// Play a specified sound effect. Is used during victory poses.
     SoundEffectVictory (i32),
+    /// Unknown.
     SoundEffectUnk (i32),
+    /// Play a specified sound effect.
     SoundEffectOther1 (i32),
+    /// Play a specified sound effect.
     SoundEffectOther2 (i32),
+    /// Play a random low voice clip.
     SoundVoiceLow,
+    /// Play a random damage voice clip.
     SoundVoiceDamage,
+    /// Play the Ottotto voice clip.
     SoundVoiceOttotto,
+    /// Play a random eating voice clip.
     SoundVoiceEating,
-    GraphicEffect (GraphicEffect),
-    AestheticWindEffect (AestheticWindEffect),
-    ScreenShake { magnitude: i32 },
+    /// Set a specified value to an int variable.
+    IntVariableSet { value: i32, variable: i32 },
+    /// Add a specified value to an int variable.
+    IntVariableAdd { value: i32, variable: i32 },
+    /// Subtract a specified value from an int variable.
+    IntVariableSubtract { value: i32, variable: i32 },
+    /// Increment an int variable.
+    IntVariableIncrement { variable: i32 },
+    /// Decrement an int variable.
+    IntVariableDecrement { variable: i32 },
+    /// Set a specified value to a float variable.
+    FloatVariableSet { value: f32, variable: i32 },
+    /// Add a specified value to a float variable.
+    FloatVariableAdd { value: f32, variable: i32 },
+    /// Subtract a specified value from a float variable.
+    FloatVariableSubtract { value: f32, variable: i32 },
+    /// Multiply a specified value on a float variable.
+    FloatVariableMultiply { value: f32, variable: i32 },
+    /// Divide a specified value on a float variable.
+    FloatVariableDivide { value: f32, variable: i32 },
+    /// Set a bool variable to true.
+    BoolVariableSetTrue { variable: i32 },
+    /// Set a bool variable to false.
+    BoolVariableSetFalse { variable: i32 },
+    /// Changes the visibility of certain bones attached to objects. Uses bone groups and switches set in the specified Reference of the Model Visibility section.",
     ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
+    /// Generate a generic graphical effect with the specified parameters.
+    GraphicEffect (GraphicEffect),
+    /// Tint the screen to the specified color.
+    LimitedScreenTint (LimitedScreenTint),
+    /// Tint the screen to the specified color until terminated by `EndUnlimitedScreenTint`.
+    UnlimitedScreenTint (UnlimitedScreenTint),
+    /// Terminates an unlimited screen tint with the specified ID.
+    EndUnlimitedScreenTint { tint_id: i32, transition_out_time: i32 },
+    /// Moves nearby movable model parts (capes, hair, etc) with a wind specified by the parameters.
+    AestheticWindEffect (AestheticWindEffect),
+    /// Shakes the screen.
+    ScreenShake { magnitude: i32 },
+    /// Unknown event.
     Unknown (Event)
 }
 
@@ -549,6 +815,29 @@ impl EdgeSlide {
             1 => EdgeSlide::StayOn,
             5 => EdgeSlide::Airbourne,
             v => EdgeSlide::Unknown (v)
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum HurtBoxState {
+    Normal,
+    Invincible,
+    IntangibleFlashing,
+    IntangibleNoFlashing,
+    IntangibleQuickFlashing,
+    Unknown (i32)
+}
+
+impl HurtBoxState {
+    fn new(value: i32) -> HurtBoxState {
+        match value {
+            0 => HurtBoxState::Normal,
+            1 => HurtBoxState::Invincible,
+            2 => HurtBoxState::IntangibleFlashing,
+            3 => HurtBoxState::IntangibleNoFlashing,
+            4 => HurtBoxState::IntangibleQuickFlashing,
+            v => HurtBoxState::Unknown (v)
         }
     }
 }
@@ -713,6 +1002,73 @@ pub struct MoveHitBox {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub enum LedgeGrabEnable {
+    Disable,
+    EnableInFront,
+    EnableInFrontAndBehind,
+    Unknown (i32),
+}
+
+impl LedgeGrabEnable {
+    fn new(value: i32) -> LedgeGrabEnable {
+        match value {
+            0 => LedgeGrabEnable::Disable,
+            1 => LedgeGrabEnable::EnableInFront,
+            2 => LedgeGrabEnable::EnableInFrontAndBehind,
+            v => LedgeGrabEnable::Unknown (v),
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum ArmorType {
+    None,
+    SuperArmor,
+    HeavyArmorKnockbackBased,
+    HeavyArmorDamageBased,
+    Unknown (i32),
+}
+
+impl ArmorType {
+    fn new(value: i32) -> ArmorType {
+        match value {
+            0 => ArmorType::None,
+            1 => ArmorType::SuperArmor,
+            2 => ArmorType::HeavyArmorKnockbackBased,
+            3 => ArmorType::HeavyArmorDamageBased,
+            v => ArmorType::Unknown (v),
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SetOrAddVelocity {
+    pub x_vel: f32,
+    pub y_vel: f32,
+    pub x_set: bool,
+    pub y_set: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum DisableMovement {
+    Enable,
+    DisableVertical,
+    DisableHorizontal,
+    Unknown (i32),
+}
+
+impl DisableMovement {
+    fn new(value: i32) -> DisableMovement {
+        match value {
+            0 => DisableMovement::Enable,
+            1 => DisableMovement::DisableVertical,
+            2 => DisableMovement::DisableHorizontal,
+            v => DisableMovement::Unknown (v),
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct GraphicEffect {
     pub graphic:                  i32,
     pub bone:                     i32,
@@ -730,6 +1086,27 @@ pub struct GraphicEffect {
     pub random_y_rotation:        f32,
     pub random_z_rotation:        f32,
     pub terminate_with_animation: bool
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct LimitedScreenTint {
+    pub transition_in_time: i32,
+    pub red: i32,
+    pub green: i32,
+    pub blue: i32,
+    pub alpha: i32,
+    pub frame_count: i32,
+    pub transition_out_time: i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct UnlimitedScreenTint {
+    pub tint_id: i32,
+    pub transition_in_time: i32,
+    pub red: i32,
+    pub green: i32,
+    pub blue: i32,
+    pub alpha: i32,
 }
 
 #[derive(Serialize, Clone, Debug)]

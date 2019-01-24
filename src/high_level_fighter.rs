@@ -6,8 +6,10 @@ use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
 use crate::misc_section::{LedgeGrab, HurtBox};
 use crate::sakurai::{FighterAttributes, AnimationFlags};
-use crate::script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, EdgeSlide, AngleFlip, Effect};
+use crate::script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, HurtBoxState, EdgeSlide, AngleFlip, Effect};
 use crate::script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
+
+use std::collections::HashMap;
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -96,7 +98,7 @@ impl HighLevelFighter {
                     let mut first_bone = first_bone.clone();
                     let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                     let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, chr0_frame_index as i32, animation_flags);
-                    let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes);
+                    let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.unwrap().misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
                     let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
                     let hit_boxes = gen_hit_boxes(&first_bone, &hit_boxes);
                     let mut hl_hit_boxes = vec!();
@@ -262,6 +264,7 @@ pub struct HighLevelFrame {
 pub struct HighLevelHurtBox {
     pub bone_matrix: Matrix4<f32>,
     pub hurt_box: HurtBox,
+    pub state: HurtBoxState,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -435,19 +438,26 @@ fn gen_ecb(bone: &Bone, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
     ecb
 }
 
-fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox]) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtBoxState, hurtbox_states: &HashMap<i32, HurtBoxState>) -> Vec<HighLevelHurtBox> {
     let mut hl_hurt_boxes = vec!();
     for hurt_box in hurt_boxes {
         if bone.index == hurt_box.bone_index as i32 {
+            let state = if let Some(state) = hurtbox_states.get(&bone.index) {
+                state
+            } else {
+                hurtbox_state_all
+            }.clone();
+
             hl_hurt_boxes.push(HighLevelHurtBox {
                 bone_matrix: bone.transform,
-                hurt_box: hurt_box.clone(),
+                hurt_box:    hurt_box.clone(),
+                state,
             });
         }
     }
 
     for child in bone.children.iter() {
-        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes));
+        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, hurtbox_state_all, hurtbox_states));
     }
 
     hl_hurt_boxes

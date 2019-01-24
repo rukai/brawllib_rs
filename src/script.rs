@@ -124,13 +124,13 @@ impl Event {
 const ARGUMENT_SIZE: usize = 0x8;
 #[derive(Serialize, Clone, Debug)]
 pub enum Argument {
+    Value (i32),
     Scalar (f32),
+    Offset (i32),
     Bool (bool),
     File (i32),
     Variable (i32),
     Requirement { flip: bool, ty: Requirement },
-    Value (i32),
-    Offset (i32),
     Unknown (i32, i32)
 }
 
@@ -144,7 +144,7 @@ pub enum Requirement {
     HoldingALedge,
     OnAPassableFloor,
     Comparison,
-    BitIsSet,
+    BoolIsTrue,
     FacingRight,
     FacingLeft,
     HitboxConnects,
@@ -205,7 +205,7 @@ impl Requirement {
               5 => Requirement::HoldingALedge,
               6 => Requirement::OnAPassableFloor,
               7 => Requirement::Comparison,
-              8 => Requirement::BitIsSet,
+              8 => Requirement::BoolIsTrue,
               9 => Requirement::FacingRight,
              10 => Requirement::FacingLeft,
              11 => Requirement::HitboxConnects,
