@@ -36,7 +36,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x01, Some(&Scalar(v0)), None, None) => EventAst::SyncWait (v0),
             (0x00, 0x02, None,              None, None) => EventAst::Nop,
             (0x00, 0x02, Some(&Scalar(v0)), None, None) => EventAst::AsyncWait (v0),
-            (0x00, 0x04, Some(&Scalar(v0)), None, None) => EventAst::SetLoop (v0),
+            (0x00, 0x04, Some(&Value(v0)),  None, None) => EventAst::SetLoop (v0),
             (0x00, 0x05, None,              None, None) => EventAst::ExecuteLoop,
             (0x00, 0x07, Some(&Offset(v0)), None, None) => EventAst::Subroutine (v0),
             (0x00, 0x08, None,              None, None) => EventAst::Return,
@@ -351,6 +351,14 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x1E, 0x00, Some(&Value(v0)),  Some(&Scalar(v1)), None) => EventAst::Armor { armor_type: ArmorType::new(v0), tolerance: v1 },
             (0x1E, 0x03, Some(&Scalar(v0)), None,              None) => EventAst::AddDamage (v0),
 
+            // posture
+            (0x05, 0x01, None, None, None) => EventAst::Posture (0x01),
+            (0x05, 0x02, None, None, None) => EventAst::Posture (0x02),
+            (0x05, 0x03, None, None, None) => EventAst::Posture (0x03),
+            (0x05, 0x04, None, None, None) => EventAst::Posture (0x04),
+            (0x05, 0x07, None, None, None) => EventAst::Posture (0x07),
+            (0x05, 0x0D, None, None, None) => EventAst::Posture (0x0D),
+
             // movement
             (0x0E, 0x08, Some(&Scalar(v0)), Some(&Scalar(v1)), Some(&Value(v2))) => {
                 if let Some(&Value(v3)) = args.get(3) {
@@ -427,6 +435,58 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x11, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Scalar(v12)), Some(&Scalar(v13)), Some(&Scalar(v14)), Some(&Bool(v15))) =
+                    (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15))
+                {
+                    EventAst::ExternalGraphicEffect (ExternalGraphicEffect {
+                        file:       (v0 >> 16) as i16,
+                        graphic:    v0 as i16,
+                        bone:       v1,
+                        x_offset:   v4,
+                        y_offset:   v3,
+                        z_offset:   v2,
+                        x_rotation: v7,
+                        y_rotation: v6,
+                        z_rotation: v5,
+                        scale:      v8,
+                        randomize:  Some(ExternalGraphicEffectRandomize {
+                            random_x_offset:   v11,
+                            random_y_offset:   v10,
+                            random_z_offset:   v9,
+                            random_x_rotation: v14,
+                            random_y_rotation: v13,
+                            random_z_rotation: v12,
+                        }),
+                        terminate_with_animation: v15,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x11, 0x01, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) |
+            (0x11, 0x02, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Bool(v9))) =
+                    (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9))
+                {
+                    EventAst::ExternalGraphicEffect (ExternalGraphicEffect {
+                        file:                     (v0 >> 16) as i16,
+                        graphic:                  v0 as i16,
+                        bone:                     v1,
+                        x_offset:                 v4,
+                        y_offset:                 v3,
+                        z_offset:                 v2,
+                        x_rotation:               v7,
+                        y_rotation:               v6,
+                        z_rotation:               v5,
+                        scale:                    v8,
+                        terminate_with_animation: v9,
+                        randomize:                None,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
             (0x11, 0x17, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), Some(&Value(v6))) => {
@@ -454,6 +514,40 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x11, 0x18, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::EndUnlimitedScreenTint { tint_id: v0, transition_out_time: v1 },
+            (0x11, 0x03, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Value(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Bool(v10)), Some(&Value(v11)), Some(&Value(v12)), Some(&Scalar(v13)), Some(&Scalar(v14)), Some(&Scalar(v15)), Some(&Scalar(v16)), Some(&Scalar(v17)), Some(&Scalar(v18)), Some(&Scalar(v19))) =
+                    (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15), args.get(16), args.get(17), args.get(18), args.get(19))
+                {
+                    EventAst::SwordGlow (SwordGlow {
+                        color:                  v0,
+                        blur_length:            v1,
+
+                        point1_bone:            v2,
+                        point1_x_offset:        v3,
+                        point1_y_offset:        v4,
+                        point1_z_offset:        v5,
+
+                        point2_bone:            v6,
+                        point2_x_offset:        v7,
+                        point2_y_offset:        v8,
+                        point2_z_offset:        v9,
+
+                        delete_after_subaction: v10,
+                        graphic_id:             v11,
+                        bone_id:                v12,
+                        x_offset:               v13,
+                        y_offset:               v14,
+                        z_offset:               v15,
+                        x_rotation:             v16,
+                        y_rotation:             v17,
+                        z_rotation:             v18,
+                        glow_length:            v19,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x11, 0x05, Some(&Value(v0)), None,              None) => EventAst::DeleteSwordGlow { fade_time: v0 },
             (0x14, 0x07, Some(&Value(v0)), Some(&Scalar(v1)), Some(&Scalar(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9)) {
                     (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Value(v9))) => {
@@ -583,7 +677,7 @@ pub enum EventAst {
     /// Pause the current flow of events until the set time is reached. Asynchronous Timers start counting from the beginning of the animation.
     AsyncWait (f32),
     /// Set a loop for X iterations.
-    SetLoop (f32),
+    SetLoop (i32),
     /// Execute the the previously set loop.
     ExecuteLoop,
     /// Enter the event routine specified and return after ending.
@@ -686,6 +780,8 @@ pub enum EventAst {
     Armor { armor_type: ArmorType, tolerance: f32 },
     /// Adds the specified amount of damage to the character's current percentage.
     AddDamage (f32),
+    /// ???
+    Posture (i32),
     /// Will either set or add the velocity amounts depending on the set_ flags.
     SetOrAddVelocity (SetOrAddVelocity),
     /// Sets the character's current velocity.
@@ -750,12 +846,18 @@ pub enum EventAst {
     ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
     /// Generate a generic graphical effect with the specified parameters.
     GraphicEffect (GraphicEffect),
+    /// Generate a graphical effect from an external file. (usually the Ef_ file)
+    ExternalGraphicEffect (ExternalGraphicEffect),
     /// Tint the screen to the specified color.
     LimitedScreenTint (LimitedScreenTint),
     /// Tint the screen to the specified color until terminated by `EndUnlimitedScreenTint`.
     UnlimitedScreenTint (UnlimitedScreenTint),
     /// Terminates an unlimited screen tint with the specified ID.
     EndUnlimitedScreenTint { tint_id: i32, transition_out_time: i32 },
+    /// Creates glow of sword. Only usable when the proper effects are loaded by their respective characters.
+    SwordGlow (SwordGlow),
+    /// Remove the sword flow in the specified time
+    DeleteSwordGlow { fade_time: i32 },
     /// Moves nearby movable model parts (capes, hair, etc) with a wind specified by the parameters.
     AestheticWindEffect (AestheticWindEffect),
     /// Shakes the screen.
@@ -1150,6 +1252,32 @@ pub struct GraphicEffect {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct ExternalGraphicEffect {
+    pub file:                     i16,
+    pub graphic:                  i16,
+    pub bone:                     i32,
+    pub x_offset:                 f32,
+    pub y_offset:                 f32,
+    pub z_offset:                 f32,
+    pub x_rotation:               f32,
+    pub y_rotation:               f32,
+    pub z_rotation:               f32,
+    pub scale:                    f32,
+    pub randomize:                Option<ExternalGraphicEffectRandomize>,
+    pub terminate_with_animation: bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ExternalGraphicEffectRandomize {
+    pub random_x_offset:   f32,
+    pub random_y_offset:   f32,
+    pub random_z_offset:   f32,
+    pub random_x_rotation: f32,
+    pub random_y_rotation: f32,
+    pub random_z_rotation: f32,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct LimitedScreenTint {
     pub transition_in_time: i32,
     pub red: i32,
@@ -1168,6 +1296,33 @@ pub struct UnlimitedScreenTint {
     pub green: i32,
     pub blue: i32,
     pub alpha: i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SwordGlow {
+    pub color:                  i32,
+    pub blur_length:            i32,
+
+    pub point1_bone:            i32,
+    pub point1_x_offset:        f32,
+    pub point1_y_offset:        f32,
+    pub point1_z_offset:        f32,
+
+    pub point2_bone:            i32,
+    pub point2_x_offset:        f32,
+    pub point2_y_offset:        f32,
+    pub point2_z_offset:        f32,
+
+    pub delete_after_subaction: bool,
+    pub graphic_id:             i32,
+    pub bone_id:                i32,
+    pub x_offset:               f32,
+    pub y_offset:               f32,
+    pub z_offset:               f32,
+    pub x_rotation:             f32,
+    pub y_rotation:             f32,
+    pub z_rotation:             f32,
+    pub glow_length:            f32,
 }
 
 #[derive(Serialize, Clone, Debug)]

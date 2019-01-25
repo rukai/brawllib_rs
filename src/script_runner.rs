@@ -520,6 +520,7 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::FinalSmashEnter => { }
             &EventAst::FinalSmashExit => { }
             &EventAst::TerminateSelf => { }
+            &EventAst::Posture (_) => { }
             &EventAst::LedgeGrabEnable (ref enable) => {
                 self.ledge_grab_enable = enable.clone();
             }
@@ -628,9 +629,12 @@ impl<'a> ScriptRunner<'a> {
 
             // graphics
             &EventAst::GraphicEffect (_) => { }
+            &EventAst::ExternalGraphicEffect (_) => { }
             &EventAst::LimitedScreenTint (_) => { }
             &EventAst::UnlimitedScreenTint (_) => { }
             &EventAst::EndUnlimitedScreenTint { .. } => { }
+            &EventAst::SwordGlow (_) => { }
+            &EventAst::DeleteSwordGlow { .. } => { }
             &EventAst::AestheticWindEffect (_) => { }
             &EventAst::ScreenShake { .. } => { }
             &EventAst::ModelChanger { .. } => { }
