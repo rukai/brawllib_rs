@@ -6,8 +6,18 @@ use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
 use crate::misc_section::{LedgeGrab, HurtBox};
 use crate::sakurai::{FighterAttributes, AnimationFlags};
-use crate::script_ast::{ScriptAst, HitBoxArguments, SpecialHitBoxArguments, HurtBoxState, EdgeSlide, AngleFlip, Effect};
-use crate::script_runner::{ScriptRunner, ChangeSubAction, ScriptHitBox};
+use crate::script_ast::{
+    ScriptAst,
+    HitBoxArguments,
+    SpecialHitBoxArguments,
+    GrabBoxArguments,
+    HurtBoxState,
+    EdgeSlide,
+    AngleFlip,
+    Effect,
+    GrabTarget,
+};
+use crate::script_runner::{ScriptRunner, ChangeSubAction, ScriptCollisionBox};
 
 use std::collections::HashMap;
 
@@ -103,20 +113,27 @@ impl HighLevelFighter {
                     let hit_boxes = gen_hit_boxes(&first_bone, &hit_boxes);
                     let mut hl_hit_boxes = vec!();
                     for next in &hit_boxes {
-                        let mut prev = None;
+                        let mut prev_pos = None;
+                        let mut prev_size = None;
                         let mut prev_values = None;
                         if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
                             for prev_hit_box in prev_hit_boxes {
-                                if prev_hit_box.values.hitbox_index == next.values.hitbox_index {
-                                    prev = Some(prev_hit_box.position);
+                                if prev_hit_box.hitbox_index == next.hitbox_index {
+                                    prev_pos = Some(prev_hit_box.position);
+                                    prev_size = Some(prev_hit_box.size);
                                     prev_values = Some(prev_hit_box.values.clone());
                                 }
                             }
                         }
                         hl_hit_boxes.push(HighLevelHitBox {
-                            prev,
+                            hitbox_index: next.hitbox_index,
+
+                            prev_pos,
+                            prev_size,
                             prev_values,
-                            next:        next.position,
+
+                            next_pos:    next.position,
+                            next_size:   next.size,
                             next_values: next.values.clone(),
                         });
                     }
@@ -268,6 +285,114 @@ pub struct HighLevelHurtBox {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub enum CollisionBoxValues {
+    Hit (HitBoxValues),
+    Grab (GrabBoxValues),
+}
+
+impl CollisionBoxValues {
+    pub fn from_hitbox(args: &HitBoxArguments) -> CollisionBoxValues {
+        CollisionBoxValues::Hit(HitBoxValues {
+            hitbox_index:                   args.hitbox_index,
+            rehit_hitbox_index:             args.rehit_hitbox_index,
+            damage:                         args.damage,
+            trajectory:                     args.trajectory,
+            weight_knockback:               args.weight_knockback,
+            kbg:                            args.kbg,
+            shield_damage:                  args.shield_damage,
+            bkb:                            args.bkb,
+            size:                           args.size,
+            tripping_rate:                  args.tripping_rate,
+            hitlag_mult:                    args.hitlag_mult,
+            di_mult:                        args.di_mult,
+            effect:                         args.effect.clone(),
+            sound_level:                    args.sound_level,
+            ground:                         args.ground,
+            aerial:                         args.aerial,
+            ty:                             args.ty,
+            clang:                          args.clang,
+            direct:                         args.direct,
+            rehit_rate:                     0, // TODO: ?
+            angle_flipping:                 AngleFlip::AwayFromAttacker, // TODO: ?
+            stretches:                      false,
+            can_hit_multiplayer_characters: true,
+            can_hit_sse_enemies:            true,
+            can_hit_damageable_ceilings:    true,
+            can_hit_damageable_walls:       true,
+            can_hit_damageable_floors:      true,
+            enabled:                        true,
+            can_be_shielded:                true,
+            can_be_reflected:               false,
+            can_be_absorbed:                false,
+            can_hit_gripped_character:      true,
+            ignore_invincibility:           false,
+            freeze_frame_disable:           false,
+            flinchless:                     false,
+        })
+    }
+
+    pub fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> CollisionBoxValues {
+        let args = &special_args.hitbox_args;
+        CollisionBoxValues::Hit(HitBoxValues {
+            hitbox_index:                   args.hitbox_index,
+            rehit_hitbox_index:             args.rehit_hitbox_index,
+            damage:                         args.damage,
+            trajectory:                     args.trajectory,
+            weight_knockback:               args.weight_knockback,
+            kbg:                            args.kbg,
+            shield_damage:                  args.shield_damage,
+            bkb:                            args.bkb,
+            size:                           args.size,
+            tripping_rate:                  args.tripping_rate,
+            hitlag_mult:                    args.hitlag_mult,
+            di_mult:                        args.di_mult,
+            effect:                         args.effect.clone(),
+            sound_level:                    args.sound_level,
+            ground:                         args.ground,
+            aerial:                         args.aerial,
+            ty:                             args.ty,
+            clang:                          args.clang,
+            direct:                         args.direct,
+            rehit_rate:                     special_args.rehit_rate,
+            angle_flipping:                 special_args.angle_flipping.clone(),
+            stretches:                      special_args.stretches,
+            can_hit_multiplayer_characters: special_args.can_hit_multiplayer_characters,
+            can_hit_sse_enemies:            special_args.can_hit_sse_enemies,
+            can_hit_damageable_ceilings:    special_args.can_hit_damageable_ceilings,
+            can_hit_damageable_walls:       special_args.can_hit_damageable_walls,
+            can_hit_damageable_floors:      special_args.can_hit_damageable_floors,
+            enabled:                        special_args.enabled,
+            can_be_shielded:                special_args.can_be_shielded,
+            can_be_reflected:               special_args.can_be_reflected,
+            can_be_absorbed:                special_args.can_be_absorbed,
+            can_hit_gripped_character:      special_args.can_hit_gripped_character,
+            ignore_invincibility:           special_args.ignore_invincibility,
+            freeze_frame_disable:           special_args.freeze_frame_disable,
+            flinchless:                     special_args.flinchless,
+        })
+    }
+
+    pub fn from_grabbox(args: &GrabBoxArguments) -> CollisionBoxValues {
+        CollisionBoxValues::Grab(GrabBoxValues {
+            hitbox_index: args.hitbox_index,
+            size:         args.size,
+            set_action:   args.set_action,
+            target:       args.target.clone(),
+            unk:          args.unk.clone(),
+        })
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct GrabBoxValues {
+    pub hitbox_index: i32,
+    pub size:         f32,
+    pub set_action:   i32,
+    pub target:       GrabTarget,
+    pub unk:          Option<i32>,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct HitBoxValues {
     pub hitbox_index:                   u8,
     pub rehit_hitbox_index:             u8,
@@ -306,101 +431,25 @@ pub struct HitBoxValues {
     pub flinchless:                     bool,
 }
 
-impl HitBoxValues {
-    pub fn from_hitbox(args: &HitBoxArguments) -> HitBoxValues {
-        HitBoxValues {
-            hitbox_index:                   args.hitbox_index,
-            rehit_hitbox_index:             args.rehit_hitbox_index,
-            damage:                         args.damage,
-            trajectory:                     args.trajectory,
-            weight_knockback:               args.weight_knockback,
-            kbg:                            args.kbg,
-            shield_damage:                  args.shield_damage,
-            bkb:                            args.bkb,
-            size:                           args.size,
-            tripping_rate:                  args.tripping_rate,
-            hitlag_mult:                    args.hitlag_mult,
-            di_mult:                        args.di_mult,
-            effect:                         args.effect.clone(),
-            sound_level:                    args.sound_level,
-            ground:                         args.ground,
-            aerial:                         args.aerial,
-            ty:                             args.ty,
-            clang:                          args.clang,
-            direct:                         args.direct,
-            rehit_rate:                     0, // TODO: ?
-            angle_flipping:                 AngleFlip::AwayFromAttacker, // TODO: ?
-            stretches:                      false,
-            can_hit_multiplayer_characters: true,
-            can_hit_sse_enemies:            true,
-            can_hit_damageable_ceilings:    true,
-            can_hit_damageable_walls:       true,
-            can_hit_damageable_floors:      true,
-            enabled:                        true,
-            can_be_shielded:                true,
-            can_be_reflected:               false,
-            can_be_absorbed:                false,
-            can_hit_gripped_character:      true,
-            ignore_invincibility:           false,
-            freeze_frame_disable:           false,
-            flinchless:                     false,
-        }
-    }
-
-    pub fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> HitBoxValues {
-        let args = &special_args.hitbox_args;
-        HitBoxValues {
-            hitbox_index:                   args.hitbox_index,
-            rehit_hitbox_index:             args.rehit_hitbox_index,
-            damage:                         args.damage,
-            trajectory:                     args.trajectory,
-            weight_knockback:               args.weight_knockback,
-            kbg:                            args.kbg,
-            shield_damage:                  args.shield_damage,
-            bkb:                            args.bkb,
-            size:                           args.size,
-            tripping_rate:                  args.tripping_rate,
-            hitlag_mult:                    args.hitlag_mult,
-            di_mult:                        args.di_mult,
-            effect:                         args.effect.clone(),
-            sound_level:                    args.sound_level,
-            ground:                         args.ground,
-            aerial:                         args.aerial,
-            ty:                             args.ty,
-            clang:                          args.clang,
-            direct:                         args.direct,
-            rehit_rate:                     special_args.rehit_rate,
-            angle_flipping:                 special_args.angle_flipping.clone(),
-            stretches:                      special_args.stretches,
-            can_hit_multiplayer_characters: special_args.can_hit_multiplayer_characters,
-            can_hit_sse_enemies:            special_args.can_hit_sse_enemies,
-            can_hit_damageable_ceilings:    special_args.can_hit_damageable_ceilings,
-            can_hit_damageable_walls:       special_args.can_hit_damageable_walls,
-            can_hit_damageable_floors:      special_args.can_hit_damageable_floors,
-            enabled:                        special_args.enabled,
-            can_be_shielded:                special_args.can_be_shielded,
-            can_be_reflected:               special_args.can_be_reflected,
-            can_be_absorbed:                special_args.can_be_absorbed,
-            can_hit_gripped_character:      special_args.can_hit_gripped_character,
-            ignore_invincibility:           special_args.ignore_invincibility,
-            freeze_frame_disable:           special_args.freeze_frame_disable,
-            flinchless:                     special_args.flinchless,
-        }
-    }
-}
-
 #[derive(Clone, Debug)]
 struct PositionHitBox {
-    pub position: Vector3<f32>,
-    pub values:   HitBoxValues,
+    pub hitbox_index: u8,
+    pub position:     Vector3<f32>,
+    pub size:         f32,
+    pub values:       CollisionBoxValues,
 }
 
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelHitBox {
-    pub prev:        Option<Vector3<f32>>,
-    pub prev_values: Option<HitBoxValues>,
-    pub next:        Vector3<f32>,
-    pub next_values: HitBoxValues,
+    pub hitbox_index: u8,
+
+    pub prev_pos:     Option<Vector3<f32>>,
+    pub prev_size:    Option<f32>,
+    pub prev_values:  Option<CollisionBoxValues>,
+
+    pub next_pos:     Vector3<f32>,
+    pub next_size:    f32,
+    pub next_values:  CollisionBoxValues,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -463,21 +512,23 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtB
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptHitBox]) -> Vec<PositionHitBox> {
-    let mut hl_hit_boxes = vec!();
+fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionHitBox> {
+    let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
         if bone.index == hit_box.bone_index as i32 {
             let transform = bone.transform * Matrix4::from_translation(Vector3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset));
-            hl_hit_boxes.push(PositionHitBox {
-                position: Vector3::new(transform.w.x, transform.w.y, transform.w.z),
-                values:   hit_box.values.clone()
+            pos_hit_boxes.push(PositionHitBox {
+                hitbox_index: hit_box.hitbox_index,
+                position:     Vector3::new(transform.w.x, transform.w.y, transform.w.z),
+                size:         hit_box.size,
+                values:       hit_box.values.clone()
             });
         }
     }
 
     for child in bone.children.iter() {
-        hl_hit_boxes.extend(gen_hit_boxes(child, hit_boxes));
+        pos_hit_boxes.extend(gen_hit_boxes(child, hit_boxes));
     }
 
-    hl_hit_boxes
+    pos_hit_boxes
 }

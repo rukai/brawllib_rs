@@ -174,7 +174,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x05, 0x00, None,             None, None) => EventAst::ReverseDirection,
 
             // hitboxes
-            (0x06, 0x04, None,             None,             None) => EventAst::RemoveAllHitBoxes,
+            (0x06, 0x04, None,             None,             None) => EventAst::DeleteAllHitBoxes,
             (0x06, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
@@ -299,8 +299,29 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x06, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: v0, new_damage: v1 },
             (0x06, 0x02, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: v0, new_size:   v1 },
             (0x06, 0x03, Some(&Value(v0)), None,             None) => EventAst::DeleteHitBox (v0),
-            //(0x06, 0x0A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar)) => EventAst::DeleteHitBox (v0),
+            (0x06, 0x0A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Value(v6)), Some(&Value(v7))) =
+                    (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7))
+                {
+                    let unk = if let Some(&Value(value)) = args.get(8) { Some(value) } else { None };
 
+                    EventAst::CreateGrabBox(GrabBoxArguments {
+                        hitbox_index: v0,
+                        bone_index:   v1,
+                        size:         v2,
+                        x_offset:     v3,
+                        y_offset:     v4,
+                        z_offset:     v5,
+                        set_action:   v6,
+                        target:       GrabTarget::new(v7),
+                        unk
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x06, 0x0C, Some(&Value(v0)), None, None) => EventAst::DeleteGrabBox (v0),
+            (0x06, 0x0D, None,             None, None) => EventAst::DeleteAllGrabBoxes,
 
             // hurtboxes
             (0x06, 0x05, Some(&Value(v0)), None,             None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(v0) },
@@ -610,17 +631,23 @@ pub enum EventAst {
     /// Create a hitbox with the specified parameters.
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
     /// Remove all currently present hitboxes.
-    RemoveAllHitBoxes, // brawlbox calls this "Terminate Collisions"
+    DeleteAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     /// Create a hitbox with the even more parameters.
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
     /// Repositions an already-existing hitbox.
     MoveHitBox (MoveHitBox),
-    /// Changes a specific hitbox's damage to the new amount. Only guaranteed to work on Offensive Collisions.
+    /// Changes a specific hitbox's damage to the new amount. Only guaranteed to work on a HitBox
     ChangeHitBoxDamage { hitbox_id: i32, new_damage: i32 },
-    /// Changes a specific hitbox's size to the new amount. Only guaranteed to work on Offensive Collisions.
+    /// Changes a specific hitbox's size to the new amount. Only guaranteed to work on a HitBox
     ChangeHitBoxSize { hitbox_id: i32, new_size: i32 },
-    /// Deletes a hitbox of the specified ID. Only guaranteed to work on Offensive Collisions.
+    /// Deletes a hitbox of the specified ID. Only guaranteed to work on a HitBox
     DeleteHitBox (i32),
+    /// Generate a grabbox with the specified parameters.
+    CreateGrabBox (GrabBoxArguments),
+    /// Deletes the grabbox with the specified ID.
+    DeleteGrabBox (i32),
+    /// Remove all currently present grabboxes
+    DeleteAllGrabBoxes,
     /// Set the state of all of the characters hurtboxes.
     ChangeHurtBoxStateAll { state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox.
@@ -669,7 +696,7 @@ pub enum EventAst {
     DisableMovement (DisableMovement),
     /// This must be set to the same value as DisableMovement to work.
     DisableMovement2 (DisableMovement),
-    /// When set to 1, vertical speed and acceleration are reset back to 0.",
+    /// When set to 1, vertical speed and acceleration are reset back to 0.
     ResetVerticalVelocityAndAcceleration (bool),
     /// Play a specified sound effect.
     SoundEffect1 (i32),
@@ -719,7 +746,7 @@ pub enum EventAst {
     BoolVariableSetTrue { variable: i32 },
     /// Set a bool variable to false.
     BoolVariableSetFalse { variable: i32 },
-    /// Changes the visibility of certain bones attached to objects. Uses bone groups and switches set in the specified Reference of the Model Visibility section.",
+    /// Changes the visibility of certain bones attached to objects. Uses bone groups and switches set in the specified Reference of the Model Visibility section.
     ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
     /// Generate a generic graphical effect with the specified parameters.
     GraphicEffect (GraphicEffect),
@@ -999,6 +1026,40 @@ pub struct MoveHitBox {
     pub new_x_offset: f32,
     pub new_y_offset: f32,
     pub new_z_offset: f32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct GrabBoxArguments {
+    pub hitbox_index: i32,
+    pub bone_index:   i32,
+    pub size:         f32,
+    pub x_offset:     f32,
+    pub y_offset:     f32,
+    pub z_offset:     f32,
+    pub set_action:   i32,
+    pub target:       GrabTarget,
+    pub unk:          Option<i32>,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum GrabTarget {
+    None,
+    GroundedOnly,
+    AerialOnly,
+    AerialAndGrounded,
+    Unknown (i32),
+}
+
+impl GrabTarget {
+    fn new(value: i32) -> GrabTarget {
+        match value {
+            0 => GrabTarget::None,
+            1 => GrabTarget::GroundedOnly,
+            2 => GrabTarget::AerialOnly,
+            3 => GrabTarget::AerialAndGrounded,
+            v => GrabTarget::Unknown (v),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
