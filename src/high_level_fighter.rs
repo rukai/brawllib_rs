@@ -25,11 +25,13 @@ use std::collections::HashMap;
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFighter {
-    pub name: String,
-    pub attributes: FighterAttributes,
-    pub actions: Vec<HighLevelAction>,
-    pub ledge_grabs: Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
-    pub fragment_scripts: Vec<ScriptAst>,
+    pub name:                  String,
+    pub attributes:            FighterAttributes,
+    pub actions:               Vec<HighLevelAction>,
+    pub ledge_grabs:           Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
+    pub scripts_fragment:      Vec<ScriptAst>,
+    pub scripts_entry_actions: Vec<ScriptAst>,
+    pub scripts_exit_actions:  Vec<ScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -204,9 +206,11 @@ impl HighLevelFighter {
         };
 
         HighLevelFighter {
-            name:            fighter.cased_name.clone(),
-            ledge_grabs:     fighter_data.unwrap().misc.ledge_grabs.clone(),
-            fragment_scripts,
+            name:                  fighter.cased_name.clone(),
+            ledge_grabs:           fighter_data.unwrap().misc.ledge_grabs.clone(),
+            scripts_fragment:      fragment_scripts,
+            scripts_entry_actions: entry_actions,
+            scripts_exit_actions:  exit_actions,
             attributes,
             actions,
         }

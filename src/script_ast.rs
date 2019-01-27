@@ -160,7 +160,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 return ProcessedBlock::Finished (Block { events: event_asts });
             }
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
-            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubActionRestartFrame (v0), // TODO: Does the default case restart?
+            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubActionRestartFrame (v0),
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
 
             // timing

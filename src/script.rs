@@ -17,8 +17,18 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]])
             for event in &script.events {
                 if event.namespace == 0 && (event.code == 7 || event.code == 9) { // if the event is a subroutine or goto
                     if let Some(Argument::Offset(offset)) = event.arguments.get(0) {
-                        let is_action = false; // TODO
-                        if !is_action && !fragments.iter().any(|x| x.offset == *offset as u32) {
+                        let mut is_action = false;
+                        'outer: for check_scripts in action_scripts.iter() {
+                            for check_script in check_scripts.iter() {
+                                if check_script.offset == *offset as u32{
+                                    is_action = true;
+                                    break 'outer;
+                                }
+                            }
+                        }
+                        let already_added = fragments.iter().any(|x| x.offset == *offset as u32);
+
+                        if !is_action && !already_added {
                             fragments.push(new_script(parent_data, *offset as usize));
                         }
                     }
@@ -34,10 +44,10 @@ fn new_script(parent_data: &[u8], offset: usize) -> Script {
         let mut events = vec!();
         let mut event_offset = offset;
         loop {
-            let namespace       =   parent_data[event_offset];
-            let code            =   parent_data[event_offset + 1];
-            let num_arguments   =   parent_data[event_offset + 2];
-            let unk1            =   parent_data[event_offset + 3];
+            let namespace     = parent_data[event_offset];
+            let code          = parent_data[event_offset + 1];
+            let num_arguments = parent_data[event_offset + 2];
+            let unk1          = parent_data[event_offset + 3];
             let raw_id = (&parent_data[event_offset ..]).read_u32::<BigEndian>().unwrap();
 
             if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
