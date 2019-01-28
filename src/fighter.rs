@@ -13,6 +13,7 @@ use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
 use crate::sakurai::SectionData;
 use crate::sakurai::fighter_data::ArcFighterData;
+use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -110,6 +111,23 @@ impl Fighter {
                 &ArcChildData::Sakurai (ref data) => {
                     for section in &data.sections {
                         if let &SectionData::FighterData (ref fighter_data_ref) = &section.data {
+                            return Some(fighter_data_ref);
+                        }
+                    }
+                }
+                _ => { }
+            }
+        }
+        None
+    }
+
+    /// retrieves the fighter data common
+    pub fn get_fighter_data_common(&self) -> Option<&ArcFighterDataCommon> {
+        for sub_arc in &self.moveset_common.children {
+            match &sub_arc.data {
+                &ArcChildData::Sakurai (ref data) => {
+                    for section in &data.sections {
+                        if let &SectionData::FighterDataCommon (ref fighter_data_ref) = &section.data {
                             return Some(fighter_data_ref);
                         }
                     }

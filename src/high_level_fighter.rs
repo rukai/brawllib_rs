@@ -28,10 +28,9 @@ pub struct HighLevelFighter {
     pub name:                  String,
     pub attributes:            FighterAttributes,
     pub actions:               Vec<HighLevelAction>,
+    pub subactions:            Vec<HighLevelSubaction>,
     pub ledge_grabs:           Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
     pub scripts_fragment:      Vec<ScriptAst>,
-    pub scripts_entry_actions: Vec<ScriptAst>,
-    pub scripts_exit_actions:  Vec<ScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -43,6 +42,7 @@ impl HighLevelFighter {
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
         info!("Generating HighLevelFighter for {}", fighter.cased_name);
         let fighter_data = fighter.get_fighter_data().unwrap();
+        let fighter_data_common = fighter.get_fighter_data_common().unwrap();
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
@@ -51,8 +51,13 @@ impl HighLevelFighter {
         let sub_action_gfx:   Vec<ScriptAst> = fighter_data.sub_action_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
         let sub_action_sfx:   Vec<ScriptAst> = fighter_data.sub_action_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
         let sub_action_other: Vec<ScriptAst> = fighter_data.sub_action_other.iter().map(|x| ScriptAst::new(x)).collect();
-        let entry_actions:    Vec<ScriptAst> = fighter_data.entry_actions   .iter().map(|x| ScriptAst::new(x)).collect();
-        let exit_actions:     Vec<ScriptAst> = fighter_data.exit_actions    .iter().map(|x| ScriptAst::new(x)).collect();
+
+        let entry_actions: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x))
+            .chain(fighter_data.entry_actions.iter().map(|x| ScriptAst::new(x)))
+            .collect();
+        let exit_actions: Vec<ScriptAst> = fighter_data_common.exit_actions.iter().map(|x| ScriptAst::new(x))
+            .chain(fighter_data.exit_actions.iter().map(|x| ScriptAst::new(x)))
+            .collect();
 
         let mut all_scripts = vec!();
         for script in fragment_scripts.iter()
@@ -76,7 +81,16 @@ impl HighLevelFighter {
             });
         }
 
-        let actions = if let Some(first_bone) = fighter.get_bones() {
+        let mut actions = vec!();
+        for i in 0..entry_actions.len() {
+            actions.push(HighLevelAction {
+                name:         i.to_string(),
+                script_entry: entry_actions[i].clone(),
+                script_exit:  exit_actions[i].clone(),
+            });
+        }
+
+        let subactions = if let Some(first_bone) = fighter.get_bones() {
             sub_action_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
                 let sub_action_flags = &fighter_data.sub_action_flags[i];
                 let name = sub_action_flags.name.clone();
@@ -196,20 +210,19 @@ impl HighLevelFighter {
                     }
                 } as usize;
 
-                HighLevelAction { name, iasa, frames, animation_flags, scripts }
+                HighLevelSubaction { name, iasa, frames, animation_flags, scripts }
             }).collect()
         } else {
             vec!()
         };
 
         HighLevelFighter {
-            name:                  fighter.cased_name.clone(),
-            ledge_grabs:           fighter_data.misc.ledge_grabs.clone(),
-            scripts_fragment:      fragment_scripts,
-            scripts_entry_actions: entry_actions,
-            scripts_exit_actions:  exit_actions,
+            name:             fighter.cased_name.clone(),
+            ledge_grabs:      fighter_data.misc.ledge_grabs.clone(),
+            scripts_fragment: fragment_scripts,
             attributes,
             actions,
+            subactions,
         }
     }
 
@@ -247,6 +260,13 @@ impl HighLevelFighter {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelAction {
+    pub name:         String,
+    pub script_entry: ScriptAst,
+    pub script_exit:  ScriptAst,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct HighLevelSubaction {
     pub name:            String,
     pub iasa:            usize,
     pub frames:          Vec<HighLevelFrame>,
