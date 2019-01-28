@@ -28,7 +28,6 @@ pub mod fighter;
 pub mod high_level_fighter;
 pub mod mbox;
 pub mod mdl0;
-pub mod misc_section;
 pub mod resources;
 pub mod sakurai;
 pub mod script;

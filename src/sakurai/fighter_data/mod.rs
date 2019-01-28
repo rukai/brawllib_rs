@@ -1,68 +1,13 @@
+pub mod misc_section;
+
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::misc_section::MiscSection;
-use crate::misc_section;
 use crate::script::Script;
 use crate::script;
 use crate::util;
+use misc_section::MiscSection;
 
-pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
-    let size                      = (&data[0x0..]).read_i32::<BigEndian>().unwrap();
-    let lookup_offset             = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
-    let lookup_entry_count        = (&data[0x8..]).read_i32::<BigEndian>().unwrap();
-    let section_count             = (&data[0xc..]).read_i32::<BigEndian>().unwrap();
-    let external_subroutine_count = (&data[0x10..]).read_i32::<BigEndian>().unwrap();
-    let mut sections = vec!();
-
-    let lookup_entries_index = ARC_SAKURAI_HEADER_SIZE + lookup_offset as usize;
-    let sections_index = lookup_entries_index + lookup_entry_count as usize * 4;
-    let external_subroutines_index = sections_index + section_count as usize * 8;
-    let string_table_index = external_subroutines_index + external_subroutine_count as usize * 8;
-
-    for i in 0..section_count {
-        let offset = sections_index + i as usize * ARC_SAKURAI_SECTION_HEADER_SIZE;
-        let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
-        let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
-        let name = String::from(util::parse_str(&data[string_table_index + string_offset as usize ..]).unwrap());
-        let section_data = if &name == "data" {
-            SectionData::FighterData(arc_fighter_data(&data[ARC_SAKURAI_HEADER_SIZE ..], &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize ..]))
-        } else {
-            SectionData::None
-        };
-        sections.push(ArcSakuraiSection { data_offset, string_offset, name, data: section_data });
-    }
-
-    ArcSakurai { size, lookup_offset, lookup_entry_count, section_count, external_subroutine_count, sections }
-}
-
-struct OffsetSizePair {
-    offset: usize,
-    size: usize,
-}
-
-fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
-    let mut pairs = vec!();
-    for i in 0..27 {
-        let offset = (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize;
-        if offset != 0 {
-            pairs.push(OffsetSizePair { offset, size: 0 });
-        }
-    }
-
-    pairs.sort_by_key(|x| x.offset);
-
-    // fill in size for most elements
-    for i in 0..pairs.len()-1 {
-        pairs[i].size = pairs[i + 1].offset - pairs[i].offset
-    }
-
-    // Just pop the last element, so if we try to access it we get a panic
-    pairs.pop();
-
-    pairs
-}
-
-fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
+pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
     let sub_action_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
     let model_visibility_start     = (&data[4..]).read_i32::<BigEndian>().unwrap();
     let attribute_start            = (&data[8..]).read_i32::<BigEndian>().unwrap();
@@ -80,7 +25,7 @@ fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
     let sub_action_sfx_start       = (&data[56..]).read_i32::<BigEndian>().unwrap();
     let sub_action_other_start     = (&data[60..]).read_i32::<BigEndian>().unwrap();
     let anchored_item_positions    = (&data[64..]).read_i32::<BigEndian>().unwrap();
-    let gooey_bomb_positions       = (&data[58..]).read_i32::<BigEndian>().unwrap();
+    let gooey_bomb_positions       = (&data[68..]).read_i32::<BigEndian>().unwrap();
     let bone_ref1                  = (&data[72..]).read_i32::<BigEndian>().unwrap();
     let bone_ref2                  = (&data[76..]).read_i32::<BigEndian>().unwrap();
     let entry_action_overrides     = (&data[80..]).read_i32::<BigEndian>().unwrap();
@@ -224,32 +169,6 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
         hip_n_bone2:                       (&data[0x1cc..]).read_u32::<BigEndian>().unwrap(),
         x_rot_n_bone:                      (&data[0x1e0..]).read_u32::<BigEndian>().unwrap(),
     }
-}
-
-const ARC_SAKURAI_HEADER_SIZE: usize = 0x20;
-#[derive(Debug)]
-pub struct ArcSakurai {
-    size: i32,
-    lookup_offset: i32,
-    lookup_entry_count: i32,
-    section_count: i32,
-    external_subroutine_count: i32,
-    pub sections: Vec<ArcSakuraiSection>,
-}
-
-const ARC_SAKURAI_SECTION_HEADER_SIZE: usize = 0x8;
-#[derive(Debug)]
-pub struct ArcSakuraiSection {
-    data_offset: i32,
-    string_offset: i32,
-    name: String,
-    pub data: SectionData,
-}
-
-#[derive(Debug)]
-pub enum SectionData {
-    FighterData (ArcFighterData),
-    None,
 }
 
 const _ARC_FIGHTER_DATA_HEADER_SIZE: usize = 0x7c;
@@ -429,4 +348,31 @@ pub struct ActionFlags {
     pub flag2: u32,
     pub flag3: u32,
     pub flag4: u32,
+}
+
+struct OffsetSizePair {
+    offset: usize,
+    size: usize,
+}
+
+fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
+    let mut pairs = vec!();
+    for i in 0..27 {
+        let offset = (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize;
+        if offset != 0 {
+            pairs.push(OffsetSizePair { offset, size: 0 });
+        }
+    }
+
+    pairs.sort_by_key(|x| x.offset);
+
+    // fill in size for most elements
+    for i in 0..pairs.len()-1 {
+        pairs[i].size = pairs[i + 1].offset - pairs[i].offset
+    }
+
+    // Just pop the last element, so if we try to access it we get a panic
+    pairs.pop();
+
+    pairs
 }

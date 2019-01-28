@@ -4,8 +4,8 @@ use rayon::prelude::*;
 use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
-use crate::misc_section::{LedgeGrab, HurtBox};
-use crate::sakurai::{FighterAttributes, AnimationFlags};
+use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox};
+use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
     ScriptAst,
     HitBoxArguments,

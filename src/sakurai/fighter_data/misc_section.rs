@@ -1,12 +1,14 @@
 use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::Vector3;
 
+use crate::util;
+
 pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     let unk0_offset           = (&data[..]).read_i32::<BigEndian>().unwrap();
-    let final_smash_aura_list = list_offset(&data[0x04..]);
-    let hurt_box_list         = list_offset(&data[0x0c..]);
-    let ledge_grab_list       = list_offset(&data[0x14..]);
-    let unk7_list             = list_offset(&data[0x1c..]);
+    let final_smash_aura_list = util::list_offset(&data[0x04..]);
+    let hurt_box_list         = util::list_offset(&data[0x0c..]);
+    let ledge_grab_list       = util::list_offset(&data[0x14..]);
+    let unk7_list             = util::list_offset(&data[0x1c..]);
     let bone_refs_offset      = (&data[0x24..]).read_i32::<BigEndian>().unwrap();
     let unk10_offset          = (&data[0x28..]).read_i32::<BigEndian>().unwrap();
     let sound_data_offset     = (&data[0x2c..]).read_i32::<BigEndian>().unwrap();
@@ -104,13 +106,6 @@ pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     }
 }
 
-fn list_offset(data: &[u8]) -> ListOffset {
-    ListOffset {
-        start_offset: (&data[0x0..]).read_i32::<BigEndian>().unwrap(),
-        count:        (&data[0x4..]).read_i32::<BigEndian>().unwrap(),
-    }
-}
-
 fn final_smash_aura(data: &[u8]) -> FinalSmashAura {
     let bone_index = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
     let x          = (&data[0x04..]).read_f32::<BigEndian>().unwrap();
@@ -204,12 +199,6 @@ pub struct MiscSection {
     collision_data_offset: i32,
     pub tether: Option<Tether>,
     unk18_offset: i32,
-}
-
-#[derive(Debug)]
-pub struct ListOffset {
-    start_offset: i32,
-    count: i32,
 }
 
 pub const FINAL_SMASH_AURA_SIZE: usize = 0x14;

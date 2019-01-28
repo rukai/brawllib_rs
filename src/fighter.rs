@@ -11,11 +11,13 @@ use crate::arc;
 use crate::bres::BresChildData;
 use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
-use crate::sakurai::{SectionData, ArcFighterData};
+use crate::sakurai::SectionData;
+use crate::sakurai::fighter_data::ArcFighterData;
 
 #[derive(Debug)]
 pub struct Fighter {
     pub cased_name: String,
+    pub moveset_common: Arc,
     pub moveset: Arc,
     pub motion: Arc,
     pub models: Vec<Arc>,
@@ -53,6 +55,13 @@ impl Fighter {
             return None;
         };
 
+        let moveset_common = if let Some(data) = fighter_data.data.get("Fighter.pac") {
+            arc::arc(data)
+        } else {
+            error!("Failed to load {}, missing moveset file: Fighter.pac", fighter_data.cased_name);
+            return None;
+        };
+
         let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
         let modded_by_psa = fighter_data.data.get(&moveset_file_name)
             .map(|a| a.windows(4).any(|b| b == psa_sequence))
@@ -86,6 +95,7 @@ impl Fighter {
 
         Some(Fighter {
             cased_name: fighter_data.cased_name,
+            moveset_common,
             moveset,
             motion,
             models,
@@ -255,6 +265,14 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
             None
         } else {
             let mut data = HashMap::new();
+
+            let common_fighter_path = fighter_path.parent().unwrap().join("Fighter.pac");
+            if let Ok(mut common_fighter) = File::open(&common_fighter_path) {
+                let mut file_data: Vec<u8> = vec!();
+                common_fighter.read_to_end(&mut file_data).unwrap();
+                data.insert(common_fighter_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+            }
+
             for data_path in fs::read_dir(&fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
                 let mut file_data: Vec<u8> = vec!();
