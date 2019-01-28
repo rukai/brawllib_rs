@@ -86,7 +86,7 @@ impl HighLevelFighter {
         let mut actions = vec!();
         for i in 0..entry_actions.len() {
             actions.push(HighLevelAction {
-                name:         i.to_string(),
+                name:         crate::action_names::action_name(i),
                 script_entry: entry_actions[i].clone(),
                 script_exit:  exit_actions[i].clone(),
             });
@@ -95,10 +95,24 @@ impl HighLevelFighter {
         let subactions = if let Some(first_bone) = fighter.get_bones() {
             sub_action_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
                 let sub_action_flags = &fighter_data.sub_action_flags[i];
-                let name = sub_action_flags.name.clone();
+                let actual_name = sub_action_flags.name.clone();
+
+                // create a unique name for this subaction
+                let mut count = 0;
+                for j in 0..i {
+                    if fighter_data.sub_action_flags[j].name == actual_name {
+                        count += 1;
+                    }
+                }
+                let name = if count == 0 {
+                    actual_name.clone()
+                } else {
+                    format!("{}_{}", actual_name, count)
+                };
+
                 let animation_flags = sub_action_flags.animation_flags.clone();
 
-                let chr0 = fighter_animations.iter().find(|x| x.name == name);
+                let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
                 let action_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
@@ -108,7 +122,7 @@ impl HighLevelFighter {
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
                 if let Some(chr0) = chr0 {
-                    let num_frames = match name.as_ref() {
+                    let num_frames = match actual_name.as_ref() {
                         "LandingAirN"  => attributes.nair_landing_lag,
                         "LandingAirF"  => attributes.fair_landing_lag,
                         "LandingAirB"  => attributes.bair_landing_lag,
@@ -192,7 +206,7 @@ impl HighLevelFighter {
                             iasa = Some(script_runner.frame_index)
                         }
 
-                        script_runner.step(name.as_ref());
+                        script_runner.step(actual_name.as_ref());
                         prev_hit_boxes = Some(hit_boxes);
 
                         if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
@@ -202,7 +216,7 @@ impl HighLevelFighter {
                 let iasa = if let Some(iasa) = iasa {
                     iasa
                 } else {
-                    match name.as_ref() {
+                    match actual_name.as_ref() {
                         "LandingAirN"  | "LandingAirF" |
                         "LandingAirB"  | "LandingAirHi" |
                         "LandingAirLw" | "LandingLight" |
