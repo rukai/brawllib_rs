@@ -13,8 +13,7 @@ script:
   - cargo test
   - cargo test --release
   - cd examples
-  - cargo build
-  - cargo build --release
+  - cargo build --release --examples --all
 
 branches:
   only:

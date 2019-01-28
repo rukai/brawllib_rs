@@ -21,7 +21,7 @@ for fighter in Fighter::load(fs::read_dir("some/real/dir/fighter").unwrap(), Non
     println!("The name of the first model file name: {}", fighter.models[0].name);
 
     let hl_fighter = HighLevelFighter::new(&fighter);
-    println!("Hurtboxes on the 4th frame of 'Run' action {:#?}", hl_fighter.actions.iter().find(|x| x.name == "Run").unwrap().frames[4].hurt_boxes);
+    println!("Hurtboxes on the 4th frame of 'Run' action {:#?}", hl_fighter.subactions.iter().find(|x| x.name == "Run").unwrap().frames[4].hurt_boxes);
 }
 ```
 
