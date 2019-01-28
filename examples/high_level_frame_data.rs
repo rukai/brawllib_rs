@@ -19,9 +19,9 @@ fn main() {
     opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
     opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
     opts.optopt("f", "fighter", "filter by fighter name", "FIGHTER_NAME");
-    opts.optopt("a", "action", "filter by action", "ACTION_NAME");
+    opts.optopt("a", "subaction", "filter by subaction", "ACTION_NAME");
     opts.optopt("i", "frame", "filter by frame", "FRAME_INDEX");
-    opts.optopt("l", "datalevel", "level to display data at", "[fighter|action|frame]");
+    opts.optopt("l", "datalevel", "level to display data at", "[fighter|subaction|frame]");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -47,7 +47,7 @@ fn main() {
     };
     let mod_dir = matches.opt_str("m").map_or(None, |x| fs::read_dir(x).ok());
     let fighter_filter = matches.opt_str("f");
-    let action_filter = matches.opt_str("a");
+    let subaction_filter = matches.opt_str("a");
     let frame_filter = matches.opt_str("i").map_or(None, |x| x.parse::<usize>().ok());
     let data_level = matches.opt_str("l").unwrap_or(String::from("fighter")).to_lowercase();
 
@@ -63,26 +63,26 @@ fn main() {
                 println!("Fighter name: {}", fighter.cased_name);
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
-                for action in hl_fighter.actions {
-                    if let &Some(ref action_filter) = &action_filter {
-                        if action.name.to_lowercase() != action_filter.to_lowercase() {
+                for subaction in hl_fighter.subactions {
+                    if let &Some(ref subaction_filter) = &subaction_filter {
+                        if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
                             continue;
                         }
                     }
-                    println!("Action name: {}", action.name);
+                    println!("Subaction name: {}", subaction.name);
 
                     if let Some(frame_filter) = frame_filter {
-                        if let Some(frame) = action.frames.get(frame_filter) {
+                        if let Some(frame) = subaction.frames.get(frame_filter) {
                             println!("{:#?}", frame);
                         }
                     }
                     else {
-                        println!("{:#?}", action.frames);
+                        println!("{:#?}", subaction.frames);
                     }
                 }
             }
         }
-        "action" => {
+        "subaction" => {
             for fighter in Fighter::load(brawl_dir, mod_dir, true) {
                 if let &Some(ref fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
@@ -92,21 +92,21 @@ fn main() {
                 println!("Fighter name: {}", fighter.cased_name);
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
-                for mut action in hl_fighter.actions {
-                    if let &Some(ref action_filter) = &action_filter {
-                        if action.name.to_lowercase() != action_filter.to_lowercase() {
+                for mut subaction in hl_fighter.subactions {
+                    if let &Some(ref subaction_filter) = &subaction_filter {
+                        if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
                             continue;
                         }
                     }
 
                     if let Some(frame_filter) = frame_filter {
-                        if frame_filter < action.frames.len() {
-                            action.frames = vec!(action.frames.remove(frame_filter));
+                        if frame_filter < subaction.frames.len() {
+                            subaction.frames = vec!(subaction.frames.remove(frame_filter));
                         } else {
-                            action.frames.clear();
+                            subaction.frames.clear();
                         }
                     }
-                    println!("{:#?}", action);
+                    println!("{:#?}", subaction);
                 }
             }
         }
@@ -120,24 +120,24 @@ fn main() {
 
                 let mut hl_fighter = HighLevelFighter::new(&fighter);
 
-                // filter by action
-                if let &Some(ref action_filter) = &action_filter {
-                    let mut new_actions = vec!();
-                    for action in hl_fighter.actions {
-                        if action.name.to_lowercase() == action_filter.to_lowercase() {
-                            new_actions.push(action);
+                // filter by subaction
+                if let &Some(ref subaction_filter) = &subaction_filter {
+                    let mut new_subactions = vec!();
+                    for subaction in hl_fighter.subactions {
+                        if subaction.name.to_lowercase() == subaction_filter.to_lowercase() {
+                            new_subactions.push(subaction);
                         }
                     }
-                    hl_fighter.actions = new_actions;
+                    hl_fighter.subactions = new_subactions;
                 }
 
                 // filter by frame
-                for action in &mut hl_fighter.actions {
+                for subaction in &mut hl_fighter.subactions {
                     if let Some(frame_filter) = frame_filter {
-                        if frame_filter < action.frames.len() {
-                            action.frames = vec!(action.frames.remove(frame_filter));
+                        if frame_filter < subaction.frames.len() {
+                            subaction.frames = vec!(subaction.frames.remove(frame_filter));
                         } else {
-                            action.frames.clear();
+                            subaction.frames.clear();
                         }
                     }
                 }

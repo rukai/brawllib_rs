@@ -17,7 +17,7 @@ use crate::script_ast::{
     Effect,
     GrabTarget,
 };
-use crate::script_runner::{ScriptRunner, ChangeSubAction, ScriptCollisionBox};
+use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox};
 
 use std::collections::HashMap;
 
@@ -209,7 +209,7 @@ impl HighLevelFighter {
                         script_runner.step(actual_name.as_ref());
                         prev_hit_boxes = Some(hit_boxes);
 
-                        if let ChangeSubAction::Continue = script_runner.change_sub_action { } else { break }
+                        if let ChangeSubaction::Continue = script_runner.change_sub_action { } else { break }
                     }
                 }
 

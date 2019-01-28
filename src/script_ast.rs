@@ -160,8 +160,8 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 return ProcessedBlock::Finished (Block { events: event_asts });
             }
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
-            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubActionRestartFrame (v0),
-            (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubAction (v0) } else { EventAst::ChangeSubActionRestartFrame (v0) }
+            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
+            (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
 
             // timing
             (0x06, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
@@ -707,9 +707,9 @@ pub enum EventAst {
     /// Allow the current action to be interrupted by another action.
     AllowInterrupt,
     /// Change the current subaction.
-    ChangeSubAction (i32),
+    ChangeSubaction (i32),
     /// Change the current subaction, restarting the frame count.
-    ChangeSubActionRestartFrame (i32),
+    ChangeSubactionRestartFrame (i32),
     /// Changes the current frame of the animation. Does not change the frame of the subaction (i.e. timers and such are unaffected).
     SetFrame (f32),
     /// Dictates the frame speed of the subaction. Example: setting to 2 makes the animation and timers occur twice as fast.

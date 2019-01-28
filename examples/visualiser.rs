@@ -1,5 +1,5 @@
 use brawllib_rs::fighter::Fighter;
-use brawllib_rs::high_level_fighter::{HighLevelFighter, HighLevelAction};
+use brawllib_rs::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
 
 use three::{
     Window,
@@ -36,7 +36,7 @@ fn main() {
     opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
     opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
     opts.optopt("f", "fighter", "fighter name", "FIGHTER_NAME");
-    opts.optopt("a", "action", "action name", "ACTION_NAME");
+    opts.optopt("a", "subaction", "subaction name", "ACTION_NAME");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -70,10 +70,10 @@ fn main() {
         return;
     };
 
-    let action_name = if let Some(action_name) = matches.opt_str("a") {
-        action_name
+    let subaction_name = if let Some(subaction_name) = matches.opt_str("a") {
+        subaction_name
     } else {
-        println!("Need to pass an action name");
+        println!("Need to pass an subaction name");
         print_usage(program, opts);
         return;
     };
@@ -81,21 +81,21 @@ fn main() {
     for fighter in Fighter::load(brawl_dir, mod_dir, true) {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
             let hl_fighter = HighLevelFighter::new(&fighter);
-            for action in hl_fighter.actions {
-                if action.name.to_lowercase() == action_name.to_lowercase() {
-                    let window_name = format!("Brawllib_rs visualiser - {} {}", fighter_name, action_name);
-                    display_action(action, window_name);
+            for subaction in hl_fighter.subactions {
+                if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
+                    let window_name = format!("Brawllib_rs visualiser - {} {}", fighter_name, subaction_name);
+                    display_subaction(subaction, window_name);
                     return;
                 }
             }
-            println!("Passed action was not found");
+            println!("Passed subaction was not found");
             return;
         }
     }
     println!("Passed fighter was not found");
 }
 
-fn display_action(action: HighLevelAction, window_name: String) {
+fn display_subaction(subaction: HighLevelSubaction, window_name: String) {
     let mut win = Window::new(window_name);
 
     // setup orbit
@@ -159,13 +159,13 @@ fn display_action(action: HighLevelAction, window_name: String) {
         match state {
             State::StepForward | State::Play => {
                 frame_index += 1;
-                if frame_index >= action.frames.len() {
+                if frame_index >= subaction.frames.len() {
                     frame_index = 0;
                 }
             }
             State::StepBackward => {
                 if frame_index == 0 {
-                    frame_index = action.frames.len() - 1;
+                    frame_index = subaction.frames.len() - 1;
                 } else {
                     frame_index -= 1
                 }
@@ -181,13 +181,13 @@ fn display_action(action: HighLevelAction, window_name: String) {
             _ => { }
         }
 
-        text.set_text(format!("frame: {}/{}", frame_index+1, action.frames.len()));
+        text.set_text(format!("frame: {}/{}", frame_index+1, subaction.frames.len()));
 
         // TODO: This will need to be heavily modified to display as rounded cubes.
         //       Render 8 sphere corners then connect them together by planes the length of the stretch value
         //       of that dimension.
         // generate hurtboxes
-        let frame = &action.frames[frame_index];
+        let frame = &subaction.frames[frame_index];
         let hurt_box_group = win.factory.group();
         for hurt_box in &frame.hurt_boxes {
             let diameter = hurt_box.hurt_box.radius * 2.0;

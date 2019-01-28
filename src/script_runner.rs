@@ -41,7 +41,7 @@ pub struct ScriptRunner<'a> {
     pub damage:               f32,
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
-    pub change_sub_action:    ChangeSubAction,
+    pub change_sub_action:    ChangeSubaction,
     pub hitlist_reset:        bool,
     pub slope_contour_stand:  Option<i32>,
     pub slope_contour_full:   Option<(i32, i32)>,
@@ -60,11 +60,11 @@ pub struct Call<'a> {
     pub subroutine: bool,
 }
 
-pub enum ChangeSubAction {
+pub enum ChangeSubaction {
     Continue,
     InfiniteLoop,
-    ChangeSubAction (i32),
-    ChangeSubActionRestartFrame (i32),
+    ChangeSubaction (i32),
+    ChangeSubactionRestartFrame (i32),
 }
 
 #[derive(Clone, Debug)]
@@ -170,7 +170,7 @@ impl<'a> ScriptRunner<'a> {
             damage:               0.0,
             airbourne:            false,
             edge_slide:           EdgeSlide::SlideOff,
-            change_sub_action:    ChangeSubAction::Continue,
+            change_sub_action:    ChangeSubaction::Continue,
             hitlist_reset:        false,
             slope_contour_stand:  None,
             slope_contour_full:   None,
@@ -241,7 +241,7 @@ impl<'a> ScriptRunner<'a> {
         }
 
         if self.frame_speed_modifier == 0.0 {
-            self.change_sub_action = ChangeSubAction::InfiniteLoop
+            self.change_sub_action = ChangeSubaction::InfiniteLoop
         }
     }
 
@@ -367,11 +367,11 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::AllowInterrupt => {
                 self.interruptible = true;
             }
-            &EventAst::ChangeSubAction (v0) => {
-                self.change_sub_action = ChangeSubAction::ChangeSubAction (v0);
+            &EventAst::ChangeSubaction (v0) => {
+                self.change_sub_action = ChangeSubaction::ChangeSubaction (v0);
             }
-            &EventAst::ChangeSubActionRestartFrame (v0) => {
-                self.change_sub_action = ChangeSubAction::ChangeSubActionRestartFrame (v0);
+            &EventAst::ChangeSubactionRestartFrame (v0) => {
+                self.change_sub_action = ChangeSubaction::ChangeSubactionRestartFrame (v0);
             }
 
             // timing

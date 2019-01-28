@@ -174,7 +174,7 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
 const _ARC_FIGHTER_DATA_HEADER_SIZE: usize = 0x7c;
 #[derive(Debug)]
 pub struct ArcFighterData {
-    pub sub_action_flags: Vec<SubActionFlags>,
+    pub sub_action_flags: Vec<SubactionFlags>,
     pub attributes: FighterAttributes,
     pub misc: MiscSection,
     pub action_flags: Vec<ActionFlags>,
@@ -295,7 +295,7 @@ bitflags! {
     }
 }
 
-fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubActionFlags> {
+fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubactionFlags> {
     let mut result = vec!();
     let num = num + 1;
     for i in 0..num {
@@ -311,7 +311,7 @@ fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubActio
             util::parse_str(&parent_data[string_offset as usize ..]).unwrap().to_string()
         };
 
-        result.push(SubActionFlags {
+        result.push(SubactionFlags {
             in_translation_time,
             animation_flags,
             name,
@@ -322,7 +322,7 @@ fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubActio
 
 const SUB_ACTION_FLAGS_SIZE: usize = 0x8;
 #[derive(Debug)]
-pub struct SubActionFlags {
+pub struct SubactionFlags {
     pub in_translation_time: u8,
     pub animation_flags:     AnimationFlags,
     pub name:                String,
