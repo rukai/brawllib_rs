@@ -25,12 +25,13 @@ use std::collections::HashMap;
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFighter {
-    pub name:                  String,
-    pub attributes:            FighterAttributes,
-    pub actions:               Vec<HighLevelAction>,
-    pub subactions:            Vec<HighLevelSubaction>,
-    pub ledge_grabs:           Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
-    pub scripts_fragment:      Vec<ScriptAst>,
+    pub name:                     String,
+    pub attributes:               FighterAttributes,
+    pub actions:                  Vec<HighLevelAction>,
+    pub subactions:               Vec<HighLevelSubaction>,
+    pub ledge_grabs:              Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
+    pub scripts_fragment_fighter: Vec<ScriptAst>,
+    pub scripts_fragment_common:  Vec<ScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -46,12 +47,13 @@ impl HighLevelFighter {
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
-        let fragment_scripts: Vec<ScriptAst> = fighter_data.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_main:  Vec<ScriptAst> = fighter_data.sub_action_main .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_gfx:   Vec<ScriptAst> = fighter_data.sub_action_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_sfx:   Vec<ScriptAst> = fighter_data.sub_action_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_other: Vec<ScriptAst> = fighter_data.sub_action_other.iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_fighter: Vec<ScriptAst> = fighter_data.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_main:          Vec<ScriptAst> = fighter_data.sub_action_main .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_gfx:           Vec<ScriptAst> = fighter_data.sub_action_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_sfx:           Vec<ScriptAst> = fighter_data.sub_action_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let sub_action_other:         Vec<ScriptAst> = fighter_data.sub_action_other.iter().map(|x| ScriptAst::new(x)).collect();
 
+        let fragment_scripts_common: Vec<ScriptAst> = fighter_data_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
         let entry_actions: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x))
             .chain(fighter_data.entry_actions.iter().map(|x| ScriptAst::new(x)))
             .collect();
@@ -60,7 +62,7 @@ impl HighLevelFighter {
             .collect();
 
         let mut all_scripts = vec!();
-        for script in fragment_scripts.iter()
+        for script in fragment_scripts_fighter.iter()
             .chain(sub_action_main.iter())
             .chain(sub_action_gfx.iter())
             .chain(sub_action_sfx.iter())
@@ -217,9 +219,10 @@ impl HighLevelFighter {
         };
 
         HighLevelFighter {
-            name:             fighter.cased_name.clone(),
-            ledge_grabs:      fighter_data.misc.ledge_grabs.clone(),
-            scripts_fragment: fragment_scripts,
+            name:                       fighter.cased_name.clone(),
+            ledge_grabs:                fighter_data.misc.ledge_grabs.clone(),
+            scripts_fragment_fighter:   fragment_scripts_fighter,
+            scripts_fragment_common:    fragment_scripts_common,
             attributes,
             actions,
             subactions,

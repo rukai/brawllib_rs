@@ -52,6 +52,9 @@ pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8]) -> ArcFig
         leg_bones_right.push(util::parse_str(&parent_data[string_offset as usize..]).unwrap().to_string());
     }
 
+    let all_scripts: Vec<&[Script]> = vec!(&entry_actions, &exit_actions);
+    let fragment_scripts = script::fragment_scripts(parent_data, &all_scripts);
+
     ArcFighterDataCommon {
         global_ics,
         global_ics_sse,
@@ -59,6 +62,7 @@ pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8]) -> ArcFig
         ics_sse,
         entry_actions,
         exit_actions,
+        fragment_scripts,
         flash_overlay_array,
         unk1,
         unk2,
@@ -92,6 +96,7 @@ pub struct ArcFighterDataCommon {
     pub ics_sse: i32,
     pub entry_actions: Vec<Script>,
     pub exit_actions: Vec<Script>,
+    pub fragment_scripts: Vec<Script>,
     pub flash_overlay_array: i32,
     pub unk1: i32,
     pub unk2: i32,
