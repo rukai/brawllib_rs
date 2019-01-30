@@ -26,6 +26,7 @@ use std::collections::HashMap;
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFighter {
     pub name:                     String,
+    pub internal_name:            String,
     pub attributes:               FighterAttributes,
     pub actions:                  Vec<HighLevelAction>,
     pub subactions:               Vec<HighLevelSubaction>,
@@ -233,10 +234,11 @@ impl HighLevelFighter {
         };
 
         HighLevelFighter {
-            name:                       fighter.cased_name.clone(),
-            ledge_grabs:                fighter_data.misc.ledge_grabs.clone(),
-            scripts_fragment_fighter:   fragment_scripts_fighter,
-            scripts_fragment_common:    fragment_scripts_common,
+            internal_name:            fighter.cased_name.clone(),
+            name:                     crate::fighter_names::fighter_name(&fighter.cased_name),
+            ledge_grabs:              fighter_data.misc.ledge_grabs.clone(),
+            scripts_fragment_fighter: fragment_scripts_fighter,
+            scripts_fragment_common:  fragment_scripts_common,
             attributes,
             actions,
             subactions,
