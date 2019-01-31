@@ -210,7 +210,7 @@ impl HighLevelFighter {
                         script_runner.step(actual_name.as_ref());
                         prev_hit_boxes = Some(hit_boxes);
 
-                        if let ChangeSubaction::Continue = script_runner.change_sub_action { } else { break }
+                        if let ChangeSubaction::Continue = script_runner.change_subaction { } else { break }
                     }
                 }
 

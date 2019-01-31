@@ -41,7 +41,7 @@ pub struct ScriptRunner<'a> {
     pub damage:               f32,
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
-    pub change_sub_action:    ChangeSubaction,
+    pub change_subaction:     ChangeSubaction,
     pub hitlist_reset:        bool,
     pub slope_contour_stand:  Option<i32>,
     pub slope_contour_full:   Option<(i32, i32)>,
@@ -131,11 +131,13 @@ impl ScriptCollisionBox {
 }
 
 impl<'a> ScriptRunner<'a> {
-    /// Runs the action main, gfx, sfx and other scripts in action_scripts.
+    /// Runs the action main, gfx, sfx and other scripts in subaction_scripts.
     /// all_scripts contains any functions that the action scripts need to call into.
-    pub fn new(action_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst]) -> ScriptRunner<'a> {
+    /// The returned runner has completed the first frame.
+    /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
+    pub fn new(subaction_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst]) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
-        for script in action_scripts {
+        for script in subaction_scripts {
             let calls = vec!(Call {
                 block: &script.block,
                 index: 0,
@@ -147,7 +149,7 @@ impl<'a> ScriptRunner<'a> {
             });
         }
 
-        ScriptRunner {
+        let mut runner = ScriptRunner {
             call_stacks,
             all_scripts,
             variables:            HashMap::new(),
@@ -170,35 +172,32 @@ impl<'a> ScriptRunner<'a> {
             damage:               0.0,
             airbourne:            false,
             edge_slide:           EdgeSlide::SlideOff,
-            change_sub_action:    ChangeSubaction::Continue,
+            change_subaction:     ChangeSubaction::Continue,
             hitlist_reset:        false,
             slope_contour_stand:  None,
             slope_contour_full:   None,
             rumble:               None,
             rumble_loop:          None,
-        }
+        };
+
+        // Need to run the script until the first wait, so that the script is in the valid state
+        // for the first frame.
+        runner.step_script("ScriptRunner init");
+
+        runner
     }
 
-    /// Steps the main, gfx, sfx and other scripts by 1 game frame
+    /// Steps the main, gfx, sfx and other scripts by 1 game frame.
+    /// `action_name` can be anything, it is just used for debugging.
     pub fn step(&mut self, action_name: &str) {
+        self.frame_index += self.frame_speed_modifier;
+        self.step_script(action_name);
+    }
+
+    fn step_script(&mut self, action_name: &str) {
         self.hitlist_reset = false;
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
-        self.frame_index += self.frame_speed_modifier;
         self.visited_gotos.clear();
-
-        match self.disable_movement {
-            DisableMovement::Enable => {
-                self.x += self.x_vel;
-                self.y += self.y_vel;
-            }
-            DisableMovement::DisableVertical => {
-                self.x += self.x_vel;
-            }
-            DisableMovement::DisableHorizontal => {
-                self.y += self.y_vel;
-            }
-            _ => error!("Unknown DisableMovement value"),
-        }
 
         // run the main, gfx, sfx and other scripts
         for i in 0..self.call_stacks.len() {
@@ -241,7 +240,21 @@ impl<'a> ScriptRunner<'a> {
         }
 
         if self.frame_speed_modifier == 0.0 {
-            self.change_sub_action = ChangeSubaction::InfiniteLoop
+            self.change_subaction = ChangeSubaction::InfiniteLoop
+        }
+
+        match self.disable_movement {
+            DisableMovement::Enable => {
+                self.x += self.x_vel;
+                self.y += self.y_vel;
+            }
+            DisableMovement::DisableVertical => {
+                self.x += self.x_vel;
+            }
+            DisableMovement::DisableHorizontal => {
+                self.y += self.y_vel;
+            }
+            _ => error!("Unknown DisableMovement value"),
         }
     }
 
@@ -368,10 +381,10 @@ impl<'a> ScriptRunner<'a> {
                 self.interruptible = true;
             }
             &EventAst::ChangeSubaction (v0) => {
-                self.change_sub_action = ChangeSubaction::ChangeSubaction (v0);
+                self.change_subaction = ChangeSubaction::ChangeSubaction (v0);
             }
             &EventAst::ChangeSubactionRestartFrame (v0) => {
-                self.change_sub_action = ChangeSubaction::ChangeSubactionRestartFrame (v0);
+                self.change_subaction = ChangeSubaction::ChangeSubactionRestartFrame (v0);
             }
 
             // timing
