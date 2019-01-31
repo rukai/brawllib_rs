@@ -4,6 +4,7 @@ use crate::script_ast::{
     ScriptAst,
     Block,
     EventAst,
+    Iterations,
     HitBoxArguments,
     SpecialHitBoxArguments,
     GrabBoxArguments,
@@ -215,6 +216,11 @@ impl<'a> ScriptRunner<'a> {
                         StepEventResult::WaitUntil (value) => {
                             self.call_stacks[i].wait_until = value;
                         }
+                        StepEventResult::NewForLoop { block, iterations } => {
+                            for _ in 0..iterations {
+                                self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
+                            }
+                        }
                         StepEventResult::NewCall (block) => {
                             self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
                         }
@@ -327,8 +333,17 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::AsyncWait (ref value) => {
                 return StepEventResult::WaitUntil (*value);
             }
-            &EventAst::SetLoop (_) => { }
-            &EventAst::ExecuteLoop => { }
+            &EventAst::ForLoop (ref for_loop) => {
+                match for_loop.iterations {
+                    Iterations::Finite (iterations) => {
+                        return StepEventResult::NewForLoop { block: &for_loop.block, iterations };
+                    }
+                    Iterations::Infinite => {
+                        // obviously an infinite loop should not be attempted :P
+                        return StepEventResult::NewCall (&for_loop.block);
+                    }
+                }
+            }
             &EventAst::Subroutine (offset) => {
                 // TODO: Maybe I should implement a protection similar to visited_gotos for subroutines.
                 // If that turns out to be a bad idea document why.
@@ -662,6 +677,7 @@ impl<'a> ScriptRunner<'a> {
 
 enum StepEventResult<'a> {
     WaitUntil  (f32),
+    NewForLoop { block: &'a Block, iterations: i32 },
     NewCall    (&'a Block),
     Goto       (&'a Block),
     Subroutine (&'a Block),

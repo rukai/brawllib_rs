@@ -36,8 +36,24 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x01, Some(&Scalar(v0)), None, None) => EventAst::SyncWait (v0),
             (0x00, 0x02, None,              None, None) => EventAst::Nop,
             (0x00, 0x02, Some(&Scalar(v0)), None, None) => EventAst::AsyncWait (v0),
-            (0x00, 0x04, Some(&Value(v0)),  None, None) => EventAst::SetLoop (v0),
-            (0x00, 0x05, None,              None, None) => EventAst::ExecuteLoop,
+            (0x00, 0x04, Some(&Value(v0)),  None, None) => { // Loop
+                let iterations = if v0 == -1 {
+                    Iterations::Infinite
+                } else {
+                    Iterations::Finite (v0)
+                };
+
+                match process_block(events) {
+                    ProcessedBlock::EndForLoop (block) => EventAst::ForLoop (ForLoop { iterations, block }),
+                    _ => {
+                        error!("ForLoop did not terminate");
+                        EventAst::Unknown (event.clone())
+                    }
+                }
+            }
+            (0x00, 0x05, None, None, None) => { // End loop
+                return ProcessedBlock::EndForLoop (Block { events: event_asts })
+            }
             (0x00, 0x07, Some(&Offset(v0)), None, None) => EventAst::Subroutine (v0),
             (0x00, 0x08, None,              None, None) => EventAst::Return,
             (0x00, 0x09, Some(&Offset(v0)), None, None) => EventAst::Goto (v0),
@@ -664,6 +680,7 @@ struct AppendBooleanExpression {
 
 enum ProcessedBlock {
     Finished     (Block),
+    EndForLoop   (Block),
     EndIf        { then_branch: Block, boolean_expressions: Vec<AppendBooleanExpression> },
     EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>>, boolean_expressions: Vec<AppendBooleanExpression> },
 }
@@ -676,10 +693,8 @@ pub enum EventAst {
     Nop,
     /// Pause the current flow of events until the set time is reached. Asynchronous Timers start counting from the beginning of the animation.
     AsyncWait (f32),
-    /// Set a loop for X iterations.
-    SetLoop (i32),
-    /// Execute the the previously set loop.
-    ExecuteLoop,
+    /// Execute the block of code N times.
+    ForLoop (ForLoop),
     /// Enter the event routine specified and return after ending.
     Subroutine (i32),
     /// Return from a Subroutine.
@@ -869,6 +884,18 @@ pub enum EventAst {
 #[derive(Serialize, Clone, Debug)]
 pub struct Block {
     pub events: Vec<EventAst>
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ForLoop {
+    pub iterations: Iterations,
+    pub block: Block,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum Iterations {
+    Finite (i32),
+    Infinite
 }
 
 #[derive(Serialize, Clone, Debug)]
