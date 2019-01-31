@@ -132,7 +132,7 @@ fn hurtbox(data: &[u8]) -> HurtBox {
     let flags = (&data[0x1c..]).read_u16::<BigEndian>().unwrap();
 
     let enabled    =   flags & 0b0000_0000_0000_0001 == 1;
-    let unk        = ((flags & 0b0000_0000_0000_0110) >> 1) as u8;
+  //let padding    = ((flags & 0b0000_0000_0000_0110) >> 1) as u8; // Always 0
     let zone       = ((flags & 0b0000_0000_0001_1000) >> 3) as u8;
     let region     = ((flags & 0b0000_0000_0110_0000) >> 5) as u8;
     let bone_index = ((flags & 0b1111_1111_1000_0000) >> 7) as u16;
@@ -149,7 +149,6 @@ fn hurtbox(data: &[u8]) -> HurtBox {
         stretch,
         radius,
         enabled,
-        unk,
         zone,
         region,
         bone_index,
@@ -218,7 +217,6 @@ pub struct HurtBox {
     pub stretch: Vector3<f32>,
     pub radius: f32,
     pub enabled: bool,
-    unk: u8,
     pub zone: HurtBoxZone,
     pub region: u8,
     pub bone_index: u16,
