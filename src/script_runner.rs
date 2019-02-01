@@ -22,7 +22,7 @@ use std::collections::HashMap;
 pub struct ScriptRunner<'a> {
     pub call_stacks:          Vec<CallStack<'a>>,
     pub all_scripts:          &'a [&'a ScriptAst],
-    pub variables:            HashMap<i32, i32>,
+    pub variables:            HashMap<u32, i32>,
     pub visited_gotos:        Vec<u32>,
     pub frame_index:          f32,
     pub interruptible:        bool,
@@ -290,16 +290,16 @@ impl<'a> ScriptRunner<'a> {
             }
             &Expression::Binary (ref binary) => {
                 let left = match &*binary.left {
-                    &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32, // TODO: Maybe this needs to be converted to be read as the same type as right, i.e. f32 or i32
-                    &Expression::Value    (ref value)   => *value as f32,
-                    &Expression::Scalar   (ref value)   => *value,
-                    _                                   => 0.0
+                    &Expression::Variable (ref variable) => 0.0, //self.variables.get(address).cloned().unwrap_or(0) as f32, // TODO: Maybe this needs to be converted to be read as the same type as right, i.e. f32 or i32
+                    &Expression::Value    (ref value)    => *value as f32,
+                    &Expression::Scalar   (ref value)    => *value,
+                    _                                    => 0.0
                 };
                 let right = match &*binary.right {
-                    &Expression::Variable (ref address) => self.variables.get(address).cloned().unwrap_or(0) as f32,
-                    &Expression::Value    (ref value)   => *value as f32,
-                    &Expression::Scalar   (ref value)   => *value,
-                    _                                   => 0.0
+                    &Expression::Variable (ref variable) => 0.0, //self.variables.get(address).cloned().unwrap_or(0) as f32,
+                    &Expression::Value    (ref value)    => *value as f32,
+                    &Expression::Scalar   (ref value)    => *value,
+                    _                                    => 0.0
                 };
                 match &binary.operator {
                     &ComparisonOperator::LessThan           => left <  right,
@@ -610,49 +610,49 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SoundVoiceEating => { }
 
             // variables
-            &EventAst::IntVariableSet { value, variable } => {
-                self.variables.insert(variable, value);
+            &EventAst::IntVariableSet { value, ref variable } => {
+                //self.variables.insert(variable, value);
             }
-            &EventAst::IntVariableAdd { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                self.variables.insert(variable, old_value + value);
+            &EventAst::IntVariableAdd { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                //self.variables.insert(variable, old_value + value);
             }
-            &EventAst::IntVariableSubtract { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                self.variables.insert(variable, old_value - value);
+            &EventAst::IntVariableSubtract { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                //self.variables.insert(variable, old_value - value);
             }
-            &EventAst::IntVariableIncrement { variable } => {
-                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                self.variables.insert(variable, old_value + 1);
+            &EventAst::IntVariableIncrement { ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                //self.variables.insert(variable, old_value + 1);
             }
-            &EventAst::IntVariableDecrement { variable } => {
-                let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                self.variables.insert(variable, old_value - 1);
+            &EventAst::IntVariableDecrement { ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
+                //self.variables.insert(variable, old_value - 1);
             }
-            &EventAst::FloatVariableSet { value, variable } => {
-                self.variables.insert(variable, value as i32); // TODO: Should these be cast bitwise? Or an enum VariableType { Int(i32), Float(f32) } ?
+            &EventAst::FloatVariableSet { value, ref variable } => {
+                //self.variables.insert(variable, value as i32); // TODO: Should these be cast bitwise? Or an enum VariableType { Int(i32), Float(f32) } ?
             }
-            &EventAst::FloatVariableAdd { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                self.variables.insert(variable, (old_value + value) as i32);
+            &EventAst::FloatVariableAdd { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                //self.variables.insert(variable, (old_value + value) as i32);
             }
-            &EventAst::FloatVariableSubtract { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                self.variables.insert(variable, (old_value - value) as i32);
+            &EventAst::FloatVariableSubtract { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                //self.variables.insert(variable, (old_value - value) as i32);
             }
-            &EventAst::FloatVariableMultiply { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                self.variables.insert(variable, (old_value * value) as i32);
+            &EventAst::FloatVariableMultiply { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                //self.variables.insert(variable, (old_value * value) as i32);
             }
-            &EventAst::FloatVariableDivide { value, variable } => {
-                let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                self.variables.insert(variable, (old_value / value) as i32);
+            &EventAst::FloatVariableDivide { value, ref variable } => {
+                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
+                //self.variables.insert(variable, (old_value / value) as i32);
             }
-            &EventAst::BoolVariableSetTrue { variable } => {
-                self.variables.insert(variable, 1);
+            &EventAst::BoolVariableSetTrue { ref variable } => {
+                //self.variables.insert(variable, 1);
             }
-            &EventAst::BoolVariableSetFalse { variable } => {
-                self.variables.insert(variable, 0);
+            &EventAst::BoolVariableSetFalse { ref variable } => {
+                //self.variables.insert(variable, 0);
             }
 
             // graphics

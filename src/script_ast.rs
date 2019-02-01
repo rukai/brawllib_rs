@@ -1,4 +1,4 @@
-use crate::script::{Script, Event, Requirement, Argument};
+use crate::script::{Script, Event, Requirement, Argument, Variable};
 use crate::script;
 
 use std::iter::Iterator;
@@ -409,18 +409,18 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x0C, 0x1F, None,             None, None) => EventAst::SoundVoiceEating,
 
             // Modify variables
-            (0x12, 0x00, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableSet { value: v0, variable: v1 },
-            (0x12, 0x01, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableAdd { value: v0, variable: v1 },
-            (0x12, 0x02, Some(&Value(v0)),    Some(&Variable(v1)), None) => EventAst::IntVariableSubtract { value: v0, variable: v1 },
-            (0x12, 0x03, Some(&Variable(v0)), None,                None) => EventAst::IntVariableIncrement { variable: v0 },
-            (0x12, 0x04, Some(&Variable(v0)), None,                None) => EventAst::IntVariableDecrement { variable: v0 },
-            (0x12, 0x06, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableSet { value: v0, variable: v1 },
-            (0x12, 0x07, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableAdd { value: v0, variable: v1 },
-            (0x12, 0x08, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableSubtract { value: v0, variable: v1 },
-            (0x12, 0x0F, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableMultiply { value: v0, variable: v1 },
-            (0x12, 0x10, Some(&Scalar(v0)),   Some(&Variable(v1)), None) => EventAst::FloatVariableDivide { value: v0, variable: v1 },
-            (0x12, 0x0A, Some(&Variable(v0)), None,                None) => EventAst::BoolVariableSetTrue { variable: v0 },
-            (0x12, 0x0B, Some(&Variable(v0)), None,                None) => EventAst::BoolVariableSetFalse { variable: v0 },
+            (0x12, 0x00, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableSet { value: v0, variable: v1.clone() },
+            (0x12, 0x01, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableAdd { value: v0, variable: v1.clone() },
+            (0x12, 0x02, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableSubtract { value: v0, variable: v1.clone() },
+            (0x12, 0x03, Some(&Variable(ref v0)), None,                    None) => EventAst::IntVariableIncrement { variable: v0.clone() },
+            (0x12, 0x04, Some(&Variable(ref v0)), None,                    None) => EventAst::IntVariableDecrement { variable: v0.clone() },
+            (0x12, 0x06, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableSet { value: v0, variable: v1.clone() },
+            (0x12, 0x07, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableAdd { value: v0, variable: v1.clone() },
+            (0x12, 0x08, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableSubtract { value: v0, variable: v1.clone() },
+            (0x12, 0x0F, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableMultiply { value: v0, variable: v1.clone() },
+            (0x12, 0x10, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableDivide { value: v0, variable: v1.clone() },
+            (0x12, 0x0A, Some(&Variable(ref v0)), None,                    None) => EventAst::BoolVariableSetTrue { variable: v0.clone() },
+            (0x12, 0x0B, Some(&Variable(ref v0)), None,                    None) => EventAst::BoolVariableSetFalse { variable: v0.clone() },
 
             // graphics
             (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 1, switch_index: v0, bone_group_index: v1 },
@@ -615,9 +615,9 @@ impl Expression {
             }
             (Some(v1), None, None) => {
                 let value = Box::new(match v1 {
-                    &Argument::Scalar(v1)   => Expression::Scalar(v1),
-                    &Argument::Variable(v1) => Expression::Variable(v1),
-                    &Argument::Value(v1)    => Expression::Value(v1),
+                    &Argument::Scalar(v1)       => Expression::Scalar(v1),
+                    &Argument::Variable(ref v1) => Expression::Variable(v1.clone()),
+                    &Argument::Value(v1)        => Expression::Value(v1),
                     _ => {
                         error!("Unhandled else if statement case: value: {:?}", v1);
                         return None;
@@ -627,18 +627,18 @@ impl Expression {
             }
             (Some(v1), Some(&Argument::Value(v2)), Some(v3)) => {
                 let left = Box::new(match v1 {
-                    &Argument::Scalar(v1)   => Expression::Scalar(v1),
-                    &Argument::Variable(v1) => Expression::Variable(v1),
-                    &Argument::Value(v1)    => Expression::Value(v1),
+                    &Argument::Scalar(v1)       => Expression::Scalar(v1),
+                    &Argument::Variable(ref v1) => Expression::Variable(v1.clone()),
+                    &Argument::Value(v1)        => Expression::Value(v1),
                     _ => {
                         error!("Unhandled else if statement case: left");
                         return None;
                     }
                 });
                 let right = Box::new(match v3 {
-                    &Argument::Scalar(v3)   => Expression::Scalar(v3),
-                    &Argument::Variable(v3) => Expression::Variable(v3),
-                    &Argument::Value(v3)    => Expression::Value(v3),
+                    &Argument::Scalar(v3)       => Expression::Scalar(v3),
+                    &Argument::Variable(ref v3) => Expression::Variable(v3.clone()),
+                    &Argument::Value(v3)        => Expression::Value(v3),
                     _ => {
                         error!("Unhandled else if statement case: right");
                         return None;
@@ -834,29 +834,29 @@ pub enum EventAst {
     /// Play a random eating voice clip.
     SoundVoiceEating,
     /// Set a specified value to an int variable.
-    IntVariableSet { value: i32, variable: i32 },
+    IntVariableSet { value: i32, variable: Variable },
     /// Add a specified value to an int variable.
-    IntVariableAdd { value: i32, variable: i32 },
+    IntVariableAdd { value: i32, variable: Variable },
     /// Subtract a specified value from an int variable.
-    IntVariableSubtract { value: i32, variable: i32 },
+    IntVariableSubtract { value: i32, variable: Variable },
     /// Increment an int variable.
-    IntVariableIncrement { variable: i32 },
+    IntVariableIncrement { variable: Variable },
     /// Decrement an int variable.
-    IntVariableDecrement { variable: i32 },
+    IntVariableDecrement { variable: Variable },
     /// Set a specified value to a float variable.
-    FloatVariableSet { value: f32, variable: i32 },
+    FloatVariableSet { value: f32, variable: Variable },
     /// Add a specified value to a float variable.
-    FloatVariableAdd { value: f32, variable: i32 },
+    FloatVariableAdd { value: f32, variable: Variable },
     /// Subtract a specified value from a float variable.
-    FloatVariableSubtract { value: f32, variable: i32 },
+    FloatVariableSubtract { value: f32, variable: Variable },
     /// Multiply a specified value on a float variable.
-    FloatVariableMultiply { value: f32, variable: i32 },
+    FloatVariableMultiply { value: f32, variable: Variable },
     /// Divide a specified value on a float variable.
-    FloatVariableDivide { value: f32, variable: i32 },
+    FloatVariableDivide { value: f32, variable: Variable },
     /// Set a bool variable to true.
-    BoolVariableSetTrue { variable: i32 },
+    BoolVariableSetTrue { variable: Variable },
     /// Set a bool variable to false.
-    BoolVariableSetFalse { variable: i32 },
+    BoolVariableSetFalse { variable: Variable },
     /// Changes the visibility of certain bones attached to objects. Uses bone groups and switches set in the specified Reference of the Model Visibility section.
     ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
     /// Generate a generic graphical effect with the specified parameters.
@@ -911,7 +911,7 @@ pub enum Expression {
     Unary    (UnaryExpression),
     Binary   (BinaryExpression),
     Not      (Box<Expression>),
-    Variable (i32),
+    Variable (Variable),
     Value    (i32),
     Scalar   (f32),
 }

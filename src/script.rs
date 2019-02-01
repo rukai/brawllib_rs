@@ -97,7 +97,17 @@ fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -
             2 => Argument::Offset (data),
             3 => Argument::Bool (data == 1),
             4 => Argument::File (data),
-            5 => Argument::Variable (data),
+            5 => {
+                let data = data as u32;
+                let memory_type    = ((data & 0xF0000000) >> 28) as u8;
+                let data_type      = ((data & 0x0F000000) >> 24) as u8;
+                let memory_address =  (data & 0x00FFFFFF)        as u32;
+
+                let memory = VariableMemory::new(memory_type, memory_address);
+                let data_type = VariableDataType::new(data_type);
+
+                Argument::Variable (Variable {memory, data_type})
+            }
             6 => Requirement::new(data),
             _ => Argument::Unknown (ty, data),
         };
@@ -139,9 +149,180 @@ pub enum Argument {
     Offset (i32),
     Bool (bool),
     File (i32),
-    Variable (i32),
+    Variable (Variable),
     Requirement { flip: bool, ty: Requirement },
     Unknown (i32, i32)
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct Variable {
+    pub memory: VariableMemory,
+    pub data_type: VariableDataType,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum VariableMemory {
+    /// Known as IC in existing tools
+    InternalConstant (InternalConstant),
+    /// Known as LA in existing tools
+    LongtermAccess (u32),
+    /// Known as RA in existing tools
+    RandomAccess (u32),
+    Unknown { memory_type: u8, memory_address: u32 }
+}
+
+impl VariableMemory {
+    fn new(memory_type: u8, memory_address: u32) -> VariableMemory {
+        match memory_type {
+            0 => VariableMemory::InternalConstant (InternalConstant::new(memory_address)),
+            1 => VariableMemory::LongtermAccess (memory_address),
+            2 => VariableMemory::RandomAccess (memory_address),
+            _ => VariableMemory::Unknown { memory_type, memory_address }
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum InternalConstant {
+    CurrentFrame,
+    Damage,
+    CharacterXPosition,
+    CharacterYPosition,
+    CharacterDirection,
+    CharacterDirectionOpposite,
+    VerticalCharacterVelocity,
+    CurrentFrameSpeed,
+    HorizontalCharacterVelocity,
+    Knockback,
+    SurfaceTraction,
+    XVelocity,
+    LaunchSpeed,
+
+    RightVelocity,
+    LeftVelocity,
+    UpVelocity,
+    DownVelocity,
+
+    ControlStickXAxis,
+    ControlStickXAxisRelative,
+    ControlStickXAxisRelativeReverse,
+    ControlStickXAxisAbsolute,
+    ControlStickXAxisReverse,
+    ControlStickXAxisReverse2,
+    ControlStickYAxis,
+    ControlStickYAxisAbsolute,
+    ControlStickYAxisReverse,
+    ControlStickYAxis2,
+
+    PreviousControlStickXAxis,
+    PreviousControlStickXAxisRelative,
+    PreviousControlStickXAxisRelativeReverse,
+    PreviousControlStickXAxisAbsolute,
+    PreviousControlStickXAxisReverse,
+    PreviousControlStickXAxisReverse2,
+    PreviousControlStickYAxis,
+    PreviousControlStickYAxisAbsolute,
+    PreviousControlStickYAxisReverse,
+    PreviousControlStickYAxis2,
+
+    CurrentSubaction,
+    CurrentAction,
+    PreviousAction,
+    HeldItem,
+    EffectOfAttack,
+
+    FramesSinceNormal,
+    FramesSinceSpecial,
+    FramesSinceJump,
+    FramesSinceShield,
+    FramesSinceShield2,
+
+    TurnRunFrameTimer,
+    JumpStartTimer,
+    MaxJumpCount,
+    GlideStartTimer,
+    TermVelFrameTimer,
+
+    Address (u32)
+}
+
+impl InternalConstant {
+    fn new(address: u32) -> InternalConstant {
+        match address {
+           00000 => InternalConstant::CurrentFrame,
+           00002 => InternalConstant::Damage,
+           00003 => InternalConstant::CharacterXPosition,
+           00004 => InternalConstant::CharacterYPosition,
+           00008 => InternalConstant::CharacterDirection,
+           00009 => InternalConstant::CharacterDirectionOpposite,
+           00023 => InternalConstant::VerticalCharacterVelocity,
+           00024 => InternalConstant::CurrentFrameSpeed,
+           00028 => InternalConstant::HorizontalCharacterVelocity,
+           00038 => InternalConstant::Knockback,
+           00039 => InternalConstant::SurfaceTraction,
+           01000 => InternalConstant::XVelocity,
+           01005 => InternalConstant::LaunchSpeed,
+           01006 => InternalConstant::RightVelocity,
+           01007 => InternalConstant::LeftVelocity,
+           01008 => InternalConstant::UpVelocity,
+           01009 => InternalConstant::DownVelocity,
+           01010 => InternalConstant::ControlStickXAxis,
+           01011 => InternalConstant::ControlStickXAxisRelative,
+           01012 => InternalConstant::ControlStickXAxisRelativeReverse,
+           01013 => InternalConstant::ControlStickXAxisAbsolute,
+           01014 => InternalConstant::ControlStickXAxisReverse,
+           01017 => InternalConstant::ControlStickXAxisReverse2,
+           01018 => InternalConstant::ControlStickYAxis,
+           01019 => InternalConstant::ControlStickYAxisAbsolute,
+           01020 => InternalConstant::ControlStickYAxisReverse,
+           01021 => InternalConstant::ControlStickYAxis2,
+           01022 => InternalConstant::PreviousControlStickXAxis,
+           01023 => InternalConstant::PreviousControlStickXAxisRelative,
+           01024 => InternalConstant::PreviousControlStickXAxisRelativeReverse,
+           01025 => InternalConstant::PreviousControlStickXAxisAbsolute,
+           01026 => InternalConstant::PreviousControlStickYAxis,
+           01027 => InternalConstant::PreviousControlStickYAxisAbsolute,
+           01028 => InternalConstant::PreviousControlStickYAxisReverse,
+           20000 => InternalConstant::CurrentSubaction,
+           20001 => InternalConstant::CurrentAction,
+           20003 => InternalConstant::PreviousAction,
+           20009 => InternalConstant::HeldItem,
+           21004 => InternalConstant::EffectOfAttack,
+           21010 => InternalConstant::FramesSinceNormal,
+           21012 => InternalConstant::FramesSinceSpecial,
+           21014 => InternalConstant::FramesSinceJump,
+           21016 => InternalConstant::FramesSinceShield,
+           21018 => InternalConstant::FramesSinceShield2,
+           23001 => InternalConstant::TurnRunFrameTimer,
+           23002 => InternalConstant::JumpStartTimer,
+           23003 => InternalConstant::MaxJumpCount,
+           23004 => InternalConstant::GlideStartTimer,
+           23007 => InternalConstant::TermVelFrameTimer,
+            _    => InternalConstant::Address (address)
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum VariableDataType {
+    /// Known as Basic in existing tools
+    Int,
+    /// Known as Float in existing tools
+    Float,
+    /// Known as Bit in existing tools
+    Bool,
+    Unknown (u8)
+}
+
+impl VariableDataType {
+    fn new(value: u8) -> VariableDataType {
+        match value {
+            0 => VariableDataType::Int,
+            1 => VariableDataType::Float,
+            2 => VariableDataType::Bool,
+            _ => VariableDataType::Unknown (value),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
