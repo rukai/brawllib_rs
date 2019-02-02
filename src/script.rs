@@ -15,22 +15,31 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]])
     for scripts in action_scripts.iter() {
         for script in scripts.iter() {
             for event in &script.events {
-                if event.namespace == 0 && (event.code == 7 || event.code == 9) { // if the event is a subroutine or goto
-                    if let Some(Argument::Offset(offset)) = event.arguments.get(0) {
-                        let mut is_action = false;
-                        'outer: for check_scripts in action_scripts.iter() {
-                            for check_script in check_scripts.iter() {
-                                if check_script.offset == *offset as u32{
-                                    is_action = true;
-                                    break 'outer;
-                                }
+                let mut offset = None;
+                if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) { // if the event is a subroutine or goto
+                    if let Some(Argument::Offset(value)) = event.arguments.get(0) {
+                        offset = Some(value);
+                    }
+                }
+                if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
+                    if let Some(Argument::Offset(value)) = event.arguments.get(1) {
+                        offset = Some(value);
+                    }
+                }
+                if let Some(offset) = offset {
+                    let mut is_action = false;
+                    'outer: for check_scripts in action_scripts.iter() {
+                        for check_script in check_scripts.iter() {
+                            if check_script.offset == *offset as u32 {
+                                is_action = true;
+                                break 'outer;
                             }
                         }
-                        let already_added = fragments.iter().any(|x| x.offset == *offset as u32);
+                    }
+                    let already_added = fragments.iter().any(|x| x.offset == *offset as u32);
 
-                        if !is_action && !already_added {
-                            fragments.push(new_script(parent_data, *offset as usize));
-                        }
+                    if !is_action && !already_added {
+                        fragments.push(new_script(parent_data, *offset as usize));
                     }
                 }
             }

@@ -134,11 +134,13 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts }, boolean_expressions } }
-            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::Switch (v0, v1),
-            (0x00, 0x11, Some(&Value(v0)), None,             None) => EventAst::Case (v0),
-            (0x00, 0x11, None,             None,             None) => EventAst::DefaultCase,
-            (0x00, 0x13, None,             None,             None) => EventAst::EndSwitch,
-            (0x01, 0x01, None,             None,             None) => EventAst::LoopRest,
+            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)),  None) => EventAst::Switch (v0, v1),
+            (0x00, 0x11, Some(&Value(v0)), None,              None) => EventAst::Case (v0),
+            (0x00, 0x11, None,             None,              None) => EventAst::DefaultCase,
+            (0x00, 0x13, None,             None,              None) => EventAst::EndSwitch,
+            (0x01, 0x01, None,             None,              None) => EventAst::LoopRest,
+            (0x0D, 0x00, Some(&Value(v0)), Some(&Offset(v1)), None) => EventAst::CallEveryFrame { thread_id: v0, offset: v1 },
+            (0x0D, 0x01, Some(&Value(v0)), None,              None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
 
             // change action
             (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
@@ -717,6 +719,10 @@ pub enum EventAst {
     EndSwitch,
     /// Briefly return execution back to the system to prevent crashes during infinite loops.
     LoopRest,
+    /// Runs a subroutine once per frame for the current action.
+    CallEveryFrame { thread_id: i32, offset: i32 },
+    /// Stops the execution of a loop created with CallEveryFrame
+    RemoveCallEveryFrame { thread_id: i32 },
     /// Enables the given Status ID
     EnableActionStatusID (i32),
     /// Change the current action upon the specified requirement being met. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
