@@ -1,5 +1,5 @@
 use crate::high_level_fighter::CollisionBoxValues;
-use crate::script::Requirement;
+use crate::script::{Requirement, VariableDataType};
 use crate::script_ast::{
     ScriptAst,
     Block,
@@ -15,6 +15,12 @@ use crate::script_ast::{
     EdgeSlide,
     Expression,
     ComparisonOperator,
+};
+use crate::script_ast::variable_ast::{
+    VariableAst,
+    InternalConstantInt,
+    LongtermAccessInt, LongtermAccessFloat, LongtermAccessBool,
+    RandomAccessInt,   RandomAccessFloat,   RandomAccessBool,
 };
 
 use std::collections::HashMap;
@@ -48,6 +54,76 @@ pub struct ScriptRunner<'a> {
     pub slope_contour_full:   Option<(i32, i32)>,
     pub rumble:               Option<(i32, i32)>,
     pub rumble_loop:          Option<(i32, i32)>,
+
+    // LongtermAccessInt
+    pub jumps_used: i32,
+    pub wall_jump_count: i32,
+    pub wall_jump_interval: i32,
+    pub footstool_count: i32,
+    pub fall_time: i32,
+    pub swim_time: i32,
+    pub lip_stick_refresh: i32,
+    pub curry_remaining_time: i32,
+    pub curry_angle2: i32,
+    pub star_remaining_time: i32,
+    pub mushroom_remaining_time: i32,
+    pub lightning_remaining_time: i32,
+    pub size_flag: i32,
+    pub metal_block_remaining_time: i32,
+    pub combo_count: i32,
+    pub bubble_time: i32,
+    pub attacks_performed: i32,
+    pub costume_id: i32,
+    pub hitstun_frames_remaining: i32,
+    pub meteor_cancel_window: i32,
+    pub missed_techs: i32,
+    pub tether_count: i32,
+    pub temp1: i32,
+    pub temp2: i32,
+
+    // LongtermAccessFloat
+    pub special_landing_lag: f32,
+    pub special_fall_mobility_multiplier: f32,
+    pub shield_charge: f32,
+    pub curry_angle1: f32,
+    pub curry_randomness: f32,
+
+    // LongtermAccessBool
+    pub is_dead: bool,
+    pub cannot_die: bool,
+    pub automatic_footstool: bool,
+    pub has_final: bool,
+    pub has_final_aura: bool,
+    pub has_curry: bool,
+    pub has_hammer: bool,
+    pub hit_by_paralyze: bool,
+    pub has_screw_attack: bool,
+    pub stamina_dead: bool,
+    pub has_tag: bool,
+    pub can_not_ledge_grab: bool,
+    pub can_not_teeter: bool,
+    pub velocity_ignore_hitstun: bool,
+    pub deflection: bool,
+
+    // RandomAccessInt
+    pub throw_data_param1: i32,
+    pub throw_data_param2: i32,
+    pub throw_data_param3: i32,
+
+    // RandomAccessFloat
+    pub enable_turn_when_below_zero: f32,
+
+    // RandomAccessBool
+    pub character_float: bool,
+    pub enable_fast_fall: bool,
+    pub shorthop: bool,
+    pub enable_action_transition: bool,
+    pub specials_movement: bool,
+    pub enable_glide: bool,
+    pub enable_jab_loop: bool,
+    pub enable_auto_jab: bool,
+    pub enable_jab_end: bool,
+    pub landing_lag: bool,
 }
 
 pub struct CallStack<'a> {
@@ -179,6 +255,76 @@ impl<'a> ScriptRunner<'a> {
             slope_contour_full:   None,
             rumble:               None,
             rumble_loop:          None,
+
+            // LongtermAccessInt
+            jumps_used: 0,
+            wall_jump_count: 0,
+            wall_jump_interval: 0,
+            footstool_count: 0,
+            fall_time: 0,
+            swim_time: 0,
+            lip_stick_refresh: 0,
+            curry_remaining_time: 0,
+            curry_angle2: 0,
+            star_remaining_time: 0,
+            mushroom_remaining_time: 0,
+            lightning_remaining_time: 0,
+            size_flag: 0,
+            metal_block_remaining_time: 0,
+            combo_count: 0,
+            bubble_time: 0,
+            attacks_performed: 0,
+            costume_id: 0,
+            hitstun_frames_remaining: 0,
+            meteor_cancel_window: 0,
+            missed_techs: 0,
+            tether_count: 0,
+            temp1: 0,
+            temp2: 0,
+
+            // LongtermAccessFloat
+            special_landing_lag: 0.0,
+            special_fall_mobility_multiplier: 0.0,
+            shield_charge: 0.0,
+            curry_angle1: 0.0,
+            curry_randomness: 0.0,
+
+            // LongtermAccessBool
+            is_dead: false,
+            cannot_die: false,
+            automatic_footstool: false,
+            has_final: false,
+            has_final_aura: false,
+            has_curry: false,
+            has_hammer: false,
+            hit_by_paralyze: false,
+            has_screw_attack: false,
+            stamina_dead: false,
+            has_tag: false,
+            can_not_ledge_grab: false,
+            can_not_teeter: false,
+            velocity_ignore_hitstun: false,
+            deflection: false,
+
+            // RandomAccessInt
+            throw_data_param1: 0,
+            throw_data_param2: 0,
+            throw_data_param3: 0,
+
+            // RandomAccessFloat
+            enable_turn_when_below_zero: 0.0,
+
+            // RandomAccessBool
+            character_float: false,
+            enable_fast_fall: false,
+            shorthop: false,
+            enable_action_transition: false,
+            specials_movement: false,
+            enable_glide: false,
+            enable_jab_loop: false,
+            enable_auto_jab: false,
+            enable_jab_end: false,
+            landing_lag: false,
         };
 
         // Need to run the script until the first wait, so that the script is in the valid state
@@ -264,10 +410,10 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
-    fn evaluate_expression(&mut self, expression: &Expression) -> bool {
+    fn evaluate_expression(&mut self, expression: &Expression) -> ExprResult {
         match expression {
             &Expression::Nullary (ref requirement) => {
-                match requirement {
+                ExprResult::Bool (match requirement {
                     Requirement::CharacterExists => true,
                     Requirement::OnGround => true,
                     Requirement::InAir => false,
@@ -275,10 +421,10 @@ impl<'a> ScriptRunner<'a> {
                     Requirement::HasntTethered3Times => true,
                     Requirement::IsNotInDamagingLens => true,
                     _ => false
-                }
+                })
             }
             &Expression::Unary (ref unary) => {
-                match unary.requirement {
+                ExprResult::Bool (match unary.requirement {
                     Requirement::CharacterExists => true,
                     Requirement::OnGround => true,
                     Requirement::InAir => false,
@@ -286,41 +432,315 @@ impl<'a> ScriptRunner<'a> {
                     Requirement::HasntTethered3Times => true,
                     Requirement::IsNotInDamagingLens => true,
                     _ => false
-                }
+                })
             }
             &Expression::Binary (ref binary) => {
-                let left = match &*binary.left {
-                    &Expression::Variable (ref variable) => 0.0, //self.variables.get(address).cloned().unwrap_or(0) as f32, // TODO: Maybe this needs to be converted to be read as the same type as right, i.e. f32 or i32
-                    &Expression::Value    (ref value)    => *value as f32,
-                    &Expression::Scalar   (ref value)    => *value,
-                    _                                    => 0.0
-                };
-                let right = match &*binary.right {
-                    &Expression::Variable (ref variable) => 0.0, //self.variables.get(address).cloned().unwrap_or(0) as f32,
-                    &Expression::Value    (ref value)    => *value as f32,
-                    &Expression::Scalar   (ref value)    => *value,
-                    _                                    => 0.0
-                };
-                match &binary.operator {
-                    &ComparisonOperator::LessThan           => left <  right,
-                    &ComparisonOperator::LessThanOrEqual    => left <= right,
-                    &ComparisonOperator::Equal              => left == right,
-                    &ComparisonOperator::NotEqual           => left != right,
-                    &ComparisonOperator::GreaterThanOrEqual => left >= right,
-                    &ComparisonOperator::GreaterThan        => left >  right,
-                    &ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left) || self.evaluate_expression(&*binary.right),
-                    &ComparisonOperator::And                => self.evaluate_expression(&*binary.left) && self.evaluate_expression(&*binary.right),
+                let result = match &binary.operator {
+                    &ComparisonOperator::LessThan => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          < right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) < right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          < right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          < right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::LessThanOrEqual => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          <= right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) <= right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          <= right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          <= right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::Equal => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          == right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) == right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          == right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          == right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::NotEqual => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          != right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) != right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          != right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          != right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::GreaterThanOrEqual => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          >= right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) >= right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          >= right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          >= right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::GreaterThan => {
+                        match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
+                            (ExprResult::Float (left), ExprResult::Float (right)) => left          > right,
+                            (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) > right,
+                            (ExprResult::Float (left), ExprResult::Int (right))   => left          > right as f32,
+                            (ExprResult::Int (left),   ExprResult::Int (right))   => left          > right,
+                            _ => panic!("FOOBARBAZ: {:?}", binary),
+                        }
+                    }
+                    &ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left).unwrap_bool() || self.evaluate_expression(&*binary.right).unwrap_bool(),
+                    &ComparisonOperator::And                => self.evaluate_expression(&*binary.left).unwrap_bool() && self.evaluate_expression(&*binary.right).unwrap_bool(),
                     &ComparisonOperator::UnknownArg (_)     => false,
+                };
+                ExprResult::Bool (result)
+            }
+            &Expression::Not (ref expression) => ExprResult::Bool (!self.evaluate_expression(expression).unwrap_bool()),
+            &Expression::Variable (ref variable) => {
+                match variable.data_type() {
+                    VariableDataType::Int            => ExprResult::Int   (self.get_variable_int_inner(variable)),
+                    VariableDataType::Float          => ExprResult::Float (self.get_variable_float_inner(variable)),
+                    VariableDataType::Bool           => ExprResult::Bool  (self.get_variable_bool_inner(variable)),
+                    VariableDataType::Unknown { .. } => ExprResult::Bool (false), // can't be handled properly so just give a dummy value
                 }
             }
-            &Expression::Not (ref expression) => {
-                !self.evaluate_expression(expression)
-            }
-            &Expression::Variable (_) |
-            &Expression::Value (_) |
-            &Expression::Scalar (_) => {
-                false
-            }
+            &Expression::Value (int) => ExprResult::Int (int),
+            &Expression::Scalar (float) => ExprResult::Float (float),
+        }
+    }
+
+    fn get_variable_int(&mut self, variable: &VariableAst) -> i32 {
+        match variable.data_type() {
+            VariableDataType::Int   => self.get_variable_int_inner(variable),
+            VariableDataType::Float => self.get_variable_float_inner(variable) as i32,
+            VariableDataType::Bool  => if self.get_variable_bool_inner(variable) { 1 } else { 0 },
+            VariableDataType::Unknown { .. } => 0,
+        }
+    }
+
+    fn get_variable_float(&mut self, variable: &VariableAst) -> f32 {
+        match variable.data_type() {
+            VariableDataType::Int   => self.get_variable_int_inner(variable) as f32,
+            VariableDataType::Float => self.get_variable_float_inner(variable),
+            VariableDataType::Bool  => if self.get_variable_bool_inner(variable) { 1.0 } else { 0.0 },
+            VariableDataType::Unknown { .. } => 0.0,
+        }
+    }
+
+    fn set_variable_int(&mut self, variable: &VariableAst, value: i32) {
+        match variable.data_type() {
+            VariableDataType::Int   => self.set_variable_int_inner(variable, value),
+            VariableDataType::Float => self.set_variable_float_inner(variable, value as f32),
+            VariableDataType::Bool  => self.set_variable_bool_inner(variable, value != 0),
+            VariableDataType::Unknown { .. } => { }
+        }
+    }
+
+    fn set_variable_float(&mut self, variable: &VariableAst, value: f32) {
+        match variable.data_type() {
+            VariableDataType::Int   => self.set_variable_int_inner(variable, value as i32),
+            VariableDataType::Float => self.set_variable_float_inner(variable, value),
+            VariableDataType::Bool  => self.set_variable_bool_inner(variable, value != 0.0),
+            VariableDataType::Unknown { .. } => { }
+        }
+    }
+
+    fn get_variable_int_inner(&self, variable: &VariableAst) -> i32 {
+        match variable {
+            VariableAst::InternalConstantInt (InternalConstantInt::CurrentFrame) => self.frame_index as i32,
+            VariableAst::InternalConstantInt (InternalConstantInt::CharacterDirection) => 1,
+            VariableAst::InternalConstantInt (InternalConstantInt::CharacterDirectionOpposite) => -1,
+            VariableAst::InternalConstantInt (InternalConstantInt::CurrentFrameSpeed) => self.frame_speed_modifier as i32,
+            VariableAst::InternalConstantInt (InternalConstantInt::CurrentSubaction) => 0, // TODO: Get this passed as an argument to ScriptRunner::new
+            VariableAst::InternalConstantInt (InternalConstantInt::CurrentAction) => 0, // TODO: Get this passed as an argument to ScriptRunner::new
+            VariableAst::InternalConstantInt (_) => 0, // Best we can do for everything else is 0
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::JumpsUsed) => self.jumps_used,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpCount) => self.wall_jump_count,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpInterval) => self.wall_jump_interval,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::FootstoolCount) => self.footstool_count,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::FallTime) => self.fall_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::SwimTime) => self.swim_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::LipStickRefresh) => self.lip_stick_refresh,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryRemainingTime) => self.curry_remaining_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryAngle2) => self.curry_angle2,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::StarRemainingTime) => self.star_remaining_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MushroomRemainingTime) => self.mushroom_remaining_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::LightningRemainingTime) => self.lightning_remaining_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::SizeFlag) => self.size_flag,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MetalBlockRemainingTime) => self.metal_block_remaining_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::ComboCount) => self.combo_count,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::BubbleTime) => self.bubble_time,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::AttacksPerformed) => self.attacks_performed,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CostumeID) => self.costume_id,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::HitstunFramesRemaining) => self.hitstun_frames_remaining,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MeteorCancelWindow) => self.meteor_cancel_window,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MissedTechs) => self.missed_techs,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::TetherCount) => self.tether_count,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp1) => self.temp1,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp2) => self.temp2,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Address (_)) => 0,
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam1) => self.throw_data_param1,
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam2) => self.throw_data_param2,
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam3) => self.throw_data_param3,
+            VariableAst::RandomAccessInt     (RandomAccessInt::Address (_)) => 0, // TODO
+            VariableAst::Unknown             { .. } => 0, // Likely from garbage data
+
+            VariableAst::LongtermAccessFloat (_) | VariableAst::LongtermAccessBool (_) |
+            VariableAst::RandomAccessFloat (_) | VariableAst::RandomAccessBool (_)
+                => panic!("Called get_variable_int on a variable that is not an int. '{:?}' It is a brawllib_rs logic error if this is reached", variable),
+        }
+    }
+
+    fn set_variable_int_inner(&mut self, variable: &VariableAst, value: i32) {
+        match variable {
+            VariableAst::InternalConstantInt (_) => {}, // Cant set a constant
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::JumpsUsed) => self.jumps_used = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpCount) => self.wall_jump_count = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpInterval) => self.wall_jump_interval = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::FootstoolCount) => self.footstool_count = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::FallTime) => self.fall_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::SwimTime) => self.swim_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::LipStickRefresh) => self.lip_stick_refresh = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryRemainingTime) => self.curry_remaining_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryAngle2) => self.curry_angle2 = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::StarRemainingTime) => self.star_remaining_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MushroomRemainingTime) => self.mushroom_remaining_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::LightningRemainingTime) => self.lightning_remaining_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::SizeFlag) => self.size_flag = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MetalBlockRemainingTime) => self.metal_block_remaining_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::ComboCount) => self.combo_count = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::BubbleTime) => self.bubble_time = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::AttacksPerformed) => self.attacks_performed = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::CostumeID) => self.costume_id = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::HitstunFramesRemaining) => self.hitstun_frames_remaining = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MeteorCancelWindow) => self.meteor_cancel_window = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::MissedTechs) => self.missed_techs = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::TetherCount) => self.tether_count = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp1) => self.temp1 = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp2) => self.temp2 = value,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Address (_)) => { }, // TODO
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam1) => self.throw_data_param1 = value,
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam2) => self.throw_data_param2 = value,
+            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam3) => self.throw_data_param3 = value,
+            VariableAst::RandomAccessInt     (RandomAccessInt::Address (_)) => { }, // TODO
+            VariableAst::Unknown             { .. } => {}, // Likely from garbage data
+
+            VariableAst::LongtermAccessFloat (_) | VariableAst::LongtermAccessBool (_) |
+            VariableAst::RandomAccessFloat (_) | VariableAst::RandomAccessBool (_)
+                => panic!("Called set_variable_int_inner on a variable that is not an int. '{:?}' It is a brawllib_rs logic error if this is reached.", variable),
+        }
+    }
+
+    fn get_variable_float_inner(&self, variable: &VariableAst) -> f32 {
+        match variable {
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::SpecialLandingLag) => self.special_landing_lag,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::SpecialFallMobilityMultiplier) => self.special_fall_mobility_multiplier,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::ShieldCharge) => self.shield_charge,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryAngle1) => self.curry_angle1,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryRandomness) => self.curry_randomness,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (_)) => 0.0, // TODO
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::EnableTurnWhenBelowZero) => self.enable_turn_when_below_zero,
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (_)) => 0.0, // TODO
+            VariableAst::Unknown             { .. } => 0.0, // Likely from garbage data
+
+            VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessBool (_) |
+            VariableAst::RandomAccessInt (_) | VariableAst::RandomAccessBool (_) |
+            VariableAst::InternalConstantInt (_) => panic!("Called get_variable_float on a variable that is not a float. '{:?}' It is a brawllib_rs logic error if this is reached.", variable),
+        }
+    }
+
+    fn set_variable_float_inner(&mut self, variable: &VariableAst, value: f32) {
+        match variable {
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::SpecialLandingLag) => self.special_landing_lag = value,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::SpecialFallMobilityMultiplier) => self.special_fall_mobility_multiplier = value,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::ShieldCharge) => self.shield_charge = value,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryAngle1) => self.curry_angle1 = value,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryRandomness) => self.curry_randomness = value,
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (_)) => { }, // TODO
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::EnableTurnWhenBelowZero) => self.enable_turn_when_below_zero = value,
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (_)) => { } // TODO
+            VariableAst::Unknown             { .. } => { }, // Likely from garbage data
+
+            VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessBool (_) |
+            VariableAst::RandomAccessInt (_) | VariableAst::RandomAccessBool (_) |
+            VariableAst::InternalConstantInt (_) => panic!("Called set_variable_float_inner on a variable that is not a float. '{:?}' It is a brawllib_rs logic error if this is reached.", variable),
+        }
+    }
+
+    fn get_variable_bool_inner(&mut self, variable: &VariableAst) -> bool {
+        match variable {
+            VariableAst::LongtermAccessBool (LongtermAccessBool::IsDead) => self.is_dead,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CannotDie) => self.cannot_die,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::AutomaticFootstool) => self.automatic_footstool,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasFinal) => self.has_final,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasFinalAura) => self.has_final_aura,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasCurry) => self.has_curry,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasHammer) => self.has_hammer,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HitByParalyze) => self.hit_by_paralyze,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasScrewAttack) => self.has_screw_attack,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::StaminaDead) => self.stamina_dead,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasTag) => self.has_tag,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotLedgeGrab) => self.can_not_ledge_grab,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotTeeter) => self.can_not_teeter,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::VelocityIgnoreHitstun) => self.velocity_ignore_hitstun,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Deflection) => self.deflection,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (_)) => false, // TODO
+
+            VariableAst::RandomAccessBool (RandomAccessBool::CharacterFloat) => self.character_float,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableFastFall) => self.enable_fast_fall,
+            VariableAst::RandomAccessBool (RandomAccessBool::Shorthop) => self.shorthop,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableActionTransition) => self.enable_action_transition,
+            VariableAst::RandomAccessBool (RandomAccessBool::SpecialsMovement) => self.specials_movement,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableGlide) => self.enable_glide,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableJabLoop) => self.enable_jab_loop,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end,
+            VariableAst::RandomAccessBool (RandomAccessBool::LandingLag) => self.landing_lag,
+            VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => false, // TODO
+            VariableAst::Unknown          { .. } => false, // Likely from garbage data
+
+            VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessFloat (_) |
+            VariableAst::RandomAccessInt (_) | VariableAst::RandomAccessFloat (_) |
+            VariableAst::InternalConstantInt (_) => panic!("Called get_variable_bool on a variable that is not a bool. '{:?}' It is a brawllib_rs logic error if this is reached.", variable),
+        }
+    }
+
+    fn set_variable_bool_inner(&mut self, variable: &VariableAst, value: bool) {
+        match variable {
+            VariableAst::LongtermAccessBool (LongtermAccessBool::IsDead) => self.is_dead = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CannotDie) => self.cannot_die = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::AutomaticFootstool) => self.automatic_footstool = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasFinal) => self.has_final = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasFinalAura) => self.has_final_aura = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasCurry) => self.has_curry = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasHammer) => self.has_hammer = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HitByParalyze) => self.hit_by_paralyze = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasScrewAttack) => self.has_screw_attack = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::StaminaDead) => self.stamina_dead = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::HasTag) => self.has_tag = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotLedgeGrab) => self.can_not_ledge_grab = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotTeeter) => self.can_not_teeter = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::VelocityIgnoreHitstun) => self.velocity_ignore_hitstun = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Deflection) => self.deflection = value,
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (_)) => {}
+
+            VariableAst::RandomAccessBool (RandomAccessBool::CharacterFloat) => self.character_float = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableFastFall) => self.enable_fast_fall = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::Shorthop) => self.shorthop = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableActionTransition) => self.enable_action_transition = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::SpecialsMovement) => self.specials_movement = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableGlide) => self.enable_glide = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableJabLoop) => self.enable_jab_loop = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::LandingLag) => self.landing_lag = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => { }
+            VariableAst::Unknown          { .. } => {}, // Likely from garbage data
+
+            VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessFloat (_) |
+            VariableAst::RandomAccessInt (_) | VariableAst::RandomAccessFloat (_) |
+            VariableAst::InternalConstantInt (_) => panic!("Called set_variable_bool_inner on a variable that is not a bool. '{:?}' It is a brawllib_rs logic error if this is reached.", variable),
         }
     }
 
@@ -375,7 +795,7 @@ impl<'a> ScriptRunner<'a> {
                 error!("Avoided Goto infinite loop");
             }
             &EventAst::IfStatement (ref if_statement) => {
-                if self.evaluate_expression(&if_statement.test) {
+                if self.evaluate_expression(&if_statement.test).unwrap_bool() {
                     return StepEventResult::NewCall (&if_statement.then_branch);
                 }
                 else {
@@ -611,48 +1031,58 @@ impl<'a> ScriptRunner<'a> {
 
             // variables
             &EventAst::IntVariableSet { value, ref variable } => {
-                //self.variables.insert(variable, value);
+                self.set_variable_int(variable, value);
             }
             &EventAst::IntVariableAdd { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                //self.variables.insert(variable, old_value + value);
+                let old_value = self.get_variable_int(variable);
+                self.set_variable_int(variable, old_value + value);
             }
             &EventAst::IntVariableSubtract { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                //self.variables.insert(variable, old_value - value);
+                let old_value = self.get_variable_int(variable);
+                self.set_variable_int(variable, old_value - value);
             }
             &EventAst::IntVariableIncrement { ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                //self.variables.insert(variable, old_value + 1);
+                let old_value = self.get_variable_int(variable);
+                self.set_variable_int(variable, old_value + 1);
             }
             &EventAst::IntVariableDecrement { ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().unwrap_or(0);
-                //self.variables.insert(variable, old_value - 1);
+                let old_value = self.get_variable_int(variable);
+                self.set_variable_int(variable, old_value - 1);
             }
             &EventAst::FloatVariableSet { value, ref variable } => {
-                //self.variables.insert(variable, value as i32); // TODO: Should these be cast bitwise? Or an enum VariableType { Int(i32), Float(f32) } ?
+                self.set_variable_float(variable, value);
             }
             &EventAst::FloatVariableAdd { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                //self.variables.insert(variable, (old_value + value) as i32);
+                let old_value = self.get_variable_float(variable);
+                self.set_variable_float(variable, old_value + value);
             }
             &EventAst::FloatVariableSubtract { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                //self.variables.insert(variable, (old_value - value) as i32);
+                let old_value = self.get_variable_float(variable);
+                self.set_variable_float(variable, old_value - value);
             }
             &EventAst::FloatVariableMultiply { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                //self.variables.insert(variable, (old_value * value) as i32);
+                let old_value = self.get_variable_float(variable);
+                self.set_variable_float(variable, old_value * value);
             }
             &EventAst::FloatVariableDivide { value, ref variable } => {
-                //let old_value = self.variables.get(&variable).cloned().map(|x| x as f32).unwrap_or(0.0);
-                //self.variables.insert(variable, (old_value / value) as i32);
+                let old_value = self.get_variable_float(variable);
+                self.set_variable_float(variable, old_value / value);
             }
             &EventAst::BoolVariableSetTrue { ref variable } => {
-                //self.variables.insert(variable, 1);
+                match variable.data_type() {
+                    VariableDataType::Int   => self.set_variable_int_inner(variable, 1),
+                    VariableDataType::Float => self.set_variable_float_inner(variable, 1.0),
+                    VariableDataType::Bool  => self.set_variable_bool_inner(variable, true),
+                    VariableDataType::Unknown { .. } => { }
+                }
             }
             &EventAst::BoolVariableSetFalse { ref variable } => {
-                //self.variables.insert(variable, 0);
+                match variable.data_type() {
+                    VariableDataType::Int   => self.set_variable_int_inner(variable, 0),
+                    VariableDataType::Float => self.set_variable_float_inner(variable, 0.0),
+                    VariableDataType::Bool  => self.set_variable_bool_inner(variable, false),
+                    VariableDataType::Unknown { .. } => { }
+                }
             }
 
             // graphics
@@ -683,4 +1113,20 @@ enum StepEventResult<'a> {
     Subroutine (&'a Block),
     Return,
     None
+}
+
+#[derive(Debug)]
+enum ExprResult {
+    Int   (i32),
+    Float (f32),
+    Bool  (bool),
+}
+
+impl ExprResult {
+    fn unwrap_bool(&self) -> bool {
+        match self {
+            ExprResult::Bool (result) => *result,
+            _ => panic!("ExprResult was {:?} instead of bool", self)
+        }
+    }
 }

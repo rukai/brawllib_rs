@@ -18,6 +18,7 @@ pub enum VariableAst {
     RandomAccessFloat (RandomAccessFloat),
     /// Known as RA in existing tools
     RandomAccessBool (RandomAccessBool),
+
     Unknown { memory_type: VariableMemoryType, data_type: VariableDataType, address: u32 }
 }
 
@@ -36,6 +37,22 @@ impl VariableAst {
                 data_type:   var.data_type.clone(),
                 address:     var.address,
             }
+        }
+    }
+
+    pub fn data_type(&self) -> VariableDataType {
+        match self {
+            VariableAst::InternalConstantInt (_) => VariableDataType::Int,
+
+            VariableAst::LongtermAccessInt   (_) => VariableDataType::Int,
+            VariableAst::LongtermAccessFloat (_) => VariableDataType::Float,
+            VariableAst::LongtermAccessBool  (_) => VariableDataType::Bool,
+
+            VariableAst::RandomAccessInt   (_) => VariableDataType::Int,
+            VariableAst::RandomAccessFloat (_) => VariableDataType::Float,
+            VariableAst::RandomAccessBool  (_) => VariableDataType::Bool,
+
+            VariableAst::Unknown { ref data_type, .. } => data_type.clone(),
         }
     }
 }
@@ -256,13 +273,12 @@ pub enum LongtermAccessBool {
     HasHammer,
     HitByParalyze,
     HasScrewAttack,
-    StaminaKOed,
+    StaminaDead,
     HasTag,
     CanNotLedgeGrab,
     CanNotTeeter,
     VelocityIgnoreHitstun,
     Deflection,
-    CostumeID,
     Address (u32),
 }
 
@@ -278,7 +294,7 @@ impl LongtermAccessBool {
             11 => LongtermAccessBool::HasHammer,
             17 => LongtermAccessBool::HitByParalyze,
             19 => LongtermAccessBool::HasScrewAttack,
-            24 => LongtermAccessBool::StaminaKOed,
+            24 => LongtermAccessBool::StaminaDead,
             27 => LongtermAccessBool::HasTag,
             36 => LongtermAccessBool::CanNotLedgeGrab,
             57 => LongtermAccessBool::CanNotTeeter,
