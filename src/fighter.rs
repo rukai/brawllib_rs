@@ -273,7 +273,7 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
     for data_path in fs::read_dir(&fighter_path).unwrap() {
         let data_name = data_path.unwrap().path().file_name().unwrap().to_str().unwrap().to_string();
         if data_name.to_lowercase() == format!("Fit{}.pac", dir_name).to_lowercase() {
-            cased_name = Some(String::from(data_name.trim_right_matches(".pac").trim_left_matches("Fit")));
+            cased_name = Some(String::from(data_name.trim_end_matches(".pac").trim_start_matches("Fit")));
         }
     }
 

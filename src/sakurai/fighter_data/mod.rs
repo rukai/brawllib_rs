@@ -301,8 +301,8 @@ fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<Subactio
     for i in 0..num {
         let in_translation_time = data[i * SUB_ACTION_FLAGS_SIZE + 0];
         let animation_flags_int = data[i * SUB_ACTION_FLAGS_SIZE + 1];
-        //  padding             (&data[i * SUB_ACTION_FLAGS_SIZE + 2..]).read_u16
-        let string_offset =     (&data[i * SUB_ACTION_FLAGS_SIZE + 4..]).read_i32::<BigEndian>().unwrap();
+        //  padding               (&data[i * SUB_ACTION_FLAGS_SIZE + 2..]).read_u16
+        let string_offset       = (&data[i * SUB_ACTION_FLAGS_SIZE + 4..]).read_i32::<BigEndian>().unwrap();
 
         let animation_flags = AnimationFlags::from_bits(animation_flags_int).unwrap();
         let name = if string_offset == 0 {

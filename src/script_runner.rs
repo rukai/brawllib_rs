@@ -38,10 +38,18 @@ pub struct ScriptRunner<'a> {
     pub ledge_grab_enable:    LedgeGrabEnable,
     pub frame_speed_modifier: f32,
     pub tag_display:          bool,
+    /// State is maintained across frames
     pub x:                    f32,
+    /// State is maintained across frames
     pub y:                    f32,
+    /// State is maintained across frames
     pub x_vel:                f32,
+    /// State is maintained across frames
     pub y_vel:                f32,
+    /// Reset to None before processing each frame
+    pub x_vel_modify:         VelModify,
+    /// Reset to None before processing each frame
+    pub y_vel_modify:         VelModify,
     pub disable_movement:     DisableMovement,
     pub armor_type:           ArmorType,
     pub armor_tolerance:      f32,
@@ -243,6 +251,8 @@ impl<'a> ScriptRunner<'a> {
             y:                    0.0,
             x_vel:                0.0,
             y_vel:                0.0,
+            x_vel_modify:         VelModify::None,
+            y_vel_modify:         VelModify::None,
             disable_movement:     DisableMovement::Enable,
             armor_type:           ArmorType::None,
             armor_tolerance:      0.0,
@@ -345,6 +355,8 @@ impl<'a> ScriptRunner<'a> {
         self.hitlist_reset = false;
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.visited_gotos.clear();
+        self.x_vel_modify = VelModify::None;
+        self.y_vel_modify = VelModify::None;
 
         // create a callstack for CallEveryFrame block
         for block in self.call_every_frame.values() {
@@ -679,26 +691,36 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::SetOrAddVelocity (ref values) => {
                 if values.x_set {
-                    self.x_vel = values.x_vel
+                    self.x_vel = values.x_vel;
+                    self.x_vel_modify = VelModify::Set(values.x_vel);
                 }
                 else {
-                    self.x_vel += values.x_vel
+                    self.x_vel += values.x_vel;
+                    self.x_vel_modify = VelModify::Add(self.x_vel_modify.value() + values.x_vel);
                 }
 
                 if values.y_set {
-                    self.y_vel = values.y_vel
+                    self.y_vel = values.y_vel;
+                    self.y_vel_modify = VelModify::Set(values.y_vel);
                 }
                 else {
-                    self.y_vel += values.y_vel
+                    self.y_vel += values.y_vel;
+                    self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + values.y_vel);
                 }
             }
             &EventAst::SetVelocity { x_vel, y_vel } => {
                 self.x_vel = x_vel;
                 self.y_vel = y_vel;
+
+                self.x_vel_modify = VelModify::Set(x_vel);
+                self.y_vel_modify = VelModify::Set(y_vel);
             }
             &EventAst::AddVelocity { x_vel, y_vel } => {
                 self.x_vel += x_vel;
                 self.y_vel += y_vel;
+
+                self.x_vel_modify = VelModify::Add(self.x_vel_modify.value() + x_vel);
+                self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + y_vel);
             }
             &EventAst::DisableMovement (ref disable_movement) => {
                 self.disable_movement = disable_movement.clone();
@@ -707,6 +729,8 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::ResetVerticalVelocityAndAcceleration (reset) => {
                 if reset {
                     self.y_vel = 0.0;
+
+                    self.y_vel_modify = VelModify::Set(0.0);
                 }
             }
 
@@ -1157,6 +1181,23 @@ impl ExprResult {
         match self {
             ExprResult::Bool (result) => *result,
             _ => panic!("ExprResult was {:?} instead of bool", self)
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum VelModify {
+    Set (f32),
+    Add (f32),
+    None,
+}
+
+impl VelModify {
+    pub fn value(&self) -> f32 {
+        match self {
+            VelModify::Set (a) => *a,
+            VelModify::Add (a) => *a,
+            VelModify::None    => 0.0,
         }
     }
 }

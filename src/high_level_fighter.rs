@@ -1,4 +1,4 @@
-use cgmath::{Vector2, Vector3, Matrix4, SquareMatrix};
+use cgmath::{Vector3, Matrix4, SquareMatrix};
 use rayon::prelude::*;
 
 use crate::chr0::Chr0;
@@ -17,7 +17,7 @@ use crate::script_ast::{
     Effect,
     GrabTarget,
 };
-use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox};
+use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox, VelModify};
 
 use std::collections::HashMap;
 
@@ -119,7 +119,7 @@ impl HighLevelFighter {
                 let action_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
-                let mut prev_xy_offset = Vector2::new(0.0, 0.0);
+                let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
                 let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
@@ -135,6 +135,13 @@ impl HighLevelFighter {
                         "LandingHeavy" => attributes.normal_landing_lag,
                         _              => chr0.num_frames as f32
                     };
+
+                    let mut x_vel = 0.0;
+                    let mut y_vel = 0.0;
+
+                    let mut x_pos = 0.0;
+                    let mut y_pos = 0.0;
+
                     while script_runner.frame_index < num_frames {
                         let mut first_bone = first_bone.clone();
                         let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
@@ -147,9 +154,30 @@ impl HighLevelFighter {
                         ).unwrap_or(Vector3::new(0.0, 0.0, 0.0));
                         // TODO: should DisableMovement affect xyz_offset from apply_chr0_to_bones?????
                         // script runner x-axis is equivalent to model z-axis
-                        let xy_offset = Vector2::new(script_runner.x + animation_xyz_offset.z, script_runner.y + animation_xyz_offset.y);
-                        let xy_velocity = xy_offset - prev_xy_offset;
-                        prev_xy_offset = xy_offset;
+
+                        let animation_xyz_velocity = animation_xyz_offset - prev_animation_xyz_offset;
+                        prev_animation_xyz_offset = animation_xyz_offset;
+
+                        let x_vel_modify = script_runner.x_vel_modify.clone();
+                        let y_vel_modify = script_runner.y_vel_modify.clone();
+
+                        let x_vel_temp = animation_xyz_velocity.z;
+                        let y_vel_temp = animation_xyz_velocity.y;
+
+                        match x_vel_modify {
+                            VelModify::Set (vel) => x_vel = vel,
+                            VelModify::Add (vel) => x_vel += vel,
+                            VelModify::None      => { }
+                        }
+
+                        match y_vel_modify {
+                            VelModify::Set (vel) => y_vel = vel,
+                            VelModify::Add (vel) => y_vel += vel,
+                            VelModify::None      => { }
+                        }
+
+                        x_pos += x_vel + x_vel_temp;
+                        y_pos += y_vel + y_vel_temp;
 
                         let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
@@ -163,7 +191,7 @@ impl HighLevelFighter {
                                 for prev_hit_box in prev_hit_boxes {
                                     if prev_hit_box.hitbox_index == next.hitbox_index {
                                         // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                        prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, xy_velocity.y, xy_velocity.x));
+                                        prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, y_vel, x_vel));
                                         prev_size = Some(prev_hit_box.size);
                                         prev_values = Some(prev_hit_box.values.clone());
                                     }
@@ -197,8 +225,12 @@ impl HighLevelFighter {
 
                         frames.push(HighLevelFrame {
                             ecb,
-                            xy_velocity,
-                            xy_offset,
+                            x_pos,
+                            y_pos,
+                            x_vel_modify,
+                            y_vel_modify,
+                            x_vel_temp,
+                            y_vel_temp,
                             hurt_boxes,
                             hit_boxes:           hl_hit_boxes,
                             interruptible:       script_runner.interruptible,
@@ -317,8 +349,8 @@ pub struct HighLevelScripts {
 pub struct HighLevelFrame {
     pub hurt_boxes:          Vec<HighLevelHurtBox>,
     pub hit_boxes:           Vec<HighLevelHitBox>,
-    pub xy_velocity:         Vector2<f32>,
-    pub xy_offset:           Vector2<f32>,
+    pub x_pos:               f32,
+    pub y_pos:               f32,
     pub interruptible:       bool,
     pub edge_slide:          EdgeSlide,
     pub airbourne:           bool,
@@ -328,6 +360,14 @@ pub struct HighLevelFrame {
     pub slope_contour_full:  Option<(i32, i32)>,
     pub rumble:              Option<(i32, i32)>,
     pub rumble_loop:         Option<(i32, i32)>,
+    /// Affects the next frames velocity
+    pub x_vel_modify: VelModify,
+    /// Affects the next frames velocity
+    pub y_vel_modify: VelModify,
+    /// Does not affect the next frames velocity
+    pub x_vel_temp: f32,
+    /// Does not affect the next frames velocity
+    pub y_vel_temp: f32,
 }
 
 #[derive(Serialize, Clone, Debug)]
