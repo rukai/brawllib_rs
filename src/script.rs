@@ -10,9 +10,9 @@ pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec
 }
 
 /// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
-pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]]) -> Vec<Script> {
+pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) -> Vec<Script> {
     let mut fragments: Vec<Script> = vec!();
-    for scripts in action_scripts.iter() {
+    for scripts in known_scripts.iter() {
         for script in scripts.iter() {
             for event in &script.events {
                 let mut offset = None;
@@ -28,7 +28,7 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], action_scripts: &[&[Script]])
                 }
                 if let Some(offset) = offset {
                     let mut is_action = false;
-                    'outer: for check_scripts in action_scripts.iter() {
+                    'outer: for check_scripts in known_scripts.iter() {
                         for check_script in check_scripts.iter() {
                             if check_script.offset == *offset as u32 {
                                 is_action = true;
