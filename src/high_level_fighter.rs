@@ -1,4 +1,4 @@
-use cgmath::{Vector3, Matrix4, SquareMatrix};
+use cgmath::{Vector2, Vector3, Matrix4, SquareMatrix};
 use rayon::prelude::*;
 
 use crate::chr0::Chr0;
@@ -94,6 +94,8 @@ impl HighLevelFighter {
         }
 
         let subactions = if let Some(first_bone) = fighter.get_bones() {
+            // TODO: After fixing a bug, where a huge amount of needless work was being done, parallelizing this doesnt get us as much.
+            // It might be better for the caller of HighLevelFighter::new() to do the parallelization.
             sub_action_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
                 let sub_action_flags = &fighter_data.sub_action_flags[i];
                 let actual_name = sub_action_flags.name.clone();
@@ -117,7 +119,7 @@ impl HighLevelFighter {
                 let action_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
-                let mut prev_offset = None;
+                let mut prev_xy_offset = Vector2::new(0.0, 0.0);
                 let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
@@ -136,7 +138,19 @@ impl HighLevelFighter {
                     while script_runner.frame_index < num_frames {
                         let mut first_bone = first_bone.clone();
                         let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
-                        let next_offset = HighLevelFighter::apply_chr0_to_bones(&mut first_bone, Matrix4::<f32>::identity(), chr0, chr0_frame_index as i32, animation_flags);
+                        let animation_xyz_offset = HighLevelFighter::apply_chr0_to_bones(
+                            &mut first_bone,
+                            Matrix4::<f32>::identity(),
+                            chr0,
+                            chr0_frame_index as i32,
+                            animation_flags
+                        ).unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+                        // TODO: should DisableMovement affect xyz_offset from apply_chr0_to_bones?????
+                        // script runner x-axis is equivalent to model z-axis
+                        let xy_offset = Vector2::new(script_runner.x + animation_xyz_offset.z, script_runner.y + animation_xyz_offset.y);
+                        let xy_velocity = xy_offset - prev_xy_offset;
+                        prev_xy_offset = xy_offset;
+
                         let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
                         let hit_boxes = gen_hit_boxes(&first_bone, &hit_boxes);
@@ -148,7 +162,8 @@ impl HighLevelFighter {
                             if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
                                 for prev_hit_box in prev_hit_boxes {
                                     if prev_hit_box.hitbox_index == next.hitbox_index {
-                                        prev_pos = Some(prev_hit_box.position);
+                                        // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
+                                        prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, xy_velocity.y, xy_velocity.x));
                                         prev_size = Some(prev_hit_box.size);
                                         prev_values = Some(prev_hit_box.values.clone());
                                     }
@@ -167,30 +182,23 @@ impl HighLevelFighter {
                             });
                         }
 
-                        let animation_velocity = match (prev_offset, next_offset) {
-                            (Some(prev_offset), Some(next_offset)) => Some(next_offset - prev_offset),
-                            (Some(_),           None)              => unreachable!(),
-                            (None,              Some(next_offset)) => Some(next_offset),
-                            (None,              None)              => None
-                        };
-                        prev_offset = next_offset;
-
                         // TODO: get these from the fighter data
                         let min_width = 2.0;
                         let min_height = 2.0;
 
                         // TODO: figure out how exactly these min values are supposed to work.
-                        let ecb = ECB {
+                        let min_ecb = ECB {
                             left:   -min_width / 2.0,
                             right:  min_width / 2.0,
                             top:    min_height,
                             bottom: if script_runner.airbourne { min_height } else { 0.0 }
                         };
-                        let ecb = gen_ecb(&first_bone, &fighter_data.misc.ecb_bones, ecb);
+                        let ecb = gen_ecb(&first_bone, &fighter_data.misc.ecb_bones, min_ecb);
 
                         frames.push(HighLevelFrame {
                             ecb,
-                            animation_velocity,
+                            xy_velocity,
+                            xy_offset,
                             hurt_boxes,
                             hit_boxes:           hl_hit_boxes,
                             interruptible:       script_runner.interruptible,
@@ -255,21 +263,25 @@ impl HighLevelFighter {
         bone.transform = parent_transform * bone.gen_transform();
         let mut offset = None;
         for chr0_child in &chr0.children {
-            let transform = parent_transform * chr0_child.get_transform(chr0.loop_value, frame);
-            // in this case TransN is not part of the animation but instead used to move the character in game.
-            if moves_character && bone.name == "TransN" {
-                offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
-                // TODO: Should this case modify bone.transform rot and scale?
-            }
-            // the animation specifies a transform for this bone, USE IT!
-            else if chr0_child.name == bone.name {
-                bone.transform = transform;
+            if chr0_child.name == bone.name {
+                let transform = parent_transform * chr0_child.get_transform(chr0.loop_value, frame);
+                if moves_character && bone.name == "TransN" {
+                    // in this case TransN is not part of the animation but instead used to move the character in game.
+                    assert!(offset.is_none());
+                    offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
+                    // TODO: Should this case modify bone.transform rot and scale?
+                }
+                else {
+                    // The animation specifies a transform for this bone, and its not used for character movement. USE IT!
+                    bone.transform = transform;
+                }
             }
         }
 
         // do the same for all children bones
         for child in bone.children.iter_mut() {
             if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame, animation_flags) {
+                assert!(offset.is_none());
                 offset = Some(result);
             }
         }
@@ -305,7 +317,8 @@ pub struct HighLevelScripts {
 pub struct HighLevelFrame {
     pub hurt_boxes:          Vec<HighLevelHurtBox>,
     pub hit_boxes:           Vec<HighLevelHitBox>,
-    pub animation_velocity:  Option<Vector3<f32>>,
+    pub xy_velocity:         Vector2<f32>,
+    pub xy_offset:           Vector2<f32>,
     pub interruptible:       bool,
     pub edge_slide:          EdgeSlide,
     pub airbourne:           bool,
@@ -483,13 +496,14 @@ struct PositionHitBox {
 pub struct HighLevelHitBox {
     pub hitbox_index: u8,
 
-    pub prev_pos:     Option<Vector3<f32>>,
-    pub prev_size:    Option<f32>,
-    pub prev_values:  Option<CollisionBoxValues>,
+    /// This value doesnt take into account the distance travelled by the character that HighLevelFighter doesnt know about e.g. due to velocity from previous subaction
+    pub prev_pos:    Option<Vector3<f32>>,
+    pub prev_size:   Option<f32>,
+    pub prev_values: Option<CollisionBoxValues>,
 
-    pub next_pos:     Vector3<f32>,
-    pub next_size:    f32,
-    pub next_values:  CollisionBoxValues,
+    pub next_pos:    Vector3<f32>,
+    pub next_size:   f32,
+    pub next_values: CollisionBoxValues,
 }
 
 #[derive(Serialize, Clone, Debug)]
