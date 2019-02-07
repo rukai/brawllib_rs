@@ -1,4 +1,4 @@
-use cgmath::{Vector3, Matrix4, SquareMatrix};
+use cgmath::{Point3, Vector3, Matrix4, SquareMatrix, InnerSpace, Transform};
 use rayon::prelude::*;
 
 use crate::chr0::Chr0;
@@ -337,6 +337,59 @@ pub struct HighLevelSubaction {
     pub scripts:         HighLevelScripts,
 }
 
+impl HighLevelSubaction {
+    /// Furthest point of a hitbox, starting from the bps
+    /// Furthest values across all frames
+    pub fn hit_box_extent(&self) -> Extent {
+        let mut extent = Extent::new();
+        for frame in &self.frames {
+            let mut new_extent = frame.hit_box_extent();
+            new_extent.up    += frame.y_pos;
+            new_extent.down  += frame.y_pos;
+            new_extent.left  += frame.x_pos;
+            new_extent.right += frame.x_pos;
+            extent.extend(&new_extent);
+        }
+        extent
+    }
+
+    /// Furthest point of a hurtbox, starting from the bps
+    /// Furthest values across all frames
+    pub fn hurt_box_extent(&self) -> Extent {
+        let mut extent = Extent::new();
+        for frame in &self.frames {
+            let mut new_extent = frame.hurt_box_extent();
+            new_extent.up    += frame.y_pos;
+            new_extent.down  += frame.y_pos;
+            new_extent.left  += frame.x_pos;
+            new_extent.right += frame.x_pos;
+            extent.extend(&new_extent);
+        }
+        extent
+    }
+
+    /// Furthest point of a hurtbox, starting from the bps
+    /// Furthest values across all frames
+    pub fn hurt_box_vulnerable_extent(&self) -> Option<Extent> {
+        let mut extent: Option<Extent> = None;
+        for frame in &self.frames {
+            if let Some(mut new_extent) = frame.hurt_box_vulnerable_extent() {
+                new_extent.up    += frame.y_pos;
+                new_extent.down  += frame.y_pos;
+                new_extent.left  += frame.x_pos;
+                new_extent.right += frame.x_pos;
+
+                if let Some(ref mut extent) = extent {
+                    extent.extend(&new_extent);
+                } else {
+                    extent = Some(new_extent);
+                }
+            }
+        }
+        extent
+    }
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelScripts {
     pub script_main:  ScriptAst,
@@ -368,6 +421,176 @@ pub struct HighLevelFrame {
     pub x_vel_temp: f32,
     /// Does not affect the next frames velocity
     pub y_vel_temp: f32,
+}
+
+impl HighLevelFrame {
+    /// Furthest point of a hitbox, starting from the bps
+    pub fn hit_box_extent(&self) -> Extent {
+        let mut extent = Extent::new();
+        for hit_box in &self.hit_boxes {
+            if let (Some(pos), Some(size)) = (hit_box.prev_pos, hit_box.prev_size) {
+                let new_extent = Extent {
+                    up:    pos.y + size,
+                    down:  pos.y - size,
+                    left:  pos.z - size,
+                    right: pos.z + size,
+                };
+                extent.extend(&new_extent);
+            }
+
+            let pos = hit_box.next_pos;
+            let size = hit_box.next_size;
+            let new_extent = Extent {
+                up:    pos.y + size,
+                down:  pos.y - size,
+                left:  pos.z - size,
+                right: pos.z + size,
+            };
+            extent.extend(&new_extent);
+        }
+        extent
+    }
+
+    /// Furthest point of a hurtbox, starting from the bps
+    pub fn hurt_box_extent(&self) -> Extent {
+        let mut extent = Extent::new();
+        for hurt_box in &self.hurt_boxes {
+            let bone_matrix = hurt_box.bone_matrix.clone();
+            let bone_scale = Vector3::new(bone_matrix.x.magnitude(), bone_matrix.y.magnitude(), bone_matrix.z.magnitude());
+          //let bone_trousle = https://www.youtube.com/watch?v=64cvrwzrmhU
+            let radius = hurt_box.hurt_box.radius;
+            let stretch = hurt_box.hurt_box.stretch;
+
+            let stretch_face_temp = stretch / radius;
+            let stretch_face = Vector3::new(
+                stretch_face_temp.x / bone_scale.x,
+                stretch_face_temp.y / bone_scale.y,
+                stretch_face_temp.z / bone_scale.z
+            );
+
+            let transform_scale = Matrix4::from_scale(radius);
+            let transform_translation = Matrix4::from_translation(Vector3::new(
+                hurt_box.hurt_box.offset.x / (bone_scale.x * radius),
+                hurt_box.hurt_box.offset.y / (bone_scale.y * radius),
+                hurt_box.hurt_box.offset.z / (bone_scale.z * radius),
+            ));
+            let transform = bone_matrix * transform_scale * transform_translation;
+
+            let sphere_8th_centers = [
+                Point3::new(0.0,            0.0,            0.0),
+                Point3::new(stretch_face.x, 0.0,            0.0),
+                Point3::new(0.0,            stretch_face.y, 0.0),
+                Point3::new(0.0,            0.0,            stretch_face.z),
+                Point3::new(stretch_face.x, stretch_face.y, 0.0),
+                Point3::new(0.0,            stretch_face.y, stretch_face.z),
+                Point3::new(stretch_face.x, 0.0,            stretch_face.z),
+            ];
+
+            for center in &sphere_8th_centers {
+                let transformed_center = transform.transform_point(*center);
+
+                // from the center of each sphere 8th we can apply the radius to get the maximum extent in all dimensions
+                let new_extent = Extent {
+                    up:    transformed_center.y + radius,
+                    down:  transformed_center.y - radius,
+                    left:  transformed_center.z - radius,
+                    right: transformed_center.z + radius,
+                };
+                extent.extend(&new_extent);
+            }
+        }
+        extent
+    }
+
+    /// Furthest point of a hurtbox, starting from the bps, excludes intangible and invincible hurtboxes
+    /// Returns None when there are no vulnerable hurtboxes
+    pub fn hurt_box_vulnerable_extent(&self) -> Option<Extent> {
+        let mut extent = Extent::new();
+        let mut some = false;
+        for hurt_box in &self.hurt_boxes {
+            if let HurtBoxState::Normal = hurt_box.state {
+                some = true;
+                let bone_matrix = hurt_box.bone_matrix.clone();
+                let bone_scale = Vector3::new(bone_matrix.x.magnitude(), bone_matrix.y.magnitude(), bone_matrix.z.magnitude());
+              //let bone_trousle = https://www.youtube.com/watch?v=64cvrwzrmhU
+                let radius = hurt_box.hurt_box.radius;
+                let stretch = hurt_box.hurt_box.stretch;
+
+                let stretch_face_temp = stretch / radius;
+                let stretch_face = Vector3::new(
+                    stretch_face_temp.x / bone_scale.x,
+                    stretch_face_temp.y / bone_scale.y,
+                    stretch_face_temp.z / bone_scale.z
+                );
+
+                let transform_scale = Matrix4::from_scale(radius);
+                let transform_translation = Matrix4::from_translation(Vector3::new(
+                    hurt_box.hurt_box.offset.x / (bone_scale.x * radius),
+                    hurt_box.hurt_box.offset.y / (bone_scale.y * radius),
+                    hurt_box.hurt_box.offset.z / (bone_scale.z * radius),
+                ));
+                let transform = bone_matrix * transform_scale * transform_translation;
+
+                let sphere_8th_centers = [
+                    Point3::new(0.0,            0.0,            0.0),
+                    Point3::new(stretch_face.x, 0.0,            0.0),
+                    Point3::new(0.0,            stretch_face.y, 0.0),
+                    Point3::new(0.0,            0.0,            stretch_face.z),
+                    Point3::new(stretch_face.x, stretch_face.y, 0.0),
+                    Point3::new(0.0,            stretch_face.y, stretch_face.z),
+                    Point3::new(stretch_face.x, 0.0,            stretch_face.z),
+                ];
+
+                for center in &sphere_8th_centers {
+                    let transformed_center = transform.transform_point(*center);
+
+                    // from the center of each sphere 8th we can apply the radius to get the maximum extent in all dimensions
+                    let new_extent = Extent {
+                        up:    transformed_center.y + radius,
+                        down:  transformed_center.y - radius,
+                        left:  transformed_center.z - radius,
+                        right: transformed_center.z + radius,
+                    };
+                    extent.extend(&new_extent);
+                }
+            }
+        }
+        if some { Some(extent) } else { None }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct Extent {
+    pub left:  f32,
+    pub right: f32,
+    pub up:    f32,
+    pub down:  f32,
+}
+
+impl Extent {
+    pub fn new() -> Extent {
+        Extent {
+            left:  0.0,
+            right: 0.0,
+            up:    0.0,
+            down:  0.0,
+        }
+    }
+
+    pub fn extend(&mut self, other: &Extent) {
+        if other.left < self.left {
+            self.left = other.left;
+        }
+        if other.right > self.right {
+            self.right = other.right;
+        }
+        if other.up > self.up {
+            self.up = other.up;
+        }
+        if other.down < self.down {
+            self.down = other.down;
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -527,7 +750,7 @@ pub struct HitBoxValues {
 #[derive(Clone, Debug)]
 struct PositionHitBox {
     pub hitbox_index: u8,
-    pub position:     Vector3<f32>,
+    pub position:     Point3<f32>,
     pub size:         f32,
     pub values:       CollisionBoxValues,
 }
@@ -537,11 +760,11 @@ pub struct HighLevelHitBox {
     pub hitbox_index: u8,
 
     /// This value doesnt take into account the distance travelled by the character that HighLevelFighter doesnt know about e.g. due to velocity from previous subaction
-    pub prev_pos:    Option<Vector3<f32>>,
+    pub prev_pos:    Option<Point3<f32>>,
     pub prev_size:   Option<f32>,
     pub prev_values: Option<CollisionBoxValues>,
 
-    pub next_pos:    Vector3<f32>,
+    pub next_pos:    Point3<f32>,
     pub next_size:   f32,
     pub next_values: CollisionBoxValues,
 }
@@ -610,10 +833,10 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionH
     let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
         if bone.index == hit_box.bone_index as i32 {
-            let transform = bone.transform * Matrix4::from_translation(Vector3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset));
+            let point = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
             pos_hit_boxes.push(PositionHitBox {
                 hitbox_index: hit_box.hitbox_index,
-                position:     Vector3::new(transform.w.x, transform.w.y, transform.w.z),
+                position:     bone.transform.transform_point(point),
                 size:         hit_box.size,
                 values:       hit_box.values.clone()
             });
