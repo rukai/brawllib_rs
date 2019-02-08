@@ -227,11 +227,21 @@ impl Fighter {
 /// Replaces brawl fighter data with mod fighter data
 fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -> Vec<FighterData> {
     let mut fighter_datas = vec!();
+    let mut common_fighter = None;
     for fighter_path in brawl_fighter_dir {
         let fighter_path = fighter_path.unwrap();
-        if fighter_path.file_type().unwrap().is_dir() {
+        let file_type = fighter_path.file_type().unwrap();
+        if file_type.is_dir() {
             if let Some(fighter_data) = fighter_data(&fighter_path.path()) {
                 fighter_datas.push(fighter_data);
+            }
+        }
+        else if file_type.is_file() && fighter_path.path().ends_with("Fighter.pac") {
+            assert!(common_fighter.is_none());
+            if let Ok(mut fighter_file) = File::open(fighter_path.path()) {
+                let mut file_data: Vec<u8> = vec!();
+                fighter_file.read_to_end(&mut file_data).unwrap();
+                common_fighter = Some(file_data);
             }
         }
     }
@@ -262,6 +272,13 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
         }
     }
 
+    // add Fighter.pac to all fighters
+    if let Some(common_fighter) = common_fighter {
+        for fighter_data in &mut fighter_datas {
+            fighter_data.data.insert(String::from("Fighter.pac"), common_fighter.clone());
+        }
+    }
+
     fighter_datas
 }
 
@@ -283,14 +300,6 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
             None
         } else {
             let mut data = HashMap::new();
-
-            let common_fighter_path = fighter_path.parent().unwrap().join("Fighter.pac");
-            if let Ok(mut common_fighter) = File::open(&common_fighter_path) {
-                let mut file_data: Vec<u8> = vec!();
-                common_fighter.read_to_end(&mut file_data).unwrap();
-                data.insert(common_fighter_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
-            }
-
             for data_path in fs::read_dir(&fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
                 let mut file_data: Vec<u8> = vec!();
