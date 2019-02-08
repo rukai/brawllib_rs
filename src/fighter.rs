@@ -156,7 +156,7 @@ impl Fighter {
                             match &bres_child.data {
                                 &BresChildData::Bres (ref model) => {
                                     for model_child in model.children.iter() {
-                                        if model_child.name == format!("Fit{}00", self.cased_name) {
+                                        if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() {
                                             match &model_child.data {
                                                 &BresChildData::Mdl0 (ref model) => {
                                                     return model.bones.as_ref();
@@ -294,6 +294,19 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
     if let Some(common_fighter) = common_fighter {
         for fighter_data in &mut fighter_datas {
             fighter_data.data.insert(String::from("Fighter.pac"), common_fighter.clone());
+        }
+    }
+
+    // copy missing warioman file from wario
+    if let Some(Some(wario_motion_etc)) = fighter_datas.iter()
+        .find(|x| x.cased_name == "Wario")
+        .map(|x| x.data.get("FitWarioMotionEtc.pac").cloned())
+    {
+        for fighter_data in &mut fighter_datas {
+            if fighter_data.cased_name == "WarioMan" {
+                fighter_data.data.insert(String::from("FitWarioManMotionEtc.pac"), wario_motion_etc);
+                break;
+            }
         }
     }
 

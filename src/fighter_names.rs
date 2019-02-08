@@ -38,7 +38,7 @@ pub fn fighter_name(name: &str) -> String {
         "SZerosuit"      => String::from("Zero Suit Samus"),
         "ToonLink"       => String::from("Toon Link"),
         "Wario"          => String::from("Wario"),
-        "Warioman"       => String::from("Wario-Man"),
+        "WarioMan"       => String::from("Wario-Man"),
         "Yoshi"          => String::from("Yoshi"),
         "Zakoball"       => String::from("Green Alloy"),
         "Zakoboy"        => String::from("Red Alloy"),
