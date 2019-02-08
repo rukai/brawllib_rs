@@ -8,7 +8,7 @@ pub fn fighter_name(name: &str) -> String {
         "Fox"            => String::from("Fox"),
         "GameWatch"      => String::from("Game & Watch"),
         "Ganon"          => String::from("Ganondorf"),
-        "Gkoopa"         => String::from("Giga Bowser"),
+        "GKoopa"         => String::from("Giga Bowser"),
         "Ike"            => String::from("Ike"),
         "Kirby"          => String::from("Kirby"),
         "Koopa"          => String::from("Bowser"),

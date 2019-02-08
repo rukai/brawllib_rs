@@ -68,17 +68,22 @@ impl Fighter {
             .map(|a| a.windows(4).any(|b| b == psa_sequence))
             .unwrap_or(false);
 
-        let motion_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
-        let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
+        let motion_etc_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
+        let motion_file_name = format!("Fit{}Motion.pac", fighter_data.cased_name);
+        let motion = if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
             arc::arc(data)
         } else {
-            // TODO: This is being hit because some fighters just use another fighters motion file
-            //       Handle this in the FighterFolder by duplicating the file in each special case.
-            // TODO: This is being hit because some fighters dont have a MotionEtc file.
-            //       instead they have seperate Motion and Etc files.
-            //       Need to investigate if I can handle this by just reading the Motion file instead of the MotionEtc file
-            error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_file_name);
-            return None;
+            if let Some(data) = fighter_data.data.get(&motion_file_name) {
+                // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
+                // Currently I dont need that file at all (What does it even contain?)
+                // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
+                arc::arc(data)
+            } else {
+                // TODO: This is being hit because some fighters just use another fighters motion file
+                //       Handle this in the FighterFolder by duplicating the file in each special case.
+                error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_etc_file_name);
+                return None;
+            }
         };
 
         let mut models = vec!();
@@ -177,44 +182,57 @@ impl Fighter {
 
     /// retrieves the animations for the character model
     pub fn get_animations(&self) -> Vec<&Chr0> {
+        // When checking the arc names, the characters name cannot be included
+        // because modded characters name them inconsistently.
+
+        if self.motion.name.ends_with("Motion") {
+            return Fighter::get_animations_fit_motion(&self.motion);
+        }
+        else if self.motion.name.ends_with("MotionEtc") {
+            for sub_arc in &self.motion.children {
+                match &sub_arc.data {
+                    &ArcChildData::Arc (ref arc) => {
+                        if arc.name.ends_with("Motion") {
+                            return Fighter::get_animations_fit_motion(arc);
+                        }
+                    }
+                    _ => panic!("Only expecting Arc at this level"),
+                }
+            }
+        }
+        panic!("Could not find Motion Arc");
+    }
+
+    /// retrieves the animations for the character model from the Fit{}Motion arc
+    pub fn get_animations_fit_motion(motion: &Arc) -> Vec<&Chr0> {
         let mut chr0s: Vec<&Chr0> = vec!();
-        for sub_arc in &self.motion.children {
+        for sub_arc in &motion.children {
             match &sub_arc.data {
-                &ArcChildData::Arc (ref arc) => {
-                    for sub_arc in &arc.children {
-                        match &sub_arc.data {
-                            &ArcChildData::Bres (ref bres) => {
+                &ArcChildData::Bres (ref bres) => {
+                    for bres_child in bres.children.iter() {
+                        match &bres_child.data {
+                            &BresChildData::Bres (ref bres) => {
                                 for bres_child in bres.children.iter() {
                                     match &bres_child.data {
-                                        &BresChildData::Bres (ref bres) => {
-                                            for bres_child in bres.children.iter() {
-                                                match &bres_child.data {
-                                                    &BresChildData::Bres (_) => {
-                                                        panic!("Not expecting bres at this level");
-                                                    }
-                                                    &BresChildData::Chr0 (ref chr0) => {
-                                                        chr0s.push(chr0);
-                                                    }
-                                                    _ => { }
-                                                }
-                                            }
+                                        &BresChildData::Bres (_) => {
+                                            panic!("Not expecting bres at this level");
                                         }
-                                        &BresChildData::Chr0 (_) => {
-                                            panic!("Not expecting Chr0 at this level");
+                                        &BresChildData::Chr0 (ref chr0) => {
+                                            chr0s.push(chr0);
                                         }
                                         _ => { }
                                     }
                                 }
                             }
-                            &ArcChildData::Arc (_) => {
-                                //panic!("Not expecting arc at this level"); // TODO: Whats here
+                            &BresChildData::Chr0 (_) => {
+                                panic!("Not expecting Chr0 at this level");
                             }
                             _ => { }
                         }
                     }
                 }
-                &ArcChildData::Bres (_) => {
-                    panic!("Not expecting bres at this level");
+                &ArcChildData::Arc (_) => {
+                    //panic!("Not expecting arc at this level"); // TODO: Whats here
                 }
                 _ => { }
             }
