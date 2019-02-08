@@ -1,4 +1,5 @@
 use crate::high_level_fighter::CollisionBoxValues;
+use crate::high_level_fighter;
 use crate::script::{Requirement, VariableDataType};
 use crate::script_ast::{
     ScriptAst,
@@ -638,7 +639,7 @@ impl<'a> ScriptRunner<'a> {
                 self.hurtbox_state_all = state.clone();
             }
             &EventAst::ChangeHurtBoxStateSpecific { bone, ref state } => {
-                self.hurtbox_states.insert(bone, state.clone());
+                self.hurtbox_states.insert(high_level_fighter::get_bone_index(bone), state.clone());
             }
             &EventAst::UnchangeHurtBoxStateSpecific => {
                 self.hurtbox_states.clear();

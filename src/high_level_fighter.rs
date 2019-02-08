@@ -807,7 +807,7 @@ fn gen_ecb(bone: &Bone, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
 fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtBoxState, hurtbox_states: &HashMap<i32, HurtBoxState>) -> Vec<HighLevelHurtBox> {
     let mut hl_hurt_boxes = vec!();
     for hurt_box in hurt_boxes {
-        if bone.index == hurt_box.bone_index as i32 {
+        if bone.index == get_bone_index(hurt_box.bone_index as i32) {
             let state = if let Some(state) = hurtbox_states.get(&bone.index) {
                 state
             } else {
@@ -832,7 +832,7 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtB
 fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionHitBox> {
     let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
-        if bone.index == hit_box.bone_index as i32 {
+        if bone.index == get_bone_index(hit_box.bone_index as i32) {
             let point = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
             pos_hit_boxes.push(PositionHitBox {
                 hitbox_index: hit_box.hitbox_index,
@@ -848,4 +848,14 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionH
     }
 
     pos_hit_boxes
+}
+
+// This is a basic (incorrect) implementation to handle wario and kirby's weird bone indexes.
+// Refer to https://github.com/libertyernie/brawltools/blob/83b79a571d84efc1884950204852a14eab58060e/Ikarus/Moveset%20Entries/MovesetNode.cs#L261
+pub fn get_bone_index(index: i32) -> i32 {
+    if index > 400 {
+        index - 400
+    } else {
+        index
+    }
 }
