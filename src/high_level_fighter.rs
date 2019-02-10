@@ -234,6 +234,7 @@ impl HighLevelFighter {
                             hurt_boxes,
                             hit_boxes:           hl_hit_boxes,
                             interruptible:       script_runner.interruptible,
+                            landing_lag:         script_runner.landing_lag,
                             edge_slide:          script_runner.edge_slide.clone(),
                             airbourne:           script_runner.airbourne,
                             hitlist_reset:       script_runner.hitlist_reset,
@@ -267,7 +268,16 @@ impl HighLevelFighter {
                     }
                 } as usize;
 
-                HighLevelSubaction { name, iasa, frames, animation_flags, scripts }
+                let landing_lag = match actual_name.as_ref() {
+                    "AttackAirN"  => Some(attributes.nair_landing_lag),
+                    "AttackAirF"  => Some(attributes.fair_landing_lag),
+                    "AttackAirB"  => Some(attributes.bair_landing_lag),
+                    "AttackAirHi" => Some(attributes.uair_landing_lag),
+                    "AttackAirLw" => Some(attributes.dair_landing_lag),
+                    _             => None,
+                };
+
+                HighLevelSubaction { name, iasa, landing_lag, frames, animation_flags, scripts }
             }).collect()
         } else {
             vec!()
@@ -333,6 +343,7 @@ pub struct HighLevelSubaction {
     pub name:            String,
     pub iasa:            usize,
     pub frames:          Vec<HighLevelFrame>,
+    pub landing_lag:     Option<f32>,
     pub animation_flags: AnimationFlags,
     pub scripts:         HighLevelScripts,
 }
@@ -407,6 +418,7 @@ pub struct HighLevelFrame {
     pub interruptible:       bool,
     pub edge_slide:          EdgeSlide,
     pub airbourne:           bool,
+    pub landing_lag:         bool,
     pub ecb:                 ECB,
     pub hitlist_reset:       bool,
     pub slope_contour_stand: Option<i32>,

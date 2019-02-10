@@ -1110,7 +1110,7 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabLoop) => self.enable_jab_loop,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end,
-            VariableAst::RandomAccessBool (RandomAccessBool::LandingLag) => self.landing_lag,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableLandingLag) => self.landing_lag,
             VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => false, // TODO
             VariableAst::Unknown          { .. } => false, // Likely from garbage data
 
@@ -1148,7 +1148,7 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabLoop) => self.enable_jab_loop = value,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab = value,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end = value,
-            VariableAst::RandomAccessBool (RandomAccessBool::LandingLag) => self.landing_lag = value,
+            VariableAst::RandomAccessBool (RandomAccessBool::EnableLandingLag) => self.landing_lag = value,
             VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => { }
             VariableAst::Unknown          { .. } => {}, // Likely from garbage data
 

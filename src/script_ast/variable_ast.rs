@@ -350,7 +350,7 @@ pub enum RandomAccessBool {
     EnableJabLoop,
     EnableAutoJab,
     EnableJabEnd,
-    LandingLag,
+    EnableLandingLag,
     Address (u32),
 }
 
@@ -366,7 +366,7 @@ impl RandomAccessBool {
             20 => RandomAccessBool::EnableJabLoop,
             22 => RandomAccessBool::EnableAutoJab,
             25 => RandomAccessBool::EnableJabEnd,
-            30 => RandomAccessBool::LandingLag,
+            30 => RandomAccessBool::EnableLandingLag,
             _  => RandomAccessBool::Address (address),
         }
     }
