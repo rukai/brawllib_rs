@@ -202,34 +202,36 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
                         let v12u = v12 as u32;
                         EventAst::CreateHitBox (HitBoxArguments {
-                            bone_index:         (v0 >> 16) as i16,
-                            rehit_hitbox_index: (v0 >> 8)  as u8,
-                            hitbox_index:        v0        as u8,
-                            damage:              v1,
-                            trajectory:          v2,
-                            weight_knockback:   (v3 >> 16) as i16,
-                            kbg:                 v3        as i16,
-                            shield_damage:      (v4 >> 16) as i16,
-                            bkb:                 v4        as i16,
-                            size:                v5,
-                            x_offset:            v6,
-                            y_offset:            v7,
-                            z_offset:            v8,
-                            tripping_rate:       v9,
-                            hitlag_mult:         v10,
-                            di_mult:             v11,
-                            effect:  Effect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                            unk1:               (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                            sound_level:       ((v12 & 0b0000_0000_0000_0000_0011_1111_1100_0000) >> 6) as u8,
-                            unk2:              ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                            ground:             (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                            aerial:             (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                            unk3:              ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                            ty:                ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
-                            clang:              (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                            unk4:               (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            direct:             (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            unk5:             ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                            bone_index:              (v0 >> 16) as i16,
+                            rehit_hitbox_index:      (v0 >> 8)  as u8,
+                            hitbox_index:             v0        as u8,
+                            damage:                   v1,
+                            trajectory:               v2,
+                            weight_knockback:        (v3 >> 16) as i16,
+                            kbg:                      v3        as i16,
+                            shield_damage:           (v4 >> 16) as i16,
+                            bkb:                      v4        as i16,
+                            size:                     v5,
+                            x_offset:                 v6,
+                            y_offset:                 v7,
+                            z_offset:                 v8,
+                            tripping_rate:            v9,
+                            hitlag_mult:              v10,
+                            di_mult:                  v11,
+                            effect: HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                            unk1:                    (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                            sound_level:            ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                            unk2:                   ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                            sound:  HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
+                            unk3:                   ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                            ground:                  (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                            aerial:                  (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                            unk4:                   ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                            ty:                     ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
+                            clang:                   (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk5:                    (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            direct:                  (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk6:                  ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                         })
                     }
                     _ => EventAst::Unknown (event.clone())
@@ -242,34 +244,36 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         let v14u = v14 as u32;
                         EventAst::CreateSpecialHitBox (SpecialHitBoxArguments {
                             hitbox_args: HitBoxArguments {
-                                bone_index:         (v0 >> 16) as i16,
-                                rehit_hitbox_index: (v0 >> 8)  as u8,
-                                hitbox_index:        v0        as u8,
-                                damage:              v1,
-                                trajectory:          v2,
-                                weight_knockback:   (v3 >> 16) as i16,
-                                kbg:                 v3        as i16,
-                                shield_damage:      (v4 >> 16) as i16,
-                                bkb:                 v4        as i16,
-                                size:                v5,
-                                x_offset:            v6,
-                                y_offset:            v7,
-                                z_offset:            v8,
-                                tripping_rate:       v9,
-                                hitlag_mult:         v10,
-                                di_mult:             v11,
-                                effect:  Effect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                                unk1:               (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                                sound_level:       ((v12 & 0b0000_0000_0000_0000_0011_1111_1100_0000) >> 6) as u8,
-                                unk2:              ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                                ground:             (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                                aerial:             (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                                unk3:              ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                                ty:                ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
-                                clang:              (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk4:               (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                direct:             (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk5:             ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                                bone_index:              (v0 >> 16) as i16,
+                                rehit_hitbox_index:      (v0 >> 8)  as u8,
+                                hitbox_index:             v0        as u8,
+                                damage:                   v1,
+                                trajectory:               v2,
+                                weight_knockback:        (v3 >> 16) as i16,
+                                kbg:                      v3        as i16,
+                                shield_damage:           (v4 >> 16) as i16,
+                                bkb:                      v4        as i16,
+                                size:                     v5,
+                                x_offset:                 v6,
+                                y_offset:                 v7,
+                                z_offset:                 v8,
+                                tripping_rate:            v9,
+                                hitlag_mult:              v10,
+                                di_mult:                  v11,
+                                effect: HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                                unk1:                    (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                                sound_level:            ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                                unk2:                   ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                                sound:  HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 6),
+                                unk3:                   ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                                ground:                  (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                                aerial:                  (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                                unk4:                   ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                                ty:                     ((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22) as u8,
+                                clang:                   (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk5:                    (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                direct:                  (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk6:                  ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                             },
                             rehit_rate: v13,
                             angle_flipping:    AngleFlip::new(v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
@@ -1006,6 +1010,29 @@ impl HurtBoxState {
             v => HurtBoxState::Unknown (v)
         }
     }
+
+    pub fn is_normal(&self) -> bool {
+        match self {
+            HurtBoxState::Normal => true,
+            _ => false
+        }
+    }
+
+    pub fn is_invincible(&self) -> bool {
+        match self {
+            HurtBoxState::Invincible => true,
+            _ => false
+        }
+    }
+
+    pub fn is_intangible(&self) -> bool {
+        match self {
+            HurtBoxState::IntangibleFlashing => true,
+            HurtBoxState::IntangibleNoFlashing => true,
+            HurtBoxState::IntangibleQuickFlashing => true,
+            _ => false
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1030,7 +1057,7 @@ impl AngleFlip {
 }
 
 #[derive(Serialize, Clone, Debug)]
-pub enum Effect {
+pub enum HitBoxEffect {
     Normal,
     None,
     Slash,
@@ -1059,35 +1086,92 @@ pub enum Effect {
     Unknown (i32)
 }
 
-impl Effect {
-    fn new(value: i32) -> Effect {
+impl HitBoxEffect {
+    fn new(value: i32) -> HitBoxEffect {
         match value {
-             0 => Effect::Normal,
-             1 => Effect::None,
-             2 => Effect::Slash,
-             3 => Effect::Electric,
-             4 => Effect::Freezing,
-             5 => Effect::Flame,
-             6 => Effect::Coin,
-             7 => Effect::Reverse,
-             8 => Effect::Trip,
-             9 => Effect::Sleep,
-            //10 => Effect::Unk1,
-            11 => Effect::Bury,
-            12 => Effect::Stun,
-            //13 => Effect::Unk2,
-            14 => Effect::Flower,
-            //15 => Effect::Unk3,
-            //16 => Effect::Unk4,
-            17 => Effect::Grass,
-            18 => Effect::Water,
-            19 => Effect::Darkness,
-            20 => Effect::Paralyze,
-            21 => Effect::Aura,
-            22 => Effect::Plunge,
-            23 => Effect::Down,
-            24 => Effect::Flinchless,
-            v  => Effect::Unknown (v),
+             0 => HitBoxEffect::Normal,
+             1 => HitBoxEffect::None,
+             2 => HitBoxEffect::Slash,
+             3 => HitBoxEffect::Electric,
+             4 => HitBoxEffect::Freezing,
+             5 => HitBoxEffect::Flame,
+             6 => HitBoxEffect::Coin,
+             7 => HitBoxEffect::Reverse,
+             8 => HitBoxEffect::Trip,
+             9 => HitBoxEffect::Sleep,
+            //10 => HitBoxEffect::Unk1,
+            11 => HitBoxEffect::Bury,
+            12 => HitBoxEffect::Stun,
+            //13 => HitBoxEffect::Unk2,
+            14 => HitBoxEffect::Flower,
+            //15 => HitBoxEffect::Unk3,
+            //16 => HitBoxEffect::Unk4,
+            17 => HitBoxEffect::Grass,
+            18 => HitBoxEffect::Water,
+            19 => HitBoxEffect::Darkness,
+            20 => HitBoxEffect::Paralyze,
+            21 => HitBoxEffect::Aura,
+            22 => HitBoxEffect::Plunge,
+            23 => HitBoxEffect::Down,
+            24 => HitBoxEffect::Flinchless,
+            v  => HitBoxEffect::Unknown (v),
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum HitBoxSound {
+    Unique,
+    Punch,
+    Kick,
+    Slash,
+    Coin,
+    HomeRunBat,
+    Paper,
+    Shock,
+    Burn,
+    Splash,
+    Explosion,
+    Thud,
+    Slam,
+    Thwomp,
+    MagicZap,
+    Shell,
+    Slap,
+    Pan,
+    Club,
+    Racket,
+    Aura,
+    NessBat,
+    Unknown (i32)
+}
+
+impl HitBoxSound {
+    fn new(value: i32) -> HitBoxSound {
+        match value {
+            0 => HitBoxSound::Unique,
+            1 => HitBoxSound::Punch,
+            2 => HitBoxSound::Kick,
+            3 => HitBoxSound::Slash,
+            4 => HitBoxSound::Coin,
+            5 => HitBoxSound::HomeRunBat,
+            6 => HitBoxSound::Paper,
+            7 => HitBoxSound::Shock,
+            8 => HitBoxSound::Burn,
+            9 => HitBoxSound::Splash,
+           11 => HitBoxSound::Explosion,
+           13 => HitBoxSound::Thud,
+           14 => HitBoxSound::Slam,
+           15 => HitBoxSound::Thwomp,
+           16 => HitBoxSound::MagicZap,
+           17 => HitBoxSound::Shell,
+           18 => HitBoxSound::Slap,
+           19 => HitBoxSound::Pan,
+           20 => HitBoxSound::Club,
+           21 => HitBoxSound::Racket,
+           22 => HitBoxSound::Aura,
+           27 => HitBoxSound::NessBat,
+            _ => HitBoxSound::Unknown (value)
         }
     }
 }
@@ -1110,18 +1194,20 @@ pub struct HitBoxArguments {
     pub tripping_rate:      f32,
     pub hitlag_mult:        f32,
     pub di_mult:            f32,
-    pub effect:             Effect,
+    pub effect:             HitBoxEffect,
     pub unk1:               bool,
     pub sound_level:        u8,
-    pub unk2:               u8,
+    pub unk2:               bool,
+    pub sound:              HitBoxSound,
+    pub unk3:               u8,
     pub ground:             bool,
     pub aerial:             bool,
-    pub unk3:               u8,
+    pub unk4:               u8,
     pub ty:                 u8,
     pub clang:              bool,
-    pub unk4:               bool,
+    pub unk5:               bool,
     pub direct:             bool,
-    pub unk5:               u8,
+    pub unk6:               u8,
 }
 
 #[derive(Serialize, Clone, Debug)]
