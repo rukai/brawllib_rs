@@ -276,34 +276,34 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                                 unk6:                      ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                             },
                             rehit_rate: v13,
-                            angle_flipping:    AngleFlip::new(v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
-                            unk1:                            (v14 & 0b0000_0000_0000_0000_0000_0000_0000_1000) != 0,
-                            stretches_to_bone:               (v14 & 0b0000_0000_0000_0000_0000_0000_0001_0000) != 0,
-                            unk2:                            (v14 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                            can_hit_multiplayer_characters:  (v14 & 0b0000_0000_0000_0000_0000_0000_0100_0000) != 0,
-                            can_hit_sse_enemies:             (v14 & 0b0000_0000_0000_0000_0000_0000_1000_0000) != 0,
-                            can_hit_unk1:                    (v14 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0,
-                            can_hit_unk2:                    (v14 & 0b0000_0000_0000_0000_0000_0010_0000_0000) != 0,
-                            can_hit_unk3:                    (v14 & 0b0000_0000_0000_0000_0000_0100_0000_0000) != 0,
-                            can_hit_unk4:                    (v14 & 0b0000_0000_0000_0000_0000_1000_0000_0000) != 0,
-                            can_hit_unk5:                    (v14 & 0b0000_0000_0000_0000_0001_0000_0000_0000) != 0,
-                            can_hit_damageable_ceilings:     (v14 & 0b0000_0000_0000_0000_0010_0000_0000_0000) != 0,
-                            can_hit_damageable_walls:        (v14 & 0b0000_0000_0000_0000_0100_0000_0000_0000) != 0,
-                            can_hit_damageable_floors:       (v14 & 0b0000_0000_0000_0000_1000_0000_0000_0000) != 0,
-                            can_hit_unk6:                    (v14 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                            can_hit_unk7:                    (v14 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                            can_hit_unk8:                    (v14 & 0b0000_0000_0000_0100_0000_0000_0000_0000) != 0,
-                            enabled:                         (v14 & 0b0000_0000_0000_1000_0000_0000_0000_0000) != 0,
-                            unk3:                           ((v14 & 0b0000_0000_0011_0000_0000_0000_0000_0000) >> 20) as u8,
-                            can_be_shielded:                 (v14 & 0b0000_0000_0100_0000_0000_0000_0000_0000) != 0,
-                            can_be_reflected:                (v14 & 0b0000_0000_1000_0000_0000_0000_0000_0000) != 0,
-                            can_be_absorbed:                 (v14 & 0b0000_0001_0000_0000_0000_0000_0000_0000) != 0,
-                            unk4:                           ((v14 & 0b0000_0110_0000_0000_0000_0000_0000_0000) >> 25) as u8,
-                            remain_grabbed:                  (v14 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                            ignore_invincibility:            (v14 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            freeze_frame_disable:            (v14 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            unk5:                            (v14 & 0b0100_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            flinchless:                     (v14u & 0b1000_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            angle_flipping: AngleFlip::new(v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
+                            unk1:                         (v14 & 0b0000_0000_0000_0000_0000_0000_0000_1000) != 0,
+                            stretches_to_bone:            (v14 & 0b0000_0000_0000_0000_0000_0000_0001_0000) != 0,
+                            unk2:                         (v14 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                            can_hit1:                     (v14 & 0b0000_0000_0000_0000_0000_0000_0100_0000) != 0,
+                            can_hit2:                     (v14 & 0b0000_0000_0000_0000_0000_0000_1000_0000) != 0,
+                            can_hit3:                     (v14 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0,
+                            can_hit4:                     (v14 & 0b0000_0000_0000_0000_0000_0010_0000_0000) != 0,
+                            can_hit5:                     (v14 & 0b0000_0000_0000_0000_0000_0100_0000_0000) != 0,
+                            can_hit6:                     (v14 & 0b0000_0000_0000_0000_0000_1000_0000_0000) != 0,
+                            can_hit7:                     (v14 & 0b0000_0000_0000_0000_0001_0000_0000_0000) != 0,
+                            can_hit8:                     (v14 & 0b0000_0000_0000_0000_0010_0000_0000_0000) != 0,
+                            can_hit9:                     (v14 & 0b0000_0000_0000_0000_0100_0000_0000_0000) != 0,
+                            can_hit10:                    (v14 & 0b0000_0000_0000_0000_1000_0000_0000_0000) != 0,
+                            can_hit11:                    (v14 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                            can_hit12:                    (v14 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                            can_hit13:                    (v14 & 0b0000_0000_0000_0100_0000_0000_0000_0000) != 0,
+                            enabled:                      (v14 & 0b0000_0000_0000_1000_0000_0000_0000_0000) != 0,
+                            unk3:                        ((v14 & 0b0000_0000_0011_0000_0000_0000_0000_0000) >> 20) as u8,
+                            can_be_shielded:              (v14 & 0b0000_0000_0100_0000_0000_0000_0000_0000) != 0,
+                            can_be_reflected:             (v14 & 0b0000_0000_1000_0000_0000_0000_0000_0000) != 0,
+                            can_be_absorbed:              (v14 & 0b0000_0001_0000_0000_0000_0000_0000_0000) != 0,
+                            unk4:                        ((v14 & 0b0000_0110_0000_0000_0000_0000_0000_0000) >> 25) as u8,
+                            remain_grabbed:               (v14 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                            ignore_invincibility:         (v14 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            freeze_frame_disable:         (v14 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk5:                         (v14 & 0b0100_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            flinchless:                  (v14u & 0b1000_0000_0000_0000_0000_0000_0000_0000) != 0,
                         })
                     }
                     _ => EventAst::Unknown (event.clone())
@@ -1035,7 +1035,7 @@ impl HurtBoxState {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum AngleFlip {
     AwayFromAttacker,
     AttackerDir,
@@ -1056,7 +1056,7 @@ impl AngleFlip {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum HitBoxEffect {
     Normal,
     None,
@@ -1119,7 +1119,7 @@ impl HitBoxEffect {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum HitBoxSound {
     Unique,
     Punch,
@@ -1176,7 +1176,7 @@ impl HitBoxSound {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum HitBoxSseType {
     None,
     Head,
@@ -1276,36 +1276,49 @@ pub struct HitBoxArguments {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct SpecialHitBoxArguments {
-    pub hitbox_args:                    HitBoxArguments,
-    pub rehit_rate:                     i32,
-    pub angle_flipping:                 AngleFlip,
-    pub unk1:                           bool,
-    pub stretches_to_bone:              bool,
-    pub unk2:                           bool,
-    pub can_hit_multiplayer_characters: bool,
-    pub can_hit_sse_enemies:            bool,
-    pub can_hit_unk1:                   bool,
-    pub can_hit_unk2:                   bool,
-    pub can_hit_unk3:                   bool,
-    pub can_hit_unk4:                   bool,
-    pub can_hit_unk5:                   bool,
-    pub can_hit_damageable_ceilings:    bool,
-    pub can_hit_damageable_walls:       bool,
-    pub can_hit_damageable_floors:      bool,
-    pub can_hit_unk6:                   bool,
-    pub can_hit_unk7:                   bool,
-    pub can_hit_unk8:                   bool,
-    pub enabled:                        bool,
-    pub unk3:                           u8,
-    pub can_be_shielded:                bool,
-    pub can_be_reflected:               bool,
-    pub can_be_absorbed:                bool,
-    pub unk4:                           u8,
-    pub remain_grabbed:                 bool,
-    pub ignore_invincibility:           bool,
-    pub freeze_frame_disable:           bool,
-    pub unk5:                           bool,
-    pub flinchless:                     bool,
+    pub hitbox_args:       HitBoxArguments,
+    pub rehit_rate:        i32,
+    pub angle_flipping:    AngleFlip,
+    pub unk1:              bool,
+    pub stretches_to_bone: bool,
+    pub unk2:              bool,
+    /// Can hit fighters, waddle dee/doo and pikmin
+    pub can_hit1:  bool,
+    /// Can hit SSE enemies
+    pub can_hit2:  bool,
+    /// Unk
+    pub can_hit3:  bool,
+    /// Can hit ROB Gyro, Snake grenade and Mr Saturn
+    pub can_hit4:  bool,
+    /// Unk
+    pub can_hit5:  bool,
+    /// Unk
+    pub can_hit6:  bool,
+    /// Can hit Stage hurtboxes not including wall/ceiling/floor
+    pub can_hit7:  bool,
+    /// Can hit wall/ceiling/floor
+    pub can_hit8:  bool,
+    /// Link & Toon Link Bomb, Bob-omb
+    pub can_hit9:  bool,
+    /// Unk
+    pub can_hit10: bool,
+    /// Link & Toon Link Bomb, Bob-omb, ROB Gyro, Snake grenade, Bob-omb, Mr Saturn, All Stage related hurtboxes?
+    pub can_hit11: bool,
+    /// Waddle Dee/Doo pikmin
+    pub can_hit12: bool,
+    /// Unk
+    pub can_hit13: bool,
+    pub enabled:              bool,
+    pub unk3:                 u8,
+    pub can_be_shielded:      bool,
+    pub can_be_reflected:     bool,
+    pub can_be_absorbed:      bool,
+    pub unk4:                 u8,
+    pub remain_grabbed:       bool,
+    pub ignore_invincibility: bool,
+    pub freeze_frame_disable: bool,
+    pub unk5:                 bool,
+    pub flinchless:           bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1330,7 +1343,7 @@ pub struct GrabBoxArguments {
     pub unk:          Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum GrabTarget {
     None,
     GroundedOnly,
@@ -1347,6 +1360,22 @@ impl GrabTarget {
             2 => GrabTarget::AerialOnly,
             3 => GrabTarget::AerialAndGrounded,
             v => GrabTarget::Unknown (v),
+        }
+    }
+
+    pub fn grounded(&self) -> bool {
+        match self {
+            GrabTarget::GroundedOnly => true,
+            GrabTarget::AerialAndGrounded => true,
+            _ => false,
+        }
+    }
+
+    pub fn aerial(&self) -> bool {
+        match self {
+            GrabTarget::AerialOnly => true,
+            GrabTarget::AerialAndGrounded => true,
+            _ => false,
         }
     }
 }

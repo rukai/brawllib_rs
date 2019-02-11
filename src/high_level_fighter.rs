@@ -211,6 +211,7 @@ impl HighLevelFighter {
                                 next_values: next.values.clone(),
                             });
                         }
+                        hl_hit_boxes.sort_by_key(|x| x.hitbox_index);
 
                         // TODO: get these from the fighter data
                         let min_width = 2.0;
@@ -614,97 +615,113 @@ pub struct HighLevelHurtBox {
     pub state: HurtBoxState,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub enum CollisionBoxValues {
     Hit (HitBoxValues),
     Grab (GrabBoxValues),
 }
 
 impl CollisionBoxValues {
-    pub fn from_hitbox(args: &HitBoxArguments) -> CollisionBoxValues {
+    pub(crate) fn from_hitbox(args: &HitBoxArguments) -> CollisionBoxValues {
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_index:                   args.hitbox_index,
-            rehit_hitbox_index:             args.rehit_hitbox_index,
-            damage:                         args.damage,
-            trajectory:                     args.trajectory,
-            weight_knockback:               args.weight_knockback,
-            kbg:                            args.kbg,
-            shield_damage:                  args.shield_damage,
-            bkb:                            args.bkb,
-            size:                           args.size,
-            tripping_rate:                  args.tripping_rate,
-            hitlag_mult:                    args.hitlag_mult,
-            di_mult:                        args.di_mult,
-            effect:                         args.effect.clone(),
-            sound_level:                    args.sound_level,
-            sound:                          args.sound.clone(),
-            ground:                         args.ground,
-            aerial:                         args.aerial,
-            sse_type:                       args.sse_type.clone(),
-            clang:                          args.clang,
-            direct:                         args.direct,
-            rehit_rate:                     0, // TODO: ?
-            angle_flipping:                 AngleFlip::AwayFromAttacker, // TODO: ?
-            stretches_to_bone:              false,
-            can_hit_multiplayer_characters: true,
-            can_hit_sse_enemies:            true,
-            can_hit_damageable_ceilings:    true,
-            can_hit_damageable_walls:       true,
-            can_hit_damageable_floors:      true,
-            enabled:                        true,
-            can_be_shielded:                true,
-            can_be_reflected:               false,
-            can_be_absorbed:                false,
-            remain_grabbed:                 true,
-            ignore_invincibility:           false,
-            freeze_frame_disable:           false,
-            flinchless:                     false,
+            hitbox_index:         args.hitbox_index,
+            rehit_hitbox_index:   args.rehit_hitbox_index,
+            damage:               args.damage,
+            trajectory:           args.trajectory,
+            weight_knockback:     args.weight_knockback,
+            kbg:                  args.kbg,
+            shield_damage:        args.shield_damage,
+            bkb:                  args.bkb,
+            size:                 args.size,
+            tripping_rate:        args.tripping_rate,
+            hitlag_mult:          args.hitlag_mult,
+            di_mult:              args.di_mult,
+            effect:               args.effect.clone(),
+            sound_level:          args.sound_level,
+            sound:                args.sound.clone(),
+            ground:               args.ground,
+            aerial:               args.aerial,
+            sse_type:             args.sse_type.clone(),
+            clang:                args.clang,
+            direct:               args.direct,
+            rehit_rate:           0, // TODO: ?
+            angle_flipping:       AngleFlip::AwayFromAttacker, // TODO: ?
+            stretches_to_bone:    false,
+            can_hit1:             true,
+            can_hit2:             true,
+            can_hit3:             true,
+            can_hit4:             true,
+            can_hit5:             true,
+            can_hit6:             true,
+            can_hit7:             true,
+            can_hit8:             true,
+            can_hit9:             true,
+            can_hit10:            true,
+            can_hit11:            true,
+            can_hit12:            true,
+            can_hit13:            true,
+            enabled:              true,
+            can_be_shielded:      true,
+            can_be_reflected:     false,
+            can_be_absorbed:      false,
+            remain_grabbed:       true,
+            ignore_invincibility: false,
+            freeze_frame_disable: false,
+            flinchless:           false,
         })
     }
 
-    pub fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> CollisionBoxValues {
+    pub(crate) fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> CollisionBoxValues {
         let args = &special_args.hitbox_args;
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_index:                   args.hitbox_index,
-            rehit_hitbox_index:             args.rehit_hitbox_index,
-            damage:                         args.damage,
-            trajectory:                     args.trajectory,
-            weight_knockback:               args.weight_knockback,
-            kbg:                            args.kbg,
-            shield_damage:                  args.shield_damage,
-            bkb:                            args.bkb,
-            size:                           args.size,
-            tripping_rate:                  args.tripping_rate,
-            hitlag_mult:                    args.hitlag_mult,
-            di_mult:                        args.di_mult,
-            effect:                         args.effect.clone(),
-            sound_level:                    args.sound_level,
-            sound:                          args.sound.clone(),
-            ground:                         args.ground,
-            aerial:                         args.aerial,
-            sse_type:                       args.sse_type.clone(),
-            clang:                          args.clang,
-            direct:                         args.direct,
-            rehit_rate:                     special_args.rehit_rate,
-            angle_flipping:                 special_args.angle_flipping.clone(),
-            stretches_to_bone:              special_args.stretches_to_bone,
-            can_hit_multiplayer_characters: special_args.can_hit_multiplayer_characters,
-            can_hit_sse_enemies:            special_args.can_hit_sse_enemies,
-            can_hit_damageable_ceilings:    special_args.can_hit_damageable_ceilings,
-            can_hit_damageable_walls:       special_args.can_hit_damageable_walls,
-            can_hit_damageable_floors:      special_args.can_hit_damageable_floors,
-            enabled:                        special_args.enabled,
-            can_be_shielded:                special_args.can_be_shielded,
-            can_be_reflected:               special_args.can_be_reflected,
-            can_be_absorbed:                special_args.can_be_absorbed,
-            remain_grabbed:                 special_args.remain_grabbed,
-            ignore_invincibility:           special_args.ignore_invincibility,
-            freeze_frame_disable:           special_args.freeze_frame_disable,
-            flinchless:                     special_args.flinchless,
+            hitbox_index:         args.hitbox_index,
+            rehit_hitbox_index:   args.rehit_hitbox_index,
+            damage:               args.damage,
+            trajectory:           args.trajectory,
+            weight_knockback:     args.weight_knockback,
+            kbg:                  args.kbg,
+            shield_damage:        args.shield_damage,
+            bkb:                  args.bkb,
+            size:                 args.size,
+            tripping_rate:        args.tripping_rate,
+            hitlag_mult:          args.hitlag_mult,
+            di_mult:              args.di_mult,
+            effect:               args.effect.clone(),
+            sound_level:          args.sound_level,
+            sound:                args.sound.clone(),
+            ground:               args.ground,
+            aerial:               args.aerial,
+            sse_type:             args.sse_type.clone(),
+            clang:                args.clang,
+            direct:               args.direct,
+            rehit_rate:           special_args.rehit_rate,
+            angle_flipping:       special_args.angle_flipping.clone(),
+            stretches_to_bone:    special_args.stretches_to_bone,
+            can_hit1:             special_args.can_hit1,
+            can_hit2:             special_args.can_hit2,
+            can_hit3:             special_args.can_hit3,
+            can_hit4:             special_args.can_hit4,
+            can_hit5:             special_args.can_hit5,
+            can_hit6:             special_args.can_hit6,
+            can_hit7:             special_args.can_hit7,
+            can_hit8:             special_args.can_hit8,
+            can_hit9:             special_args.can_hit9,
+            can_hit10:            special_args.can_hit10,
+            can_hit11:            special_args.can_hit11,
+            can_hit12:            special_args.can_hit12,
+            can_hit13:            special_args.can_hit13,
+            enabled:              special_args.enabled,
+            can_be_shielded:      special_args.can_be_shielded,
+            can_be_reflected:     special_args.can_be_reflected,
+            can_be_absorbed:      special_args.can_be_absorbed,
+            remain_grabbed:       special_args.remain_grabbed,
+            ignore_invincibility: special_args.ignore_invincibility,
+            freeze_frame_disable: special_args.freeze_frame_disable,
+            flinchless:           special_args.flinchless,
         })
     }
 
-    pub fn from_grabbox(args: &GrabBoxArguments) -> CollisionBoxValues {
+    pub(crate) fn from_grabbox(args: &GrabBoxArguments) -> CollisionBoxValues {
         CollisionBoxValues::Grab(GrabBoxValues {
             hitbox_index: args.hitbox_index,
             size:         args.size,
@@ -715,7 +732,7 @@ impl CollisionBoxValues {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct GrabBoxValues {
     pub hitbox_index: i32,
     pub size:         f32,
@@ -724,44 +741,98 @@ pub struct GrabBoxValues {
     pub unk:          Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct HitBoxValues {
-    pub hitbox_index:                   u8,
-    pub rehit_hitbox_index:             u8,
-    pub damage:                         i32,
-    pub trajectory:                     i32,
-    pub weight_knockback:               i16,
-    pub kbg:                            i16,
-    pub shield_damage:                  i16,
-    pub bkb:                            i16,
-    pub size:                           f32,
-    pub tripping_rate:                  f32,
-    pub hitlag_mult:                    f32,
-    pub di_mult:                        f32,
-    pub effect:                         HitBoxEffect,
-    pub sound_level:                    u8,
-    pub sound:                          HitBoxSound,
-    pub ground:                         bool,
-    pub aerial:                         bool,
-    pub sse_type:                       HitBoxSseType,
-    pub clang:                          bool,
-    pub direct:                         bool,
-    pub rehit_rate:                     i32,
-    pub angle_flipping:                 AngleFlip,
-    pub stretches_to_bone:              bool,
-    pub can_hit_multiplayer_characters: bool,
-    pub can_hit_sse_enemies:            bool,
-    pub can_hit_damageable_ceilings:    bool,
-    pub can_hit_damageable_walls:       bool,
-    pub can_hit_damageable_floors:      bool,
-    pub enabled:                        bool,
-    pub can_be_shielded:                bool,
-    pub can_be_reflected:               bool,
-    pub can_be_absorbed:                bool,
-    pub remain_grabbed:                 bool,
-    pub ignore_invincibility:           bool,
-    pub freeze_frame_disable:           bool,
-    pub flinchless:                     bool,
+    pub hitbox_index:         u8,
+    pub rehit_hitbox_index:   u8,
+    pub damage:               i32,
+    pub trajectory:           i32,
+    pub weight_knockback:     i16,
+    pub kbg:                  i16,
+    pub shield_damage:        i16,
+    pub bkb:                  i16,
+    pub size:                 f32,
+    pub tripping_rate:        f32,
+    pub hitlag_mult:          f32,
+    pub di_mult:              f32,
+    pub effect:               HitBoxEffect,
+    pub sound_level:          u8,
+    pub sound:                HitBoxSound,
+    pub ground:               bool,
+    pub aerial:               bool,
+    pub sse_type:             HitBoxSseType,
+    pub clang:                bool,
+    pub direct:               bool,
+    pub rehit_rate:           i32,
+    pub angle_flipping:       AngleFlip,
+    pub stretches_to_bone:    bool,
+    pub can_hit1:             bool,
+    pub can_hit2:             bool,
+    pub can_hit3:             bool,
+    pub can_hit4:             bool,
+    pub can_hit5:             bool,
+    pub can_hit6:             bool,
+    pub can_hit7:             bool,
+    pub can_hit8:             bool,
+    pub can_hit9:             bool,
+    pub can_hit10:            bool,
+    pub can_hit11:            bool,
+    pub can_hit12:            bool,
+    pub can_hit13:            bool,
+    pub enabled:              bool,
+    pub can_be_shielded:      bool,
+    pub can_be_reflected:     bool,
+    pub can_be_absorbed:      bool,
+    pub remain_grabbed:       bool,
+    pub ignore_invincibility: bool,
+    pub freeze_frame_disable: bool,
+    pub flinchless:           bool,
+}
+
+impl HitBoxValues {
+    pub fn can_hit_fighter(&self) -> bool {
+        self.can_hit1
+    }
+
+    pub fn can_hit_waddle_dee_doo(&self) -> bool {
+        self.can_hit1 || self.can_hit12
+    }
+
+    pub fn can_hit_pikmin(&self) -> bool {
+        self.can_hit1 || self.can_hit12
+    }
+
+    pub fn can_hit_sse(&self) -> bool {
+        self.can_hit2
+    }
+
+    pub fn can_hit_gyro(&self) -> bool {
+        self.can_hit4 || self.can_hit11
+    }
+
+    pub fn can_hit_snake_grenade(&self) -> bool {
+        self.can_hit4 || self.can_hit11
+    }
+
+    pub fn can_hit_mr_saturn(&self) -> bool {
+        self.can_hit4 || self.can_hit11
+    }
+
+    pub fn can_hit_stage_non_wall_ceiling_floor(&self) -> bool {
+        self.can_hit7 || self.can_hit11
+    }
+
+    pub fn can_hit_wall_ceiling_floor(&self) -> bool {
+        self.can_hit8 || self.can_hit11
+    }
+
+    pub fn can_hit_link_bomb(&self) -> bool {
+        self.can_hit9 || self.can_hit10
+    }
+
+    pub fn can_hit_bobomb(&self) -> bool {
+        self.can_hit9 || self.can_hit10
+    }
 }
 
 #[derive(Clone, Debug)]
