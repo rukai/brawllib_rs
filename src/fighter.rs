@@ -22,7 +22,9 @@ pub struct Fighter {
     pub moveset: Arc,
     pub motion: Arc,
     pub models: Vec<Arc>,
-    pub modded_by_psa: bool
+    // TODO: Is there any reason to keep this now I can `mod_type`, any mods are going to be done by psa anyway...
+    pub modded_by_psa: bool,
+    pub mod_type: ModType,
 }
 
 impl Fighter {
@@ -99,13 +101,21 @@ impl Fighter {
             }
         }
 
+        let mod_type = match (fighter_data.read_from_vanilla, fighter_data.read_from_mod) {
+            (true, true)   => ModType::ModFromBase,
+            (true, false)  => ModType::NotMod,
+            (false, true)  => ModType::ModFromScratch,
+            (false, false) => unreachable!("The data has to have been read from somewhere"),
+        };
+
         Some(Fighter {
             cased_name: fighter_data.cased_name,
             moveset_common,
             moveset,
             motion,
             models,
-            modded_by_psa
+            modded_by_psa,
+            mod_type,
         })
     }
 
@@ -250,7 +260,8 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
         let fighter_path = fighter_path.unwrap();
         let file_type = fighter_path.file_type().unwrap();
         if file_type.is_dir() {
-            if let Some(fighter_data) = fighter_data(&fighter_path.path()) {
+            if let Some(mut fighter_data) = fighter_data(&fighter_path.path()) {
+                fighter_data.read_from_vanilla = true;
                 fighter_datas.push(fighter_data);
             }
         }
@@ -278,11 +289,13 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
                         let mut file_data: Vec<u8> = vec!();
                         File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
                         fighter_data.data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+                        fighter_data.read_from_mod = true;
                     }
                 }
                 else {
                     // fighter data doesnt exist yet, create it
-                    if let Some(fighter_data) = fighter_data(&fighter_path) {
+                    if let Some(mut fighter_data) = fighter_data(&fighter_path) {
+                        fighter_data.read_from_mod = true;
                         fighter_datas.push(fighter_data);
                     }
                 }
@@ -305,6 +318,7 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
         for fighter_data in &mut fighter_datas {
             if fighter_data.cased_name == "WarioMan" {
                 fighter_data.data.insert(String::from("FitWarioManMotionEtc.pac"), wario_motion_etc);
+                // Just assume wariomans read_from_* is unaffected by this copy :/
                 break;
             }
         }
@@ -337,12 +351,34 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
                 File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
                 data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
             }
-            Some(FighterData { cased_name, data })
+            Some(FighterData {
+                cased_name,
+                data,
+                // These fields get set later
+                read_from_vanilla: false,
+                read_from_mod: false,
+            })
         }
     } else { None }
 }
 
 struct FighterData {
     cased_name: String,
-    data: HashMap<String, Vec<u8>>
+    data: HashMap<String, Vec<u8>>,
+    read_from_vanilla: bool,
+    read_from_mod: bool,
+}
+
+#[derive(Debug)]
+pub enum ModType {
+    /// Original brawl fighter.
+    /// All .pac files are the unmodified from brawl.
+    NotMod,
+    /// Original brawl fighter that has been modified.
+    /// Its .pac files overwrite those of the existing character, but if .pac files are missing existing ones are used.
+    ModFromBase,
+    /// Fighter that has been made from scratch.
+    /// All .pac files define a new unique character without the use of any existing brawl .pac files.
+    /// Although it can reference custom coding of a cloned character somehow.
+    ModFromScratch,
 }
