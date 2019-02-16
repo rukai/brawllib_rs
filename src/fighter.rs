@@ -166,13 +166,15 @@ impl Fighter {
                             match &bres_child.data {
                                 &BresChildData::Bres (ref model) => {
                                     for model_child in model.children.iter() {
-                                        if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() {
-                                            match &model_child.data {
-                                                &BresChildData::Mdl0 (ref model) => {
-                                                    return model.bones.as_ref();
-                                                }
-                                                _ => { }
+                                        // A check like this would be useful but it doesnt account for from scratch mod fighters.
+                                        // `if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() { }`
+                                        // Instead, the first model is the characters model, so we just return it immediately.
+
+                                        match &model_child.data {
+                                            &BresChildData::Mdl0 (ref model) => {
+                                                return model.bones.as_ref();
                                             }
+                                            _ => { }
                                         }
                                     }
                                 }
