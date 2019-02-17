@@ -8,10 +8,12 @@ use crate::util;
 use crate::math;
 
 pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bone {
-    bone_siblings(&data[resources[0].data_offset as usize ..]).pop().unwrap()
+    bone_siblings(&data[resources[0].data_offset as usize ..], 0).pop().unwrap()
 }
 
-fn bone_siblings(data: &[u8]) -> Vec<Bone> {
+fn bone_siblings(data_root: &[u8], offset: i32) -> Vec<Bone> {
+    let data = &data_root[offset as usize..];
+
     let header_len    = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
     let mdl0_offset   = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
     let string_offset = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
@@ -137,13 +139,13 @@ fn bone_siblings(data: &[u8]) -> Vec<Bone> {
     let children = if first_child_offset == 0 {
         vec!()
     } else {
-        bone_siblings(&data[first_child_offset as usize ..])
+        bone_siblings(&data_root, offset + first_child_offset)
     };
 
     let mut siblings = if next_offset == 0 {
         vec!()
     } else {
-        bone_siblings(&data[next_offset as usize ..])
+        bone_siblings(&data_root, offset + next_offset)
     };
 
     siblings.push(Bone {
