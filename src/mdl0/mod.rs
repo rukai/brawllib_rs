@@ -1,12 +1,18 @@
 pub mod bones;
+pub mod palettes;
+pub mod textures;
+pub mod vertices;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use crate::resources::*;
+use crate::resources::Resource;
 use crate::resources;
-use crate::mdl0::bones::Bone;
 use crate::mbox::MBox;
 use crate::mbox;
+use palettes::PaletteRef;
+use textures::TextureRef;
+use vertices::Vertices;
+use bones::Bone;
 
 pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let _size        = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
@@ -68,8 +74,8 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let mut materials = None;
     let mut shaders = None;
     let mut objects = None;
-    let mut textures = None;
-    let mut palettes = None;
+    let mut texture_refs = None;
+    let mut palette_refs = None;
 
     let fur_version = version >= 10;
     let num_children = if fur_version { 13 } else { 11 };
@@ -85,19 +91,19 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
                 8  if fur_version => { materials = Some(resources) }
                 9  if fur_version => { shaders = Some(resources) }
                 10 if fur_version => { objects = Some(resources) }
-                11 if fur_version => { textures = Some(resources) }
-                12 if fur_version => { palettes = Some(resources) }
+                11 if fur_version => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
+                12 if fur_version => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
                 0 => { definitions = Some(Mdl0Definitions { resources }) }
                 1 => { bones = Some(bones::bones(&data[resources_offset as usize ..], resources)) }
-                2 => { vertices = Some(resources) }
+                2 => { vertices = Some(vertices::vertices(&data[resources_offset as usize ..], resources)) }
                 3 => { normals = Some(resources) }
                 4 => { colors = Some(resources) }
                 5 => { uv = Some(resources) }
                 6 => { materials = Some(resources) }
                 7 => { shaders = Some(resources) }
                 8 => { objects = Some(resources) }
-                9 => { textures = Some(resources) }
-                10 => { palettes = Some(resources) }
+                9 => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
+                10 => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
                 _ => { unreachable!() }
             }
         }
@@ -118,8 +124,8 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
         materials,
         shaders,
         objects,
-        textures,
-        palettes,
+        texture_refs,
+        palette_refs,
     }
 }
 
@@ -130,7 +136,7 @@ pub struct Mdl0 {
     pub props: Option<Mdl0Props>,
     pub definitions: Option<Mdl0Definitions>,
     pub bones: Option<Bone>,
-    vertices: Option<Vec<Resource>>,
+    pub vertices: Option<Vec<Vertices>>,
     normals: Option<Vec<Resource>>,
     colors: Option<Vec<Resource>>,
     uv: Option<Vec<Resource>>,
@@ -139,8 +145,8 @@ pub struct Mdl0 {
     materials: Option<Vec<Resource>>,
     shaders: Option<Vec<Resource>>,
     objects: Option<Vec<Resource>>,
-    textures: Option<Vec<Resource>>,
-    palettes: Option<Vec<Resource>>,
+    pub texture_refs: Option<Vec<Vec<TextureRef>>>,
+    pub palette_refs: Option<Vec<Vec<PaletteRef>>>,
 }
 
 #[derive(Debug)]

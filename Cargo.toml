@@ -25,3 +25,4 @@ mint = "0.5"
 
 [profile.release]
 debug = true
+debug-assertions = true
