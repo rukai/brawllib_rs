@@ -17,7 +17,16 @@ pub(crate) fn chr0(data: &[u8]) -> Chr0 {
     let num_children     = (&data[0x1e..]).read_u16::<BigEndian>().unwrap();
     let loop_value       = (&data[0x20..]).read_i32::<BigEndian>().unwrap();
     let scaling_rule     = (&data[0x24..]).read_i32::<BigEndian>().unwrap();
-    assert_eq!(version, 4);
+    if version == 0 || version == 4 {
+        // Current implementation only handles version 4
+        // version 0 seems to be the same as version 4
+    }
+    else if version == 5 {
+        unimplemented!("Need to implement handling for chr0 v5, refer to brawlbox CHR0Node.cs");
+    }
+    else {
+        panic!("Unknown chr0 version: {}", version);
+    }
 
     let name = String::from(util::parse_str(&data[string_offset as usize ..]).unwrap());
 
