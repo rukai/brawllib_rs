@@ -4,13 +4,10 @@ use crate::util;
 
 // ResourceGroup in brawlbox
 pub(crate) fn resources(data: &[u8]) -> Vec<Resource> {
-    let _total_size = (&data[..]).read_i32::<BigEndian>().unwrap();
+    let total_size = (&data[..]).read_i32::<BigEndian>().unwrap();
     let num_children = (&data[4 ..]).read_i32::<BigEndian>().unwrap();
 
-    if _total_size != (num_children + 1) * RESOURCE_SIZE as i32 + RESOURCE_HEADER_SIZE as i32 {
-        error!("I'm pretty sure is due to a bad mod. I have no idea how brawl box manages to avoid reading garbage data in this case and I'm not about to find out. Lets just pretend it succeeded :/");
-        return vec!();
-    }
+    assert_eq!(total_size, (num_children + 1) * RESOURCE_SIZE as i32 + RESOURCE_HEADER_SIZE as i32);
 
     let mut resources = vec!();
     for i in 1..=num_children { // the first child is a dummy so we skip it.
