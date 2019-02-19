@@ -191,7 +191,7 @@ impl HighLevelFighter {
                             let mut prev_values = None;
                             if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
                                 for prev_hit_box in prev_hit_boxes {
-                                    if prev_hit_box.hitbox_index == next.hitbox_index {
+                                    if prev_hit_box.hitbox_id == next.hitbox_id {
                                         // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
                                         prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, y_vel, x_vel));
                                         prev_size = Some(prev_hit_box.size);
@@ -200,7 +200,7 @@ impl HighLevelFighter {
                                 }
                             }
                             hl_hit_boxes.push(HighLevelHitBox {
-                                hitbox_index: next.hitbox_index,
+                                hitbox_id: next.hitbox_id,
 
                                 prev_pos,
                                 prev_size,
@@ -211,7 +211,7 @@ impl HighLevelFighter {
                                 next_values: next.values.clone(),
                             });
                         }
-                        hl_hit_boxes.sort_by_key(|x| x.hitbox_index);
+                        hl_hit_boxes.sort_by_key(|x| x.hitbox_id);
 
                         // TODO: get these from the fighter data
                         let min_width = 2.0;
@@ -624,8 +624,8 @@ pub enum CollisionBoxValues {
 impl CollisionBoxValues {
     pub(crate) fn from_hitbox(args: &HitBoxArguments) -> CollisionBoxValues {
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_index:         args.hitbox_index,
-            rehit_hitbox_index:   args.rehit_hitbox_index,
+            hitbox_id:            args.hitbox_id,
+            set_id:               args.set_id,
             damage:               args.damage,
             trajectory:           args.trajectory,
             weight_knockback:     args.weight_knockback,
@@ -664,7 +664,7 @@ impl CollisionBoxValues {
             can_be_shielded:      true,
             can_be_reflected:     false,
             can_be_absorbed:      false,
-            remain_grabbed:       true,
+            remain_grabbed:       false,
             ignore_invincibility: false,
             freeze_frame_disable: false,
             flinchless:           false,
@@ -674,8 +674,8 @@ impl CollisionBoxValues {
     pub(crate) fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> CollisionBoxValues {
         let args = &special_args.hitbox_args;
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_index:         args.hitbox_index,
-            rehit_hitbox_index:   args.rehit_hitbox_index,
+            hitbox_id:            args.hitbox_id,
+            set_id:               args.set_id,
             damage:               args.damage,
             trajectory:           args.trajectory,
             weight_knockback:     args.weight_knockback,
@@ -723,28 +723,28 @@ impl CollisionBoxValues {
 
     pub(crate) fn from_grabbox(args: &GrabBoxArguments) -> CollisionBoxValues {
         CollisionBoxValues::Grab(GrabBoxValues {
-            hitbox_index: args.hitbox_index,
-            size:         args.size,
-            set_action:   args.set_action,
-            target:       args.target.clone(),
-            unk:          args.unk.clone(),
+            hitbox_id:  args.hitbox_id,
+            size:       args.size,
+            set_action: args.set_action,
+            target:     args.target.clone(),
+            unk:        args.unk.clone(),
         })
     }
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct GrabBoxValues {
-    pub hitbox_index: i32,
-    pub size:         f32,
-    pub set_action:   i32,
-    pub target:       GrabTarget,
-    pub unk:          Option<i32>,
+    pub hitbox_id:  i32,
+    pub size:       f32,
+    pub set_action: i32,
+    pub target:     GrabTarget,
+    pub unk:        Option<i32>,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct HitBoxValues {
-    pub hitbox_index:         u8,
-    pub rehit_hitbox_index:   u8,
+    pub hitbox_id:            u8,
+    pub set_id:               u8,
     pub damage:               i32,
     pub trajectory:           i32,
     pub weight_knockback:     i16,
@@ -837,7 +837,7 @@ impl HitBoxValues {
 
 #[derive(Clone, Debug)]
 struct PositionHitBox {
-    pub hitbox_index: u8,
+    pub hitbox_id:    u8,
     pub position:     Point3<f32>,
     pub size:         f32,
     pub values:       CollisionBoxValues,
@@ -845,7 +845,7 @@ struct PositionHitBox {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelHitBox {
-    pub hitbox_index: u8,
+    pub hitbox_id: u8,
 
     /// This value doesnt take into account the distance travelled by the character that HighLevelFighter doesnt know about e.g. due to velocity from previous subaction
     pub prev_pos:    Option<Point3<f32>>,
@@ -923,10 +923,10 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionH
         if bone.index == get_bone_index(hit_box.bone_index as i32) {
             let point = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
             pos_hit_boxes.push(PositionHitBox {
-                hitbox_index: hit_box.hitbox_index,
-                position:     bone.transform.transform_point(point),
-                size:         hit_box.size,
-                values:       hit_box.values.clone()
+                hitbox_id: hit_box.hitbox_id,
+                position:  bone.transform.transform_point(point),
+                size:      hit_box.size,
+                values:    hit_box.values.clone()
             });
         }
     }

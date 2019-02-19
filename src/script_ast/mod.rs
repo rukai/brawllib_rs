@@ -203,8 +203,8 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         let v12u = v12 as u32;
                         EventAst::CreateHitBox (HitBoxArguments {
                             bone_index:                  (v0 >> 16) as i16,
-                            rehit_hitbox_index:          (v0 >> 8)  as u8,
-                            hitbox_index:                 v0        as u8,
+                            set_id:                      (v0 >> 8)  as u8,
+                            hitbox_id:                    v0        as u8,
                             damage:                       v1,
                             trajectory:                   v2,
                             weight_knockback:            (v3 >> 16) as i16,
@@ -245,8 +245,8 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         EventAst::CreateSpecialHitBox (SpecialHitBoxArguments {
                             hitbox_args: HitBoxArguments {
                                 bone_index:                  (v0 >> 16) as i16,
-                                rehit_hitbox_index:          (v0 >> 8)  as u8,
-                                hitbox_index:                 v0        as u8,
+                                set_id:                      (v0 >> 8)  as u8,
+                                hitbox_id:                    v0        as u8,
                                 damage:                       v1,
                                 trajectory:                   v2,
                                 weight_knockback:            (v3 >> 16) as i16,
@@ -331,8 +331,10 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 {
                     let unk = if let Some(&Value(value)) = args.get(8) { Some(value) } else { None };
 
+                    assert!(v0 >= 0 && v0 <= 0xFF, "grab boxes shouldn't include any extra data with the hitbox_id");
+
                     EventAst::CreateGrabBox(GrabBoxArguments {
-                        hitbox_index: v0,
+                        hitbox_id:    v0,
                         bone_index:   v1,
                         size:         v2,
                         x_offset:     v3,
@@ -1243,8 +1245,8 @@ impl HitBoxSseType {
 #[derive(Serialize, Clone, Debug)]
 pub struct HitBoxArguments {
     pub bone_index:         i16,
-    pub hitbox_index:       u8,
-    pub rehit_hitbox_index: u8,
+    pub hitbox_id:          u8,
+    pub set_id:             u8,
     pub damage:             i32,
     pub trajectory:         i32,
     pub weight_knockback:   i16,
@@ -1332,7 +1334,7 @@ pub struct MoveHitBox {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct GrabBoxArguments {
-    pub hitbox_index: i32,
+    pub hitbox_id:    i32,
     pub bone_index:   i32,
     pub size:         f32,
     pub x_offset:     f32,

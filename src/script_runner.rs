@@ -155,49 +155,49 @@ pub enum ChangeSubaction {
 
 #[derive(Clone, Debug)]
 pub struct ScriptCollisionBox {
-    pub bone_index:   i16,
-    pub hitbox_index: u8,
-    pub x_offset:     f32,
-    pub y_offset:     f32,
-    pub z_offset:     f32,
-    pub size:         f32,
-    pub values:       CollisionBoxValues
+    pub bone_index: i16,
+    pub hitbox_id:  u8,
+    pub x_offset:   f32,
+    pub y_offset:   f32,
+    pub z_offset:   f32,
+    pub size:       f32,
+    pub values:     CollisionBoxValues
 }
 
 impl ScriptCollisionBox {
     fn from_hitbox(args: &HitBoxArguments) -> ScriptCollisionBox {
         ScriptCollisionBox {
-            bone_index:   args.bone_index,
-            hitbox_index: args.hitbox_index,
-            x_offset:     args.x_offset,
-            y_offset:     args.y_offset,
-            z_offset:     args.z_offset,
-            size:         args.size,
-            values:       CollisionBoxValues::from_hitbox(args)
+            bone_index:  args.bone_index,
+            hitbox_id:   args.hitbox_id,
+            x_offset:    args.x_offset,
+            y_offset:    args.y_offset,
+            z_offset:    args.z_offset,
+            size:        args.size,
+            values:      CollisionBoxValues::from_hitbox(args)
         }
     }
 
     fn from_special_hitbox(args: &SpecialHitBoxArguments) -> ScriptCollisionBox {
         ScriptCollisionBox {
-            bone_index:   args.hitbox_args.bone_index,
-            hitbox_index: args.hitbox_args.hitbox_index,
-            x_offset:     args.hitbox_args.x_offset,
-            y_offset:     args.hitbox_args.y_offset,
-            z_offset:     args.hitbox_args.z_offset,
-            size:         args.hitbox_args.size,
-            values:       CollisionBoxValues::from_special_hitbox(args)
+            bone_index: args.hitbox_args.bone_index,
+            hitbox_id:  args.hitbox_args.hitbox_id,
+            x_offset:   args.hitbox_args.x_offset,
+            y_offset:   args.hitbox_args.y_offset,
+            z_offset:   args.hitbox_args.z_offset,
+            size:       args.hitbox_args.size,
+            values:     CollisionBoxValues::from_special_hitbox(args)
         }
     }
 
     fn from_grabbox(args: &GrabBoxArguments) -> ScriptCollisionBox {
         ScriptCollisionBox {
-            bone_index:   args.bone_index as i16,
-            hitbox_index: args.hitbox_index as u8,
-            x_offset:     args.x_offset,
-            y_offset:     args.y_offset,
-            z_offset:     args.z_offset,
-            size:         args.size,
-            values:       CollisionBoxValues::from_grabbox(args)
+            bone_index: args.bone_index as i16,
+            hitbox_id:  args.hitbox_id as u8,
+            x_offset:   args.x_offset,
+            y_offset:   args.y_offset,
+            z_offset:   args.z_offset,
+            size:       args.size,
+            values:     CollisionBoxValues::from_grabbox(args)
         }
     }
 
@@ -550,32 +550,34 @@ impl<'a> ScriptRunner<'a> {
 
             // hitboxes
             &EventAst::CreateHitBox (ref args) => {
-                if args.hitbox_index < self.hitboxes.len() as u8 {
-                    if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_index as usize] {
+                if args.hitbox_id < self.hitboxes.len() as u8 {
+                    // TODO: While this is true it only covess, a small subset of what hitbox sets actually do and should therefore be removed.
+                    if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
                         if let CollisionBoxValues::Hit (ref prev_hitbox) = prev_hitbox.values {
-                            if args.rehit_hitbox_index > prev_hitbox.rehit_hitbox_index {
+                            if args.set_id != prev_hitbox.set_id {
                                 self.hitlist_reset = true;
                             }
                         }
                     }
-                    self.hitboxes[args.hitbox_index as usize] = Some(ScriptCollisionBox::from_hitbox(args));
+                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_index, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }
             }
             &EventAst::CreateSpecialHitBox (ref args) => {
-                let index = args.hitbox_args.hitbox_index as usize;
-                if args.hitbox_args.hitbox_index < self.hitboxes.len() as u8 {
+                let index = args.hitbox_args.hitbox_id as usize;
+                if args.hitbox_args.hitbox_id < self.hitboxes.len() as u8 {
+                    // TODO: While this is true it only covess, a small subset of what hitbox sets actually do and should therefore be removed.
                     if let Some(ref prev_hitbox) = self.hitboxes[index] {
                         if let CollisionBoxValues::Hit (ref prev_hitbox) = prev_hitbox.values {
-                            if args.hitbox_args.rehit_hitbox_index > prev_hitbox.rehit_hitbox_index {
+                            if args.hitbox_args.set_id != prev_hitbox.set_id {
                                 self.hitlist_reset = true;
                             }
                         }
                     }
                     self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_index, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, action_name);
                 }
             }
             &EventAst::DeleteAllHitBoxes => {
@@ -584,6 +586,7 @@ impl<'a> ScriptRunner<'a> {
                         *hitbox = None;
                     }
                 }
+                // This doesnt account for individual hitboxes being removed, which resets the hitlist for just that hitbox
                 self.hitlist_reset = true;
             }
             &EventAst::MoveHitBox (ref move_hitbox) => {
@@ -608,21 +611,21 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::DeleteHitBox (hitbox_index) => {
-                if self.hitboxes[hitbox_index as usize].as_ref().map(|x| x.is_hit()).unwrap_or(false) {
-                    self.hitboxes[hitbox_index as usize] = None;
+            &EventAst::DeleteHitBox (hitbox_id) => {
+                if self.hitboxes[hitbox_id as usize].as_ref().map(|x| x.is_hit()).unwrap_or(false) {
+                    self.hitboxes[hitbox_id as usize] = None;
                 }
             }
             &EventAst::CreateGrabBox (ref args) => {
-                if args.hitbox_index < self.hitboxes.len() as i32 {
-                    self.hitboxes[args.hitbox_index as usize] = Some(ScriptCollisionBox::from_grabbox(args));
+                if args.hitbox_id < self.hitboxes.len() as i32 {
+                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_grabbox(args));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_index, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }
             }
-            &EventAst::DeleteGrabBox (hitbox_index) => {
-                if self.hitboxes[hitbox_index as usize].as_ref().map(|x| x.is_grab()).unwrap_or(false) {
-                    self.hitboxes[hitbox_index as usize] = None;
+            &EventAst::DeleteGrabBox (hitbox_id) => {
+                if self.hitboxes[hitbox_id as usize].as_ref().map(|x| x.is_grab()).unwrap_or(false) {
+                    self.hitboxes[hitbox_id as usize] = None;
                 }
             }
             &EventAst::DeleteAllGrabBoxes => {
