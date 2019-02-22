@@ -16,7 +16,7 @@ pub(crate) fn chr0(data: &[u8]) -> Chr0 {
     let num_frames       = (&data[0x1c..]).read_u16::<BigEndian>().unwrap();
     let num_children     = (&data[0x1e..]).read_u16::<BigEndian>().unwrap();
     let loop_value       = (&data[0x20..]).read_i32::<BigEndian>().unwrap();
-    let scaling_rule     = (&data[0x24..]).read_i32::<BigEndian>().unwrap();
+    let scaling_rule     = (&data[0x24..]).read_i32::<BigEndian>().unwrap(); // TODO: YOSHI!?!?!
     if version == 0 || version == 4 {
         // Current implementation only handles version 4
         // version 0 seems to be the same as version 4
@@ -101,6 +101,13 @@ impl Chr0Child {
         let scale = self.scale.get_value(loop_value, frame, 1.0);
         let rot = self.rot.get_value(loop_value, frame, 0.0);
         let translation = self.translation.get_value(loop_value, frame, 0.0);
+        math::gen_transform(scale, rot, translation)
+    }
+
+    pub fn get_transform_rot_only(&self, loop_value: bool, frame: i32) -> Matrix4<f32> {
+        let scale = Vector3::new(1.0, 1.0, 1.0);
+        let rot = self.rot.get_value(loop_value, frame, 0.0);
+        let translation = Vector3::new(0.0, 0.0, 0.0);
         math::gen_transform(scale, rot, translation)
     }
 }
@@ -310,7 +317,7 @@ impl Keyframe {
         }
     }
 
-    /// to be generic we take InterpolatedNEntry's as we can convert all other formats can be converted to this format
+    /// to be generic we take InterpolatedNEntry's as we can convert all other formats to this format
     fn get_value_interpolated_n_entry<I>(children: I, _loop_value: bool, frame: i32) -> f32 where I: Iterator<Item = InterpolatedNEntry> {
         // TODO: the loop flag is very rarely used (most looping actions such as run or wait dont even use it)
         //       But there is a seperate loop flag AnimationFlags which is used often. Maybe that should be used here?

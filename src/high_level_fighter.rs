@@ -150,6 +150,7 @@ impl HighLevelFighter {
                         let animation_xyz_offset = HighLevelFighter::apply_chr0_to_bones(
                             &mut first_bone,
                             Matrix4::<f32>::identity(),
+                            Matrix4::<f32>::identity(),
                             chr0,
                             chr0_frame_index as i32,
                             animation_flags
@@ -301,11 +302,14 @@ impl HighLevelFighter {
     /// Modifies, in place, the matrices of the passed tree of bones, to follow that of the specified animation frame
     /// The resulting matrices are independent of its parent bones matrix.
     /// Returns the MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
-    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> Option<Vector3<f32>> {
+    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> Option<Vector3<f32>> {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
         // by default the bones tpose transformation is used.
         bone.transform = parent_transform * bone.gen_transform();
+        bone.transform_hitbox = parent_transform * bone.gen_transform();
+
+        // if the animation specifies a transform for the bone, override the models default tpose transform.
         let mut offset = None;
         for chr0_child in &chr0.children {
             if chr0_child.name == bone.name {
@@ -319,6 +323,7 @@ impl HighLevelFighter {
                 else {
                     // The animation specifies a transform for this bone, and its not used for character movement. USE IT!
                     bone.transform = transform;
+                    bone.transform_hitbox = parent_transform_hitbox * chr0_child.get_transform_rot_only(chr0.loop_value, frame);
                 }
             }
         }
@@ -330,7 +335,7 @@ impl HighLevelFighter {
 
         // do the same for all children bones
         for child in bone.children.iter_mut() {
-            if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame, animation_flags) {
+            if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, bone.transform_hitbox, chr0, frame, animation_flags) {
                 assert!(offset.is_none());
                 offset = Some(result);
             }
@@ -926,12 +931,19 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionH
     let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
         if bone.index == get_bone_index(hit_box.bone_index as i32) {
-            let point = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
+            let offset = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
+            let offset = bone.transform_hitbox.transform_point(offset);
+            let position = Point3::new(
+                offset.x + bone.transform.w.x,
+                offset.y + bone.transform.w.y,
+                offset.z + bone.transform.w.z,
+            );
+
             pos_hit_boxes.push(PositionHitBox {
                 hitbox_id: hit_box.hitbox_id,
-                position:  bone.transform.transform_point(point),
                 size:      hit_box.size,
-                values:    hit_box.values.clone()
+                values:    hit_box.values.clone(),
+                position,
             });
         }
     }
@@ -943,7 +955,7 @@ fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionH
     pos_hit_boxes
 }
 
-// This is a basic (incorrect) implementation to handle wario and kirby's weird bone indexes.
+// This is a basic (incorrect) implementation to handle wario and kirby's weird bone indices.
 // Refer to https://github.com/libertyernie/brawltools/blob/83b79a571d84efc1884950204852a14eab58060e/Ikarus/Moveset%20Entries/MovesetNode.cs#L261
 pub fn get_bone_index(index: i32) -> i32 {
     if index > 400 {
