@@ -147,15 +147,16 @@ impl HighLevelFighter {
                     while script_runner.frame_index < num_frames {
                         let mut first_bone = first_bone.clone();
                         let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
-                        let animation_xyz_offset = HighLevelFighter::apply_chr0_to_bones(
+                        let (animation_xyz_offset, frame_bones) = HighLevelFighter::transform_bones(
                             &mut first_bone,
                             Matrix4::<f32>::identity(),
                             Matrix4::<f32>::identity(),
                             chr0,
                             chr0_frame_index as i32,
                             animation_flags
-                        ).unwrap_or(Vector3::new(0.0, 0.0, 0.0));
-                        // TODO: should DisableMovement affect xyz_offset from apply_chr0_to_bones?????
+                        );
+                        let animation_xyz_offset = animation_xyz_offset.unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+                        // TODO: should DisableMovement affect xyz_offset from transform_bones?????
                         // script runner x-axis is equivalent to model z-axis
 
                         let animation_xyz_velocity = animation_xyz_offset - prev_animation_xyz_offset;
@@ -182,9 +183,9 @@ impl HighLevelFighter {
                         x_pos += x_vel + x_vel_temp;
                         y_pos += y_vel + y_vel_temp;
 
-                        let hurt_boxes = gen_hurt_boxes(&first_bone, &fighter_data.misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
+                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
-                        let hit_boxes = gen_hit_boxes(&first_bone, &hit_boxes);
+                        let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes);
                         let mut hl_hit_boxes = vec!();
                         for next in &hit_boxes {
                             let mut prev_pos = None;
@@ -299,15 +300,17 @@ impl HighLevelFighter {
         }
     }
 
-    /// Modifies, in place, the matrices of the passed tree of bones, to follow that of the specified animation frame
+    /// Generates a tree of BoneTransforms from the specified animation frame applied on the passed tree of bones
     /// The resulting matrices are independent of its parent bones matrix.
-    /// Returns the MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
-    fn apply_chr0_to_bones(bone: &mut Bone, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> Option<Vector3<f32>> {
+    /// Returns a tuple containing:
+    ///     0.  The MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
+    ///     1.  The BoneTransforms tree.
+    fn transform_bones(bone: &Bone, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> (Option<Vector3<f32>>, BoneTransforms) {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
         // by default the bones tpose transformation is used.
-        bone.transform = parent_transform * bone.gen_transform();
-        bone.transform_hitbox = parent_transform * bone.gen_transform();
+        let mut transform_normal = parent_transform * bone.gen_transform();
+        let mut transform_hitbox = parent_transform * bone.gen_transform_rot_only();
 
         // if the animation specifies a transform for the bone, override the models default tpose transform.
         let mut offset = None;
@@ -318,30 +321,47 @@ impl HighLevelFighter {
                     // in this case TransN is not part of the animation but instead used to move the character in game.
                     assert!(offset.is_none());
                     offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
-                    // TODO: Should this case modify bone.transform rot and scale?
+                    // TODO: Should this case modify transform_normal rot and scale?
                 }
                 else {
                     // The animation specifies a transform for this bone, and its not used for character movement. USE IT!
-                    bone.transform = transform;
-                    bone.transform_hitbox = parent_transform_hitbox * chr0_child.get_transform_rot_only(chr0.loop_value, frame);
+                    transform_normal = transform;
+                    transform_hitbox = parent_transform_hitbox * chr0_child.get_transform_rot_only(chr0.loop_value, frame);
                 }
             }
         }
 
         // Ignore any transformations from the models tpose TopN bone or the animations TopN bone
         if bone.name == "TopN" {
-            bone.transform = Matrix4::identity();
+            transform_normal = Matrix4::identity();
+            transform_hitbox = Matrix4::identity();
         }
 
         // do the same for all children bones
-        for child in bone.children.iter_mut() {
-            if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, bone.transform_hitbox, chr0, frame, animation_flags) {
+        let mut children = vec!();
+        for child in bone.children.iter() {
+            let (moves, processed_child) = HighLevelFighter::transform_bones(child, transform_normal, transform_hitbox, chr0, frame, animation_flags);
+            children.push(processed_child);
+            if let Some(moves) = moves {
                 assert!(offset.is_none());
-                offset = Some(result);
+                offset = Some(moves);
             }
         }
-        offset
+        let bone = BoneTransforms {
+            index: bone.index,
+            transform_normal,
+            transform_hitbox,
+            children,
+        };
+        (offset, bone)
     }
+}
+
+pub struct BoneTransforms {
+    pub index:            i32,
+    pub transform_normal: Matrix4<f32>,
+    pub transform_hitbox: Matrix4<f32>,
+    pub children:         Vec<BoneTransforms>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -902,7 +922,7 @@ fn gen_ecb(bone: &Bone, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
     ecb
 }
 
-fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtBoxState, hurtbox_states: &HashMap<i32, HurtBoxState>) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtBoxState, hurtbox_states: &HashMap<i32, HurtBoxState>) -> Vec<HighLevelHurtBox> {
     let mut hl_hurt_boxes = vec!();
     for hurt_box in hurt_boxes {
         if bone.index == get_bone_index(hurt_box.bone_index as i32) {
@@ -913,7 +933,7 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtB
             }.clone();
 
             hl_hurt_boxes.push(HighLevelHurtBox {
-                bone_matrix: bone.transform,
+                bone_matrix: bone.transform_normal,
                 hurt_box:    hurt_box.clone(),
                 state,
             });
@@ -927,16 +947,16 @@ fn gen_hurt_boxes(bone: &Bone, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtB
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &Bone, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionHitBox> {
+fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionHitBox> {
     let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
         if bone.index == get_bone_index(hit_box.bone_index as i32) {
             let offset = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
             let offset = bone.transform_hitbox.transform_point(offset);
             let position = Point3::new(
-                offset.x + bone.transform.w.x,
-                offset.y + bone.transform.w.y,
-                offset.z + bone.transform.w.z,
+                offset.x + bone.transform_normal.w.x,
+                offset.y + bone.transform_normal.w.y,
+                offset.z + bone.transform_normal.w.z,
             );
 
             pos_hit_boxes.push(PositionHitBox {

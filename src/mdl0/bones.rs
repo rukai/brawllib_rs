@@ -1,5 +1,5 @@
 use byteorder::{BigEndian, ReadBytesExt};
-use cgmath::{Vector3, Matrix4, SquareMatrix};
+use cgmath::{Vector3, Matrix4};
 
 use crate::mbox::MBox;
 use crate::mbox;
@@ -164,7 +164,6 @@ fn bone_siblings(data_root: &[u8], offset: i32) -> Vec<Bone> {
         extents,
         user_data_offset,
         transform,
-        transform_hitbox: Matrix4::identity(),
         transform_inv,
         children,
     });
@@ -190,8 +189,6 @@ pub struct Bone {
     user_data_offset: i32,
     // these matrices are calculated from scale, rot and translate but are independent of the parent bone
     pub transform: Matrix4<f32>,
-    /// This is a terrible hack, remove it ASAP
-    pub transform_hitbox: Matrix4<f32>,
     pub transform_inv: Matrix4<f32>,
     pub children: Vec<Bone>,
 }
@@ -199,6 +196,10 @@ pub struct Bone {
 impl Bone {
     pub fn gen_transform(&self) -> Matrix4<f32> {
         math::gen_transform(self.scale, self.rot, self.translate)
+    }
+
+    pub(crate) fn gen_transform_rot_only(&self) -> Matrix4<f32> {
+        math::gen_transform(Vector3::new(1.0, 1.0, 1.0), self.rot, Vector3::new(0.0, 0.0, 0.0))
     }
 }
 
