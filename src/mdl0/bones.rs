@@ -201,15 +201,21 @@ impl Bone {
 
 bitflags! {
     pub struct BoneFlags: u32 {
+        /// Needs to match what this bones transformation does. Identity matrix.
         const NO_TRANSFORM          = 0x1;
+        /// Needs to match what this bones transformation does. Identity translation.
         const FIXED_TRANSLATION     = 0x2;
+        /// Needs to match what this bones transformation does. Identity rotation.
         const FIXED_ROTATION        = 0x4;
+        /// Needs to match what this bones transformation does. Identity scale.
         const FIXED_SCALE           = 0x8;
+        /// Needs to match what this bones transformation does. Scales equally in all dimensions.
         const SCALE_EQUAL           = 0x10;
         const SEG_SCALE_COMP_APPLY  = 0x20;
         const SEG_SCALE_COMP_PARENT = 0x40;
         const CLASSIC_SCALE_OFF     = 0x80;
         const VISIBLE               = 0x100;
+        /// Needs to be true if the bone has geometry.
         const HAS_GEOMETRY          = 0x200;
         const HAS_BILLBOARD_PARENT  = 0x400;
     }

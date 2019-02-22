@@ -323,6 +323,11 @@ impl HighLevelFighter {
             }
         }
 
+        // Ignore any transformations from the models tpose TopN bone or the animations TopN bone
+        if bone.name == "TopN" {
+            bone.transform = Matrix4::identity();
+        }
+
         // do the same for all children bones
         for child in bone.children.iter_mut() {
             if let Some(result) = HighLevelFighter::apply_chr0_to_bones(child, bone.transform, chr0, frame, animation_flags) {
