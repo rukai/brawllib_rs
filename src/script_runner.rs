@@ -160,17 +160,18 @@ pub enum ChangeSubaction {
 
 #[derive(Clone, Debug)]
 pub struct ScriptCollisionBox {
-    pub bone_index: i16,
-    pub hitbox_id:  u8,
-    pub x_offset:   f32,
-    pub y_offset:   f32,
-    pub z_offset:   f32,
-    pub size:       f32,
-    pub values:     CollisionBoxValues
+    pub bone_index:  i16,
+    pub hitbox_id:   u8,
+    pub x_offset:    f32,
+    pub y_offset:    f32,
+    pub z_offset:    f32,
+    pub size:        f32,
+    pub values:      CollisionBoxValues,
+    pub interpolate: bool,
 }
 
 impl ScriptCollisionBox {
-    fn from_hitbox(args: &HitBoxArguments) -> ScriptCollisionBox {
+    fn from_hitbox(args: &HitBoxArguments, interpolate: bool) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index:  args.bone_index,
             hitbox_id:   args.hitbox_id,
@@ -178,11 +179,12 @@ impl ScriptCollisionBox {
             y_offset:    args.y_offset,
             z_offset:    args.z_offset,
             size:        args.size,
-            values:      CollisionBoxValues::from_hitbox(args)
+            values:      CollisionBoxValues::from_hitbox(args),
+            interpolate,
         }
     }
 
-    fn from_special_hitbox(args: &SpecialHitBoxArguments) -> ScriptCollisionBox {
+    fn from_special_hitbox(args: &SpecialHitBoxArguments, interpolate: bool) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index: args.hitbox_args.bone_index,
             hitbox_id:  args.hitbox_args.hitbox_id,
@@ -190,11 +192,12 @@ impl ScriptCollisionBox {
             y_offset:   args.hitbox_args.y_offset,
             z_offset:   args.hitbox_args.z_offset,
             size:       args.hitbox_args.size,
-            values:     CollisionBoxValues::from_special_hitbox(args)
+            values:     CollisionBoxValues::from_special_hitbox(args),
+            interpolate,
         }
     }
 
-    fn from_grabbox(args: &GrabBoxArguments) -> ScriptCollisionBox {
+    fn from_grabbox(args: &GrabBoxArguments, interpolate: bool) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index: args.bone_index as i16,
             hitbox_id:  args.hitbox_id as u8,
@@ -202,7 +205,8 @@ impl ScriptCollisionBox {
             y_offset:   args.y_offset,
             z_offset:   args.z_offset,
             size:       args.size,
-            values:     CollisionBoxValues::from_grabbox(args)
+            values:     CollisionBoxValues::from_grabbox(args),
+            interpolate,
         }
     }
 
@@ -364,6 +368,14 @@ impl<'a> ScriptRunner<'a> {
         self.visited_gotos.clear();
         self.x_vel_modify = VelModify::None;
         self.y_vel_modify = VelModify::None;
+
+        // The hitbox existed last frame so should be interpolated.
+        // (Unless it gets overwritten, but that will be handled when that happens)
+        for hitbox in &mut self.hitboxes {
+            if let Some(ref mut hitbox) = hitbox {
+                hitbox.interpolate = true;
+            }
+        }
 
         for change_action in self.change_actions.clone() {
             if self.evaluate_expression(&change_action.test).unwrap_bool() {
@@ -566,31 +578,33 @@ impl<'a> ScriptRunner<'a> {
             // hitboxes
             &EventAst::CreateHitBox (ref args) => {
                 if args.hitbox_id < self.hitboxes.len() as u8 {
-                    // TODO: While this is true it only covess, a small subset of what hitbox sets actually do and should therefore be removed.
-                    if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
-                        if let CollisionBoxValues::Hit (ref prev_hitbox) = prev_hitbox.values {
-                            if args.set_id != prev_hitbox.set_id {
-                                self.hitlist_reset = true;
-                            }
+                    // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
+                    // In this case interpolation should not occur.
+                    let interpolate = if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
+                        match prev_hitbox.values {
+                            CollisionBoxValues::Hit (ref prev_hitbox) => args.set_id == prev_hitbox.set_id,
+                            _ => false,
                         }
-                    }
-                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args));
+                    } else { false };
+
+                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }
             }
             &EventAst::CreateSpecialHitBox (ref args) => {
-                let index = args.hitbox_args.hitbox_id as usize;
                 if args.hitbox_args.hitbox_id < self.hitboxes.len() as u8 {
-                    // TODO: While this is true it only covess, a small subset of what hitbox sets actually do and should therefore be removed.
-                    if let Some(ref prev_hitbox) = self.hitboxes[index] {
-                        if let CollisionBoxValues::Hit (ref prev_hitbox) = prev_hitbox.values {
-                            if args.hitbox_args.set_id != prev_hitbox.set_id {
-                                self.hitlist_reset = true;
-                            }
+                    // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
+                    // In this case interpolation should not occur.
+                    let index = args.hitbox_args.hitbox_id as usize;
+                    let interpolate = if let Some(ref prev_hitbox) = self.hitboxes[index] {
+                        match prev_hitbox.values {
+                            CollisionBoxValues::Hit (ref prev_hitbox) => args.hitbox_args.set_id == prev_hitbox.set_id,
+                            _ => false,
                         }
-                    }
-                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args));
+                    } else { false };
+
+                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, action_name);
                 }
@@ -601,8 +615,10 @@ impl<'a> ScriptRunner<'a> {
                         *hitbox = None;
                     }
                 }
-                // This doesnt account for individual hitboxes being removed, which resets the hitlist for just that hitbox
-                self.hitlist_reset = true;
+                // Whenever a hitbox set is emptied, new hitboxes added to it can hit again.
+                //for hitbox_set_reset in self.hitbox_set_resets {
+                //    *hitbox_set_reset = true;
+                //}
             }
             &EventAst::MoveHitBox (ref move_hitbox) => {
                 if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
@@ -632,8 +648,15 @@ impl<'a> ScriptRunner<'a> {
                 }
             }
             &EventAst::CreateGrabBox (ref args) => {
+                let mut interpolate = false;
+                if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
+                    // TODO: Should a grabbox interpolate from an existing hitbox and vice versa
+                    if let CollisionBoxValues::Grab (_) = prev_hitbox.values {
+                        interpolate = true;
+                    }
+                }
                 if args.hitbox_id < self.hitboxes.len() as i32 {
-                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_grabbox(args));
+                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_grabbox(args, interpolate));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }

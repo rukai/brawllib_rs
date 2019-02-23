@@ -191,13 +191,15 @@ impl HighLevelFighter {
                             let mut prev_pos = None;
                             let mut prev_size = None;
                             let mut prev_values = None;
-                            if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
-                                for prev_hit_box in prev_hit_boxes {
-                                    if prev_hit_box.hitbox_id == next.hitbox_id {
-                                        // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                        prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, y_vel, x_vel));
-                                        prev_size = Some(prev_hit_box.size);
-                                        prev_values = Some(prev_hit_box.values.clone());
+                            if next.interpolate {
+                                if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
+                                    for prev_hit_box in prev_hit_boxes {
+                                        if prev_hit_box.hitbox_id == next.hitbox_id {
+                                            // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
+                                            prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, y_vel, x_vel));
+                                            prev_size = Some(prev_hit_box.size);
+                                            prev_values = Some(prev_hit_box.values.clone());
+                                        }
                                     }
                                 }
                             }
@@ -867,10 +869,11 @@ impl HitBoxValues {
 
 #[derive(Clone, Debug)]
 struct PositionHitBox {
-    pub hitbox_id:    u8,
-    pub position:     Point3<f32>,
-    pub size:         f32,
-    pub values:       CollisionBoxValues,
+    pub hitbox_id:   u8,
+    pub position:    Point3<f32>,
+    pub size:        f32,
+    pub interpolate: bool,
+    pub values:      CollisionBoxValues,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -960,9 +963,10 @@ fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox]) -> Vec
             );
 
             pos_hit_boxes.push(PositionHitBox {
-                hitbox_id: hit_box.hitbox_id,
-                size:      hit_box.size,
-                values:    hit_box.values.clone(),
+                hitbox_id:   hit_box.hitbox_id,
+                size:        hit_box.size,
+                values:      hit_box.values.clone(),
+                interpolate: hit_box.interpolate,
                 position,
             });
         }
