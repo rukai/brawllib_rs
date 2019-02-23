@@ -172,7 +172,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         }
                     }
 
-                    EventAst::ChangeAction { action: v0, test }
+                    EventAst::ChangeAction (ChangeAction { action: v0, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
@@ -186,7 +186,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
 
             // timing
-            (0x06, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
+            (0x04, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
             (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier (v0),
             (0x0c, 0x23, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::TimeManipulation (v0, v1),
 
@@ -734,7 +734,7 @@ pub enum EventAst {
     /// Change the current action upon the specified requirement being met. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
     ChangeActionStatus { status_id: i32, action: i32, requirement: Requirement, flip: bool },
     /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
-    ChangeAction { action: i32, test: Expression },
+    ChangeAction (ChangeAction),
     /// Allow the current action to be interrupted by another action.
     AllowInterrupt,
     /// Change the current subaction.
@@ -1545,15 +1545,21 @@ pub struct SwordGlow {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct AestheticWindEffect {
-    unk1:    i32,
-    unk2:    f32,
-    stength: f32,
-    speed:   f32,
-    size:    f32,
-    unk3:    f32,
-    unk4:    f32,
-    unk5:    f32,
-    unk6:    f32,
-    unk7:    f32,
-    unk8:    i32,
+    pub unk1:    i32,
+    pub unk2:    f32,
+    pub stength: f32,
+    pub speed:   f32,
+    pub size:    f32,
+    pub unk3:    f32,
+    pub unk4:    f32,
+    pub unk5:    f32,
+    pub unk6:    f32,
+    pub unk7:    f32,
+    pub unk8:    i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ChangeAction {
+    pub action: i32,
+    pub test:   Expression
 }

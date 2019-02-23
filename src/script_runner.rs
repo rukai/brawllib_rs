@@ -16,6 +16,7 @@ use crate::script_ast::{
     EdgeSlide,
     Expression,
     ComparisonOperator,
+    ChangeAction,
 };
 use crate::script_ast::variable_ast::{
     VariableAst,
@@ -58,6 +59,8 @@ pub struct ScriptRunner<'a> {
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
     pub change_subaction:     ChangeSubaction,
+    /// These are rechecked every frame after being created
+    pub change_actions:       Vec<ChangeAction>,
     pub hitlist_reset:        bool,
     pub slope_contour_stand:  Option<i32>,
     pub slope_contour_full:   Option<(i32, i32)>,
@@ -151,6 +154,8 @@ pub enum ChangeSubaction {
     InfiniteLoop,
     ChangeSubaction (i32),
     ChangeSubactionRestartFrame (i32),
+    // TODO: Because we currently only operate at the subaction level, this is the best we can do.
+    ChangeAction (i32),
 }
 
 #[derive(Clone, Debug)]
@@ -261,6 +266,7 @@ impl<'a> ScriptRunner<'a> {
             airbourne:            false,
             edge_slide:           EdgeSlide::SlideOff,
             change_subaction:     ChangeSubaction::Continue,
+            change_actions:       vec!(),
             hitlist_reset:        false,
             slope_contour_stand:  None,
             slope_contour_full:   None,
@@ -358,6 +364,13 @@ impl<'a> ScriptRunner<'a> {
         self.visited_gotos.clear();
         self.x_vel_modify = VelModify::None;
         self.y_vel_modify = VelModify::None;
+
+        for change_action in self.change_actions.clone() {
+            if self.evaluate_expression(&change_action.test).unwrap_bool() {
+                // TODO: Because we currently only operate at the subaction level, this is the best we can do.
+                self.change_subaction = ChangeSubaction::ChangeAction (change_action.action);
+            }
+        }
 
         // create a callstack for CallEveryFrame block
         for block in self.call_every_frame.values() {
@@ -519,7 +532,9 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::EnableActionStatusID (_) => { } // TODO
             &EventAst::ChangeActionStatus { .. } => { } // TODO
-            &EventAst::ChangeAction { .. } => { } // TODO
+            &EventAst::ChangeAction (ref change_action) => {
+                self.change_actions.push(change_action.clone());
+            }
             &EventAst::AllowInterrupt => {
                 self.interruptible = true;
             }
