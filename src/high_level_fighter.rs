@@ -133,7 +133,7 @@ impl HighLevelFighter {
                         "LandingAirB"  => attributes.bair_landing_lag,
                         "LandingAirHi" => attributes.uair_landing_lag,
                         "LandingAirLw" => attributes.dair_landing_lag,
-                        "LandingLight" => attributes.light_landing_lag,
+                        "LandingLight" => attributes.light_landing_lag, // TODO: This needs +1 do the others?!?!?
                         "LandingHeavy" => attributes.normal_landing_lag,
                         _              => chr0.num_frames as f32
                     };
@@ -244,7 +244,7 @@ impl HighLevelFighter {
                             landing_lag:         script_runner.landing_lag,
                             edge_slide:          script_runner.edge_slide.clone(),
                             airbourne:           script_runner.airbourne,
-                            hitlist_reset:       script_runner.hitlist_reset,
+                            hitbox_sets_rehit:   script_runner.hitbox_sets_rehit,
                             slope_contour_stand: script_runner.slope_contour_stand,
                             slope_contour_full:  script_runner.slope_contour_full,
                             rumble:              script_runner.rumble,
@@ -455,7 +455,7 @@ pub struct HighLevelFrame {
     pub airbourne:           bool,
     pub landing_lag:         bool,
     pub ecb:                 ECB,
-    pub hitlist_reset:       bool,
+    pub hitbox_sets_rehit:   [bool; 10],
     pub slope_contour_stand: Option<i32>,
     pub slope_contour_full:  Option<(i32, i32)>,
     pub rumble:              Option<(i32, i32)>,

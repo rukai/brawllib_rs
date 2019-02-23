@@ -61,7 +61,7 @@ pub struct ScriptRunner<'a> {
     pub change_subaction:     ChangeSubaction,
     /// These are rechecked every frame after being created
     pub change_actions:       Vec<ChangeAction>,
-    pub hitlist_reset:        bool,
+    pub hitbox_sets_rehit:    [bool; 10],
     pub slope_contour_stand:  Option<i32>,
     pub slope_contour_full:   Option<(i32, i32)>,
     pub rumble:               Option<(i32, i32)>,
@@ -271,7 +271,7 @@ impl<'a> ScriptRunner<'a> {
             edge_slide:           EdgeSlide::SlideOff,
             change_subaction:     ChangeSubaction::Continue,
             change_actions:       vec!(),
-            hitlist_reset:        false,
+            hitbox_sets_rehit:    [false; 10],
             slope_contour_stand:  None,
             slope_contour_full:   None,
             rumble:               None,
@@ -363,7 +363,9 @@ impl<'a> ScriptRunner<'a> {
     }
 
     fn step_script(&mut self, action_name: &str) {
-        self.hitlist_reset = false;
+        for rehit in self.hitbox_sets_rehit.iter_mut() {
+            *rehit = false;
+        }
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.visited_gotos.clear();
         self.x_vel_modify = VelModify::None;
@@ -587,6 +589,23 @@ impl<'a> ScriptRunner<'a> {
                         }
                     } else { false };
 
+                    // Force rehit if no existing hitboxes.
+                    // Both DeleteAllHitboxes and DeleteHitbox on the last hitbox will trigger rehit.
+                    // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html?frame=11
+                    let mut empty_set = true;
+                    for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
+                        if let CollisionBoxValues::Hit (hitbox) = hitbox.values {
+                            if hitbox.set_id == args.set_id {
+                                empty_set = false;
+                            }
+                        }
+                    }
+                    if empty_set {
+                        if let Some(rehit) = self.hitbox_sets_rehit.get_mut(args.set_id as usize) {
+                            *rehit = true;
+                        }
+                    }
+
                     self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
@@ -604,6 +623,23 @@ impl<'a> ScriptRunner<'a> {
                         }
                     } else { false };
 
+                    // Force rehit if no existing hitboxes.
+                    // Both DeleteAllHitboxes and DeleteHitbox on the last hitbox will trigger rehit.
+                    // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
+                    let mut empty_set = true;
+                    for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
+                        if let CollisionBoxValues::Hit (hitbox) = hitbox.values {
+                            if hitbox.set_id == args.hitbox_args.set_id {
+                                empty_set = false;
+                            }
+                        }
+                    }
+                    if empty_set {
+                        if let Some(rehit) = self.hitbox_sets_rehit.get_mut(args.hitbox_args.set_id as usize) {
+                            *rehit = true;
+                        }
+                    }
+
                     self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, action_name);
@@ -615,10 +651,6 @@ impl<'a> ScriptRunner<'a> {
                         *hitbox = None;
                     }
                 }
-                // Whenever a hitbox set is emptied, new hitboxes added to it can hit again.
-                //for hitbox_set_reset in self.hitbox_set_resets {
-                //    *hitbox_set_reset = true;
-                //}
             }
             &EventAst::MoveHitBox (ref move_hitbox) => {
                 if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
@@ -643,6 +675,8 @@ impl<'a> ScriptRunner<'a> {
                 }
             }
             &EventAst::DeleteHitBox (hitbox_id) => {
+                // Shock claims this doesnt work on special hitboxes but it seems to work fine here:
+                // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
                 if self.hitboxes[hitbox_id as usize].as_ref().map(|x| x.is_hit()).unwrap_or(false) {
                     self.hitboxes[hitbox_id as usize] = None;
                 }
@@ -672,7 +706,6 @@ impl<'a> ScriptRunner<'a> {
                         *hitbox = None;
                     }
                 }
-                self.hitlist_reset = true;
             }
 
             // hurtboxes
