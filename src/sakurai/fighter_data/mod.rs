@@ -8,7 +8,7 @@ use crate::util;
 use misc_section::MiscSection;
 
 pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
-    let sub_action_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
+    let subaction_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
     let model_visibility_start     = (&data[4..]).read_i32::<BigEndian>().unwrap();
     let attribute_start            = (&data[8..]).read_i32::<BigEndian>().unwrap();
     let sse_attribute_start        = (&data[12..]).read_i32::<BigEndian>().unwrap();
@@ -20,10 +20,10 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterDat
     let entry_actions_start        = (&data[36..]).read_i32::<BigEndian>().unwrap();
     let exit_actions_start         = (&data[40..]).read_i32::<BigEndian>().unwrap();
     let action_pre_start           = (&data[44..]).read_i32::<BigEndian>().unwrap();
-    let sub_action_main_start      = (&data[48..]).read_i32::<BigEndian>().unwrap();
-    let sub_action_gfx_start       = (&data[52..]).read_i32::<BigEndian>().unwrap();
-    let sub_action_sfx_start       = (&data[56..]).read_i32::<BigEndian>().unwrap();
-    let sub_action_other_start     = (&data[60..]).read_i32::<BigEndian>().unwrap();
+    let subaction_main_start      = (&data[48..]).read_i32::<BigEndian>().unwrap();
+    let subaction_gfx_start       = (&data[52..]).read_i32::<BigEndian>().unwrap();
+    let subaction_sfx_start       = (&data[56..]).read_i32::<BigEndian>().unwrap();
+    let subaction_other_start     = (&data[60..]).read_i32::<BigEndian>().unwrap();
     let anchored_item_positions    = (&data[64..]).read_i32::<BigEndian>().unwrap();
     let gooey_bomb_positions       = (&data[68..]).read_i32::<BigEndian>().unwrap();
     let bone_ref1                  = (&data[72..]).read_i32::<BigEndian>().unwrap();
@@ -40,8 +40,10 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterDat
 
     let sizes = get_sizes(data);
 
-    let sub_action_flags_num = sizes.iter().find(|x| x.offset == sub_action_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
-    let sub_action_flags = sub_action_flags(parent_data, &parent_data[sub_action_flags_start as usize ..], sub_action_flags_num);
+    let subaction_flags_num = sizes.iter().find(|x| x.offset == subaction_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
+    let subaction_flags = subaction_flags(parent_data, &parent_data[subaction_flags_start as usize ..], subaction_flags_num);
+
+    let model_visibility = model_visibility(parent_data, model_visibility_start as usize);
 
     let action_flags_num = sizes.iter().find(|x| x.offset == action_flags_start as usize).unwrap().size / ACTION_FLAGS_SIZE;
     let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
@@ -50,31 +52,31 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterDat
     let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num);
     let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num);
 
-    let sub_action_main_num = sizes.iter().find(|x| x.offset == sub_action_main_start as usize).unwrap().size / 4; // divide by integer size
-    let sub_action_main = script::scripts(parent_data, &parent_data[sub_action_main_start as usize ..], sub_action_main_num);
-    let sub_action_gfx = script::scripts(parent_data, &parent_data[sub_action_gfx_start as usize ..], sub_action_main_num);
-    let sub_action_sfx = script::scripts(parent_data, &parent_data[sub_action_sfx_start as usize ..], sub_action_main_num);
-    let sub_action_other = script::scripts(parent_data, &parent_data[sub_action_other_start as usize ..], sub_action_main_num);
+    let subaction_main_num = sizes.iter().find(|x| x.offset == subaction_main_start as usize).unwrap().size / 4; // divide by integer size
+    let subaction_main = script::scripts(parent_data, &parent_data[subaction_main_start as usize ..], subaction_main_num);
+    let subaction_gfx = script::scripts(parent_data, &parent_data[subaction_gfx_start as usize ..], subaction_main_num);
+    let subaction_sfx = script::scripts(parent_data, &parent_data[subaction_sfx_start as usize ..], subaction_main_num);
+    let subaction_other = script::scripts(parent_data, &parent_data[subaction_other_start as usize ..], subaction_main_num);
 
-    let all_scripts: Vec<&[Script]> = vec!(&entry_actions, &exit_actions, &sub_action_main, &sub_action_gfx, &sub_action_sfx, &sub_action_other);
+    let all_scripts: Vec<&[Script]> = vec!(&entry_actions, &exit_actions, &subaction_main, &subaction_gfx, &subaction_sfx, &subaction_other);
     let fragment_scripts = script::fragment_scripts(parent_data, &all_scripts);
 
     let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
     let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);
 
     ArcFighterData {
-        sub_action_flags,
+        subaction_flags,
         attributes,
         misc,
         action_flags,
         entry_actions,
         exit_actions,
-        sub_action_main,
-        sub_action_gfx,
-        sub_action_sfx,
-        sub_action_other,
+        subaction_main,
+        subaction_gfx,
+        subaction_sfx,
+        subaction_other,
         fragment_scripts,
-        model_visibility_start,
+        model_visibility,
         sse_attribute_start,
         common_action_flags_start,
         action_interrupts,
@@ -174,18 +176,18 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
 const _ARC_FIGHTER_DATA_HEADER_SIZE: usize = 0x7c;
 #[derive(Debug)]
 pub struct ArcFighterData {
-    pub sub_action_flags: Vec<SubactionFlags>,
+    pub subaction_flags: Vec<SubactionFlags>,
     pub attributes: FighterAttributes,
     pub misc: MiscSection,
     pub action_flags: Vec<ActionFlags>,
     pub entry_actions: Vec<Script>,
     pub exit_actions: Vec<Script>,
-    pub sub_action_main: Vec<Script>,
-    pub sub_action_gfx: Vec<Script>,
-    pub sub_action_sfx: Vec<Script>,
-    pub sub_action_other: Vec<Script>,
+    pub subaction_main: Vec<Script>,
+    pub subaction_gfx: Vec<Script>,
+    pub subaction_sfx: Vec<Script>,
+    pub subaction_other: Vec<Script>,
     pub fragment_scripts: Vec<Script>,
-    model_visibility_start: i32,
+    pub model_visibility: ModelVisibility,
     sse_attribute_start: i32,
     common_action_flags_start: i32,
     action_interrupts: i32,
@@ -295,12 +297,12 @@ bitflags! {
     }
 }
 
-fn sub_action_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubactionFlags> {
+fn subaction_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubactionFlags> {
     let mut result = vec!();
     let num = num + 1;
     for i in 0..num {
-        let in_translation_time = data[i * SUB_ACTION_FLAGS_SIZE + 0];
-        let animation_flags_int = data[i * SUB_ACTION_FLAGS_SIZE + 1];
+        let in_translation_time =   data[i * SUB_ACTION_FLAGS_SIZE + 0];
+        let animation_flags_int =   data[i * SUB_ACTION_FLAGS_SIZE + 1];
         //  padding               (&data[i * SUB_ACTION_FLAGS_SIZE + 2..]).read_u16
         let string_offset       = (&data[i * SUB_ACTION_FLAGS_SIZE + 4..]).read_i32::<BigEndian>().unwrap();
 
@@ -326,6 +328,92 @@ pub struct SubactionFlags {
     pub in_translation_time: u8,
     pub animation_flags:     AnimationFlags,
     pub name:                String,
+}
+
+fn model_visibility(parent_data: &[u8], model_visibility_start: usize) -> ModelVisibility {
+    let reference_offset  = (&parent_data[model_visibility_start + 0x00..]).read_i32::<BigEndian>().unwrap() as usize;
+    let bone_switch_count = (&parent_data[model_visibility_start + 0x04..]).read_i32::<BigEndian>().unwrap() as usize;
+    let defaults_offset   = (&parent_data[model_visibility_start + 0x08..]).read_i32::<BigEndian>().unwrap() as usize;
+    let defaults_count    = (&parent_data[model_visibility_start + 0x0c..]).read_i32::<BigEndian>().unwrap() as usize;
+
+    let mut references = vec!();
+    if reference_offset != 0 {
+        // this works because the data at reference_offset, defaults_offset and model_visibility_start are stored sequentially
+        let reference_count = if defaults_offset == 0 {
+            (model_visibility_start - reference_offset) / VISIBILITY_REFERENCE_SIZE
+        } else {
+            (defaults_offset - reference_offset) / VISIBILITY_REFERENCE_SIZE
+        };
+
+        for reference_i in 0..reference_count {
+            let bone_switch_offset = (&parent_data[reference_offset + VISIBILITY_REFERENCE_SIZE * reference_i ..]).read_i32::<BigEndian>().unwrap() as usize;
+            let mut bone_switches = vec!();
+            if bone_switch_offset != 0 {
+
+                for bone_switch_i in 0..bone_switch_count {
+                    let visibility_group_list = util::list_offset(&parent_data[bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i ..]);
+                    let mut groups = vec!();
+
+                    for visibility_group_i in 0..visibility_group_list.count as usize {
+                        let bone_list = util::list_offset(&parent_data[visibility_group_list.start_offset as usize + util::LIST_OFFSET_SIZE * visibility_group_i ..]);
+                        let mut bones = vec!();
+
+                        for bone_i in 0..bone_list.count as usize {
+                            let bone = (&parent_data[bone_list.start_offset as usize + 4 * bone_i ..]).read_i32::<BigEndian>().unwrap();
+                            bones.push(bone);
+                        }
+
+                        groups.push(VisibilityGroup { bones });
+                    }
+
+                    bone_switches.push(VisibilityBoneSwitch { groups });
+                }
+            }
+            references.push(VisibilityReference { bone_switches });
+        }
+    }
+
+    let mut defaults = vec!();
+    for i in 0..defaults_count {
+        let switch_index  = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
+        let default_group = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
+
+        defaults.push(VisibilityDefault { switch_index, default_group });
+    }
+
+    ModelVisibility {
+        references,
+        defaults,
+    }
+}
+
+#[derive(Debug)]
+pub struct ModelVisibility {
+    pub references: Vec<VisibilityReference>,
+    pub defaults:   Vec<VisibilityDefault>,
+}
+
+const VISIBILITY_REFERENCE_SIZE: usize = 0x4;
+#[derive(Debug)]
+pub struct VisibilityReference {
+    pub bone_switches: Vec<VisibilityBoneSwitch>,
+}
+
+#[derive(Debug)]
+pub struct VisibilityBoneSwitch {
+    pub groups: Vec<VisibilityGroup>,
+}
+
+#[derive(Debug)]
+pub struct VisibilityGroup {
+    pub bones: Vec<i32>,
+}
+
+const VISIBILITY_DEFAULT_SIZE: usize = 0x8;
+#[derive(Debug)]
+pub struct VisibilityDefault {
+    pub switch_index:  i32,
+    pub default_group: i32,
 }
 
 fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {

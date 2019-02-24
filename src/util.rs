@@ -9,7 +9,6 @@ pub(crate) fn list_offset(data: &[u8]) -> ListOffset {
     }
 }
 
-
 pub(crate) const LIST_OFFSET_SIZE: usize = 0x8;
 #[derive(Debug)]
 pub(crate) struct ListOffset {

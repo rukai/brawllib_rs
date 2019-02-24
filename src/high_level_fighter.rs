@@ -51,10 +51,10 @@ impl HighLevelFighter {
         let fighter_animations = fighter.get_animations();
 
         let fragment_scripts_fighter: Vec<ScriptAst> = fighter_data.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_main:          Vec<ScriptAst> = fighter_data.sub_action_main .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_gfx:           Vec<ScriptAst> = fighter_data.sub_action_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_sfx:           Vec<ScriptAst> = fighter_data.sub_action_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let sub_action_other:         Vec<ScriptAst> = fighter_data.sub_action_other.iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_main:          Vec<ScriptAst> = fighter_data.subaction_main .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_gfx:           Vec<ScriptAst> = fighter_data.subaction_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_sfx:           Vec<ScriptAst> = fighter_data.subaction_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_other:         Vec<ScriptAst> = fighter_data.subaction_other.iter().map(|x| ScriptAst::new(x)).collect();
 
         let fragment_scripts_common: Vec<ScriptAst> = fighter_data_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
         let entry_actions: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x))
@@ -66,23 +66,23 @@ impl HighLevelFighter {
 
         let mut all_scripts = vec!();
         for script in fragment_scripts_fighter.iter()
-            .chain(sub_action_main.iter())
-            .chain(sub_action_gfx.iter())
-            .chain(sub_action_sfx.iter())
-            .chain(sub_action_other.iter())
+            .chain(subaction_main.iter())
+            .chain(subaction_gfx.iter())
+            .chain(subaction_sfx.iter())
+            .chain(subaction_other.iter())
             .chain(entry_actions.iter())
             .chain(exit_actions.iter())
         {
             all_scripts.push(script);
         }
 
-        let mut sub_action_scripts = vec!();
-        for i in 0..sub_action_main.len() {
-            sub_action_scripts.push(HighLevelScripts {
-                script_main:  sub_action_main[i].clone(),
-                script_gfx:   sub_action_gfx[i].clone(),
-                script_sfx:   sub_action_sfx[i].clone(),
-                script_other: sub_action_other[i].clone(),
+        let mut subaction_scripts = vec!();
+        for i in 0..subaction_main.len() {
+            subaction_scripts.push(HighLevelScripts {
+                script_main:  subaction_main[i].clone(),
+                script_gfx:   subaction_gfx[i].clone(),
+                script_sfx:   subaction_sfx[i].clone(),
+                script_other: subaction_other[i].clone(),
             });
         }
 
@@ -98,14 +98,14 @@ impl HighLevelFighter {
         let subactions = if let Some(first_bone) = fighter.get_bones() {
             // TODO: After fixing a bug, where a huge amount of needless work was being done, parallelizing this doesnt get us as much.
             // It might be better for the caller of HighLevelFighter::new() to do the parallelization.
-            sub_action_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
-                let sub_action_flags = &fighter_data.sub_action_flags[i];
-                let actual_name = sub_action_flags.name.clone();
+            subaction_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
+                let subaction_flags = &fighter_data.subaction_flags[i];
+                let actual_name = subaction_flags.name.clone();
 
                 // create a unique name for this subaction
                 let mut count = 0;
                 for j in 0..i {
-                    if fighter_data.sub_action_flags[j].name == actual_name {
+                    if fighter_data.subaction_flags[j].name == actual_name {
                         count += 1;
                     }
                 }
@@ -115,7 +115,7 @@ impl HighLevelFighter {
                     format!("{}_{}", actual_name, count)
                 };
 
-                let animation_flags = sub_action_flags.animation_flags.clone();
+                let animation_flags = subaction_flags.animation_flags.clone();
 
                 let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
                 let action_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
