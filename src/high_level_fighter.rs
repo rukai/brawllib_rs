@@ -145,10 +145,9 @@ impl HighLevelFighter {
                     let mut y_pos = 0.0;
 
                     while script_runner.frame_index < num_frames {
-                        let mut first_bone = first_bone.clone();
                         let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                         let (animation_xyz_offset, frame_bones) = HighLevelFighter::transform_bones(
-                            &mut first_bone,
+                            &first_bone,
                             Matrix4::<f32>::identity(),
                             Matrix4::<f32>::identity(),
                             chr0,
@@ -228,7 +227,7 @@ impl HighLevelFighter {
                             top:    min_height,
                             bottom: if script_runner.airbourne { min_height } else { 0.0 }
                         };
-                        let ecb = gen_ecb(&first_bone, &fighter_data.misc.ecb_bones, min_ecb);
+                        let ecb = gen_ecb(&frame_bones, &fighter_data.misc.ecb_bones, min_ecb);
 
                         frames.push(HighLevelFrame {
                             ecb,
@@ -312,7 +311,7 @@ impl HighLevelFighter {
 
         // by default the bones tpose transformation is used.
         let mut transform_normal = parent_transform * bone.gen_transform();
-        let mut transform_hitbox = parent_transform * bone.gen_transform_rot_only();
+        let mut transform_hitbox = parent_transform_hitbox * bone.gen_transform_rot_only();
 
         // if the animation specifies a transform for the bone, override the models default tpose transform.
         let mut offset = None;
@@ -898,11 +897,11 @@ pub struct ECB {
     pub bottom: f32,
 }
 
-fn gen_ecb(bone: &Bone, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
+fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
     for ecb_bone in ecb_bones {
         if bone.index == *ecb_bone {
-            let x = bone.transform.w.z;
-            let y = bone.transform.w.y;
+            let x = bone.transform_normal.w.z;
+            let y = bone.transform_normal.w.y;
 
             if x < ecb.left {
                 ecb.left = x;
