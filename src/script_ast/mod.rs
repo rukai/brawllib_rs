@@ -435,8 +435,8 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x12, 0x0B, Some(&Variable(ref v0)), None,                    None) => EventAst::BoolVariableSetFalse { variable: VariableAst::new(v0) },
 
             // graphics
-            (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 1, switch_index: v0, bone_group_index: v1 },
-            (0x0B, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 2, switch_index: v0, bone_group_index: v1 },
+            (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 0, switch_index: v0, bone_group_index: v1 },
+            (0x0B, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 1, switch_index: v0, bone_group_index: v1 },
             (0x11, 0x1A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) |
             (0x11, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15)) {

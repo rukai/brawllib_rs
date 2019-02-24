@@ -21,8 +21,6 @@ use crate::script_ast::{
 };
 use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox, VelModify};
 
-use std::collections::HashMap;
-
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
 #[derive(Serialize, Clone, Debug)]
@@ -122,7 +120,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts);
+                let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts, &fighter_data);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -182,7 +180,7 @@ impl HighLevelFighter {
                         x_pos += x_vel + x_vel_temp;
                         y_pos += y_vel + y_vel_temp;
 
-                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner.hurtbox_state_all, &script_runner.hurtbox_states);
+                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
                         let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes);
                         let mut hl_hit_boxes = vec!();
@@ -924,7 +922,11 @@ fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
     ecb
 }
 
-fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], hurtbox_state_all: &HurtBoxState, hurtbox_states: &HashMap<i32, HurtBoxState>) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner) -> Vec<HighLevelHurtBox> {
+    let hurtbox_state_all = &script_runner.hurtbox_state_all;
+    let hurtbox_states    = &script_runner.hurtbox_states;
+    let invisible_bones   = &script_runner.invisible_bones;
+
     let mut hl_hurt_boxes = vec!();
     for hurt_box in hurt_boxes {
         if bone.index == get_bone_index(hurt_box.bone_index as i32) {
@@ -934,16 +936,18 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], hurtbox_state_a
                 hurtbox_state_all
             }.clone();
 
-            hl_hurt_boxes.push(HighLevelHurtBox {
-                bone_matrix: bone.transform_normal,
-                hurt_box:    hurt_box.clone(),
-                state,
-            });
+            if invisible_bones.iter().all(|x| get_bone_index(*x) != bone.index) {
+                hl_hurt_boxes.push(HighLevelHurtBox {
+                    bone_matrix: bone.transform_normal,
+                    hurt_box:    hurt_box.clone(),
+                    state,
+                });
+            }
         }
     }
 
     for child in bone.children.iter() {
-        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, hurtbox_state_all, hurtbox_states));
+        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner));
     }
 
     hl_hurt_boxes

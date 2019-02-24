@@ -375,10 +375,10 @@ fn model_visibility(parent_data: &[u8], model_visibility_start: usize) -> ModelV
 
     let mut defaults = vec!();
     for i in 0..defaults_count {
-        let switch_index  = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
-        let default_group = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
+        let switch_index = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
+        let group_index  = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
 
-        defaults.push(VisibilityDefault { switch_index, default_group });
+        defaults.push(VisibilityDefault { switch_index, group_index });
     }
 
     ModelVisibility {
@@ -404,16 +404,19 @@ pub struct VisibilityBoneSwitch {
     pub groups: Vec<VisibilityGroup>,
 }
 
+/// Enabling a `VisibilityGroup` will disable all other groups in the same `VisibilityBoneSwitch`
 #[derive(Debug)]
 pub struct VisibilityGroup {
     pub bones: Vec<i32>,
 }
 
 const VISIBILITY_DEFAULT_SIZE: usize = 0x8;
+/// Enables the `VisibilityGroup` with the matching `switch_index` and `group_index` for all `VisibilityReferences`s.
+/// When a new subaction is started, everything is set invisible and then all `VisibilityDefault`s are run.
 #[derive(Debug)]
 pub struct VisibilityDefault {
-    pub switch_index:  i32,
-    pub default_group: i32,
+    pub switch_index: i32,
+    pub group_index: i32,
 }
 
 fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {

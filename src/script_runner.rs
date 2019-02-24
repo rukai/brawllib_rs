@@ -1,5 +1,6 @@
 use crate::high_level_fighter::CollisionBoxValues;
 use crate::high_level_fighter;
+use crate::sakurai::fighter_data::ArcFighterData;
 use crate::script::{Requirement, VariableDataType};
 use crate::script_ast::{
     ScriptAst,
@@ -59,7 +60,9 @@ pub struct ScriptRunner<'a> {
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
     pub change_subaction:     ChangeSubaction,
-    /// These are rechecked every frame after being created
+    /// Children of these bones are also visible
+    pub invisible_bones:      Vec<i32>,
+    /// Each ChangeAction is rechecked every frame after being created
     pub change_actions:       Vec<ChangeAction>,
     pub hitbox_sets_rehit:    [bool; 10],
     pub slope_contour_stand:  Option<i32>,
@@ -230,7 +233,7 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst]) -> ScriptRunner<'a> {
+    pub fn new(subaction_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
@@ -243,6 +246,114 @@ impl<'a> ScriptRunner<'a> {
                 wait_until: -1.0
             });
         }
+
+        // TODO: Need to understand what ModelVisibility.cs:269 is doing (ResetVisibility)
+        //
+        // Actually:
+        // I'm pretty sure it doesnt affect children bones, so everything makes sense now.
+        // Actually x2:
+        // Why is bone 0 used then, its got nothing to render :O
+        // ABORT ABORT
+        //
+        // I think I want a tree.
+        // *   It lets me handle the initial values from the flags
+        // *   It lets me easily set all children
+        // *   It lets me easily set and reset values
+
+        let mut invisible_bones = vec!();
+        // TODO: populate with bone flags
+        // This isnt actually part of the visibility reset that occurs at the start of a subaction
+        // and should be only called during initialization if such a refactor occurs.
+
+        for reference in &fighter_data.model_visibility.references {
+            for default in &fighter_data.model_visibility.defaults {
+                if let Some(bone_switch) = reference.bone_switches.get(default.switch_index as usize) {
+                    if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
+                        for bone in &group.bones {
+                            invisible_bones.push(*bone);
+                        }
+                    }
+                }
+            }
+        }
+        ////First, disable bones
+        //foreach (ModelVisBoneSwitch Switch in entry)
+        //{
+        //    int i = 0;
+        //    foreach (ModelVisGroup Group in Switch)
+        //    {
+        //        if (i != Switch._defaultGroup)
+        //            foreach (BoneIndexValue b in Group._bones)
+        //                if (b.BoneNode != null)
+        //                    foreach (DrawCall p in b.BoneNode._visDrawCalls)
+        //                        p._render = false;
+        //        i++;
+        //    }
+        //}
+
+        // TODO: enable bones.
+        // This doesnt actually affect anything at the moment.
+        // The two cases where this could affect things in the future are:
+        // *   ScriptRunner is extended to run at the action level, in which case new subactions would cause the bones to reset after being potentially modified
+        // *   invisible_bones is populated with the visible bone flags from the MDL0 bone data.
+        for reference in &fighter_data.model_visibility.references {
+            for default in &fighter_data.model_visibility.defaults {
+                if let Some(bone_switch) = reference.bone_switches.get(default.switch_index as usize) {
+                    if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
+                        for bone in &group.bones {
+                            invisible_bones.retain(|x| x != bone);
+                        }
+                    }
+                }
+            }
+        }
+
+        ////Now, enable bones
+        //foreach (ModelVisBoneSwitch Switch in entry)
+        //    if (Switch._defaultGroup >= 0 && Switch._defaultGroup < Switch.Count)
+        //    {
+        //        ModelVisGroup Group = Switch[Switch._defaultGroup];
+        //        foreach (BoneIndexValue b in Group._bones)
+        //            if (b.BoneNode != null)
+        //                foreach (DrawCall p in b.BoneNode._visDrawCalls)
+        //                    p._render = true;
+        //    }
+        //
+        //
+        //
+        //    FOR THE EVENT:
+        //public void ApplyVisibility(int refId, int switchID, int groupID)
+        //{
+        //    if (refId < 0 || refId >= _references.Count)
+        //        return;
+
+        //    //Get the target reference
+        //    ModelVisReference refEntry = _references[refId];
+
+        //    //Check if the reference and switch id is usable
+        //    if (switchID >= refEntry.Count || switchID < 0)
+        //        return;
+
+        //    //Turn off objects
+        //    ModelVisBoneSwitch switchEntry = refEntry[switchID];
+        //    foreach (ModelVisGroup grp in switchEntry)
+        //        foreach (BoneIndexValue b in grp._bones)
+        //            if (b.BoneNode != null)
+        //                foreach (DrawCall obj in b.BoneNode._visDrawCalls)
+        //                    obj._render = false;
+
+        //    //Check if the group id is usable
+        //    if (groupID >= switchEntry.Count || groupID < 0)
+        //        return;
+
+        //    //Turn on objects
+        //    ModelVisGroup group = switchEntry[groupID];
+        //    if (group != null)
+        //        foreach (BoneIndexValue b in group._bones)
+        //            if (b.BoneNode != null)
+        //                foreach (DrawCall obj in b.BoneNode._visDrawCalls)
+        //                    obj._render = true;
+        //}
 
         let mut runner = ScriptRunner {
             call_stacks,
@@ -276,6 +387,7 @@ impl<'a> ScriptRunner<'a> {
             slope_contour_full:   None,
             rumble:               None,
             rumble_loop:          None,
+            invisible_bones,
 
             // LongtermAccessInt
             jumps_used: 0,
@@ -889,7 +1001,12 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::DeleteSwordGlow { .. } => { }
             &EventAst::AestheticWindEffect (_) => { }
             &EventAst::ScreenShake { .. } => { }
-            &EventAst::ModelChanger { .. } => { }
+            //&EventAst::ModelChanger { reference, switch_index, bone_group_index } => {
+            &EventAst::ModelChanger { .. } => {
+                // TODO: Model visibility change
+            }
+
+            // do nothing
             &EventAst::Unknown (ref event) => {
                 debug!("unknown event: {:#?}", event);
             }
