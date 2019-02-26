@@ -2,6 +2,7 @@ pub mod bones;
 pub mod palettes;
 pub mod textures;
 pub mod vertices;
+pub mod objects;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -13,6 +14,7 @@ use palettes::PaletteRef;
 use textures::TextureRef;
 use vertices::Vertices;
 use bones::Bone;
+use objects::Object;
 
 pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let _size        = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
@@ -90,7 +92,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
                 7  if fur_version => { fur_layer_coords = Some(resources) }
                 8  if fur_version => { materials = Some(resources) }
                 9  if fur_version => { shaders = Some(resources) }
-                10 if fur_version => { objects = Some(resources) }
+                10 if fur_version => { objects = Some(objects::objects(&data[resources_offset as usize ..], resources)) }
                 11 if fur_version => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
                 12 if fur_version => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
                 0 => { definitions = Some(Mdl0Definitions { resources }) }
@@ -101,7 +103,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
                 5 => { uv = Some(resources) }
                 6 => { materials = Some(resources) }
                 7 => { shaders = Some(resources) }
-                8 => { objects = Some(resources) }
+                8 => { objects = Some(objects::objects(&data[resources_offset as usize ..], resources)) }
                 9 => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
                 10 => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
                 _ => { unreachable!() }
@@ -144,7 +146,7 @@ pub struct Mdl0 {
     fur_layer_coords: Option<Vec<Resource>>,
     materials: Option<Vec<Resource>>,
     shaders: Option<Vec<Resource>>,
-    objects: Option<Vec<Resource>>,
+    pub objects: Option<Vec<Object>>,
     pub texture_refs: Option<Vec<Vec<TextureRef>>>,
     pub palette_refs: Option<Vec<Vec<PaletteRef>>>,
 }
