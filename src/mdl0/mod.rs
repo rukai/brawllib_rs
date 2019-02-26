@@ -10,6 +10,7 @@ use crate::resources::Resource;
 use crate::resources;
 use crate::mbox::MBox;
 use crate::mbox;
+use crate::util;
 use palettes::PaletteRef;
 use textures::TextureRef;
 use vertices::Vertices;
@@ -21,20 +22,19 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let version      = (&data[0x8..]).read_i32::<BigEndian>().unwrap();
     let _bres_offset = (&data[0xc..]).read_i32::<BigEndian>().unwrap();
 
-    //let string_offset = match version {
-    //    0xA => 0x44,
-    //    0xB => 0x48,
-    //    _   => 0x3C
-    //};
+    let string_offset_offset = match version {
+        0xA => 0x44,
+        0xB => 0x48,
+        _   => 0x3C
+    };
+    let string_offset = (&data[string_offset_offset..]).read_i32::<BigEndian>().unwrap();
+    let name = util::parse_str(&data[string_offset as usize .. ]).unwrap().to_string();
 
     //let data_offset = match version {
     //    0xA => 0x40,
     //    0xB => 0x44,
     //    _   => 0 // no data
     //};
-
-    //let name = format!("yo {}", (util::parse_str(&data[string_offset .. ]).unwrap()));
-    //println!("{} {}", version, util::hex_dump(&data[string_offset - 40 .. string_offset + 40]));
 
     let props_offset = match version {
         0x08 => 0x40,
@@ -112,7 +112,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     }
 
     Mdl0 {
-        //name,
+        name,
         version,
         props,
         definitions,
@@ -133,7 +133,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
 
 #[derive(Debug)]
 pub struct Mdl0 {
-    //pub name: String,
+    pub name: String,
     version: i32,
     pub props: Option<Mdl0Props>,
     pub definitions: Option<Mdl0Definitions>,
