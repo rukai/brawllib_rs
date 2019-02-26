@@ -3,6 +3,7 @@ pub mod palettes;
 pub mod textures;
 pub mod vertices;
 pub mod objects;
+pub mod definitions;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -16,6 +17,7 @@ use textures::TextureRef;
 use vertices::Vertices;
 use bones::Bone;
 use objects::Object;
+use definitions::Definition;
 
 pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let _size        = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
@@ -95,7 +97,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
                 10 if fur_version => { objects = Some(objects::objects(&data[resources_offset as usize ..], resources)) }
                 11 if fur_version => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
                 12 if fur_version => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
-                0 => { definitions = Some(Mdl0Definitions { resources }) }
+                0 => { definitions = Some(definitions::definitions(&data[resources_offset as usize..], resources)) }
                 1 => { bones = Some(bones::bones(&data[resources_offset as usize ..], resources)) }
                 2 => { vertices = Some(vertices::vertices(&data[resources_offset as usize ..], resources)) }
                 3 => { normals = Some(resources) }
@@ -136,7 +138,7 @@ pub struct Mdl0 {
     pub name: String,
     version: i32,
     pub props: Option<Mdl0Props>,
-    pub definitions: Option<Mdl0Definitions>,
+    pub definitions: Option<Vec<Definition>>,
     pub bones: Option<Bone>,
     pub vertices: Option<Vec<Vertices>>,
     normals: Option<Vec<Resource>>,
@@ -149,11 +151,6 @@ pub struct Mdl0 {
     pub objects: Option<Vec<Object>>,
     pub texture_refs: Option<Vec<Vec<TextureRef>>>,
     pub palette_refs: Option<Vec<Vec<PaletteRef>>>,
-}
-
-#[derive(Debug)]
-pub struct Mdl0Definitions {
-    resources: Vec<Resource>,
 }
 
 #[derive(Debug)]

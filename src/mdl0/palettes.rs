@@ -20,6 +20,13 @@ pub(crate) fn palettes(data: &[u8], resources: Vec<Resource>) -> Vec<Vec<Palette
     palettes
 }
 
+// TODO: Create this struct and return Vec<Palette> from palettes
+// Can probably do similar in other mdl0 modules as well
+// pub struct Palette {
+//     pub name: String, // take from resource.string
+//     pub references: Vec<PaletteRef>,
+// }
+
 const PALETTE_REF_SIZE: usize = 0x8;
 #[derive(Debug)]
 pub struct PaletteRef {
