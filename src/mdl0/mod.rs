@@ -12,8 +12,8 @@ use crate::resources;
 use crate::mbox::MBox;
 use crate::mbox;
 use crate::util;
-use palettes::PaletteRef;
-use textures::TextureRef;
+use palettes::Palette;
+use textures::Texture;
 use vertices::Vertices;
 use bones::Bone;
 use objects::Object;
@@ -78,7 +78,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     let mut materials = None;
     let mut shaders = None;
     let mut objects = None;
-    let mut texture_refs = None;
+    let mut texture_refs = None; // TODO: Bleh I think the naming of this and children is wrong
     let mut palette_refs = None;
 
     let fur_version = version >= 10;
@@ -149,8 +149,8 @@ pub struct Mdl0 {
     materials: Option<Vec<Resource>>,
     shaders: Option<Vec<Resource>>,
     pub objects: Option<Vec<Object>>,
-    pub texture_refs: Option<Vec<Vec<TextureRef>>>,
-    pub palette_refs: Option<Vec<Vec<PaletteRef>>>,
+    pub texture_refs: Option<Vec<Texture>>,
+    pub palette_refs: Option<Vec<Palette>>,
 }
 
 #[derive(Debug)]

@@ -33,6 +33,7 @@ pub(crate) fn vertices(data: &[u8], resources: Vec<Resource>) -> Vec<Vertices> {
         let data = (&data[data_offset as usize.. size as usize]).to_vec();
 
         vertices.push(Vertices {
+            name: resource.string,
             data,
             string_offset,
             index,
@@ -51,6 +52,7 @@ pub(crate) fn vertices(data: &[u8], resources: Vec<Resource>) -> Vec<Vertices> {
 const _VERTICES_SIZE: usize = 0x40;
 #[derive(Debug)]
 pub struct Vertices {
+    pub name: String,
     pub data: Vec<u8>,
     pub string_offset: i32,
     pub index: i32,

@@ -2,10 +2,10 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use crate::resources::Resource;
 
-pub(crate) fn textures(data: &[u8], resources: Vec<Resource>) -> Vec<Vec<TextureRef>> {
+pub(crate) fn textures(data: &[u8], resources: Vec<Resource>) -> Vec<Texture> {
     let mut textures = vec!();
     for resource in resources {
-        let mut texture = vec!();
+        let mut references = vec!();
 
         let num_children = (&data[resource.data_offset as usize..]).read_i32::<BigEndian>().unwrap();
         for i in 0..num_children as usize {
@@ -13,11 +13,18 @@ pub(crate) fn textures(data: &[u8], resources: Vec<Resource>) -> Vec<Vec<Texture
             let material_offset  = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
             let reference_offset = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
 
-            texture.push(TextureRef { material_offset, reference_offset });
+            references.push(TextureRef { material_offset, reference_offset });
         }
-        textures.push(texture);
+        let name = resource.string;
+        textures.push(Texture { name, references });
     }
     textures
+}
+
+#[derive(Debug)]
+pub struct Texture {
+    pub name: String,
+    pub references: Vec<TextureRef>,
 }
 
 const TEXTURE_REF_SIZE: usize = 0x8;
