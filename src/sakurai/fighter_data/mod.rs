@@ -43,7 +43,7 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterDat
     let subaction_flags_num = sizes.iter().find(|x| x.offset == subaction_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
     let subaction_flags = subaction_flags(parent_data, &parent_data[subaction_flags_start as usize ..], subaction_flags_num);
 
-    let model_visibility = model_visibility(parent_data, model_visibility_start as usize);
+    let model_visibility = model_visibility(parent_data, model_visibility_start);
 
     let action_flags_num = sizes.iter().find(|x| x.offset == action_flags_start as usize).unwrap().size / ACTION_FLAGS_SIZE;
     let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
@@ -330,27 +330,34 @@ pub struct SubactionFlags {
     pub name:                String,
 }
 
-fn model_visibility(parent_data: &[u8], model_visibility_start: usize) -> ModelVisibility {
-    let reference_offset  = (&parent_data[model_visibility_start + 0x00..]).read_i32::<BigEndian>().unwrap() as usize;
-    let bone_switch_count = (&parent_data[model_visibility_start + 0x04..]).read_i32::<BigEndian>().unwrap() as usize;
-    let defaults_offset   = (&parent_data[model_visibility_start + 0x08..]).read_i32::<BigEndian>().unwrap() as usize;
-    let defaults_count    = (&parent_data[model_visibility_start + 0x0c..]).read_i32::<BigEndian>().unwrap() as usize;
+fn model_visibility(parent_data: &[u8], model_visibility_start: i32) -> ModelVisibility {
+    let reference_offset  = (&parent_data[model_visibility_start as usize + 0x00..]).read_i32::<BigEndian>().unwrap();
+    let bone_switch_count = (&parent_data[model_visibility_start as usize + 0x04..]).read_i32::<BigEndian>().unwrap();
+    let defaults_offset   = (&parent_data[model_visibility_start as usize + 0x08..]).read_i32::<BigEndian>().unwrap();
+    let defaults_count    = (&parent_data[model_visibility_start as usize + 0x0c..]).read_i32::<BigEndian>().unwrap();
 
     let mut references = vec!();
     if reference_offset != 0 {
         // this works because the data at reference_offset, defaults_offset and model_visibility_start are stored sequentially
         let reference_count = if defaults_offset == 0 {
-            (model_visibility_start - reference_offset) / VISIBILITY_REFERENCE_SIZE
+            (model_visibility_start - reference_offset) / VISIBILITY_REFERENCE_SIZE as i32
         } else {
-            (defaults_offset - reference_offset) / VISIBILITY_REFERENCE_SIZE
+            (defaults_offset - reference_offset) / VISIBILITY_REFERENCE_SIZE as i32
         };
+        if reference_count < 0 {
+            error!("Oh no the reference_count calculation is messed up, please handle this case properly");
+            return ModelVisibility {
+                references: vec!(),
+                defaults: vec!(),
+            };
+        }
 
-        for reference_i in 0..reference_count {
-            let bone_switch_offset = (&parent_data[reference_offset + VISIBILITY_REFERENCE_SIZE * reference_i ..]).read_i32::<BigEndian>().unwrap() as usize;
+        for reference_i in 0..reference_count as usize {
+            let bone_switch_offset = (&parent_data[reference_offset as usize + VISIBILITY_REFERENCE_SIZE * reference_i ..]).read_i32::<BigEndian>().unwrap() as usize;
             let mut bone_switches = vec!();
             if bone_switch_offset != 0 {
 
-                for bone_switch_i in 0..bone_switch_count {
+                for bone_switch_i in 0..bone_switch_count as usize {
                     let visibility_group_list = util::list_offset(&parent_data[bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i ..]);
                     let mut groups = vec!();
 
@@ -374,9 +381,9 @@ fn model_visibility(parent_data: &[u8], model_visibility_start: usize) -> ModelV
     }
 
     let mut defaults = vec!();
-    for i in 0..defaults_count {
-        let switch_index = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
-        let group_index  = (&parent_data[defaults_offset + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
+    for i in 0..defaults_count as usize {
+        let switch_index = (&parent_data[defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
+        let group_index  = (&parent_data[defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
 
         defaults.push(VisibilityDefault { switch_index, group_index });
     }
