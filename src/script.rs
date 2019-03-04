@@ -45,6 +45,12 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
             }
         }
     }
+    if fragments.len() > 0 {
+        // the fragment scripts may refer to their own fragment scripts
+        let mut all = known_scripts.to_vec();
+        all.push(&fragments);
+        fragments.extend(fragment_scripts(parent_data, &all));
+    }
     fragments
 }
 
