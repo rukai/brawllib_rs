@@ -675,8 +675,8 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SetFrame (v0) => {
                 self.frame_index = v0;
             }
-            &EventAst::FrameSpeedModifier (v0) => {
-                self.frame_speed_modifier = v0;
+            &EventAst::FrameSpeedModifier { multiplier, .. } => {
+                self.frame_speed_modifier = multiplier;
             }
             &EventAst::TimeManipulation (_, _) => { }
 
@@ -818,6 +818,12 @@ impl<'a> ScriptRunner<'a> {
                         *hitbox = None;
                     }
                 }
+            }
+            &EventAst::SpecifyThrow (_) => {
+                // TODO
+            }
+            &EventAst::ApplyThrow (_) => {
+                // TODO
             }
 
             // hurtboxes

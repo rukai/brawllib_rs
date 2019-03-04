@@ -1,4 +1,4 @@
-use crate::script::{Script, Event, Requirement, Argument};
+use crate::script::{Script, Event, Requirement, Variable, Argument};
 use crate::script;
 
 use std::iter::Iterator;
@@ -188,7 +188,8 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
 
             // timing
             (0x04, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
-            (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier (v0),
+            (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: 0 },
+            (0x04, 0x07, Some(&Scalar(v0)), Some(&Value(v1)), None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: v1 },
             (0x0c, 0x23, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::TimeManipulation (v0, v1),
 
             // misc state
@@ -351,6 +352,45 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             }
             (0x06, 0x0C, Some(&Value(v0)), None, None) => EventAst::DeleteGrabBox (v0),
             (0x06, 0x0D, None,             None, None) => EventAst::DeleteAllGrabBoxes,
+            (0x06, 0x0E, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15), args.get(16)) {
+                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), Some(&Value(v6)), Some(&Value(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Value(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Bool(v14)), Some(&Bool(v15)), Some(&Value(v16))) => {
+                        EventAst::SpecifyThrow (SpecifyThrow {
+                            id:          v0,
+                            bone:        v1,
+                            damage:      v2,
+                            trajectory:  v3,
+                            kbg:         v4,
+                            wk:          v5,
+                            bkb:         v6,
+                            effect:      HitBoxEffect::new(v7),
+                            unk0:        v8,
+                            unk1:        v9,
+                            unk2:        v10,
+                            unk3:        v11,
+                            sfx:         HitBoxSound::new(v12),
+                            grab_target: GrabTarget::new(v13),
+                            unk4:        v14,
+                            unk5:        v15,
+                            i_frames:    v16,
+                        })
+                    }
+                    _ => EventAst::Unknown(event.clone())
+                }
+            }
+            (0x06, 0x0F, Some(&Value(v0)), Some(&Value(v1)), Some(&Variable(ref v2))) => {
+                if let (Some(&Variable(ref v3)), Some(&Variable(ref v4))) = (args.get(3), args.get(4)) {
+                    EventAst::ApplyThrow (ApplyThrow {
+                        unk0: v0,
+                        bone: v1,
+                        unk1: v2.clone(),
+                        unk2: v3.clone(),
+                        unk3: v4.clone(),
+                    })
+                } else {
+                    EventAst::Unknown(event.clone())
+                }
+            }
 
             // hurtboxes
             (0x06, 0x05, Some(&Value(v0)), None,             None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(v0) },
@@ -367,6 +407,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x07, 0x0B, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
             (0x18, 0x00, Some(&Value(v0)),  None,              None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
             (0x18, 0x01, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
+            (0x10, 0x00, Some(&Value(v0)),  None,              None) => EventAst::GenerateArticle { article_id: v0, subaction_only: true }, // TODO: subaction_only?
             (0x10, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),   None) => EventAst::GenerateArticle { article_id: v0, subaction_only: v1 },
             (0x10, 0x01, Some(&Value(v0)),  None,              None) => EventAst::ArticleEvent (v0),
             (0x10, 0x02, Some(&Value(v0)),  None,              None) => EventAst::ArticleAnimation (v0),
@@ -745,7 +786,7 @@ pub enum EventAst {
     /// Changes the current frame of the animation. Does not change the frame of the subaction (i.e. timers and such are unaffected).
     SetFrame (f32),
     /// Dictates the frame speed of the subaction. Example: setting to 2 makes the animation and timers occur twice as fast.
-    FrameSpeedModifier (f32),
+    FrameSpeedModifier { multiplier: f32, unk: i32 },
     /// Change the speed of time for various parts of the environment.
     TimeManipulation (i32, i32),
     /// Specify whether the character is on or off the ground.
@@ -774,6 +815,10 @@ pub enum EventAst {
     DeleteGrabBox (i32),
     /// Remove all currently present grabboxes
     DeleteAllGrabBoxes,
+    /// Specify the throw
+    SpecifyThrow (SpecifyThrow),
+    /// Apply the previously specified throw
+    ApplyThrow (ApplyThrow),
     /// Set the state of all of the characters hurtboxes.
     ChangeHurtBoxStateAll { state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox.
@@ -1381,6 +1426,37 @@ impl GrabTarget {
             _ => false,
         }
     }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SpecifyThrow {
+    /// ID of throw data. Seemingly, a "0" indicates this is the throw data, while a "1" indicates this is used if the opponent escapes during the throw. "2" has also been seen (by Light Arrow)."
+    pub id:          i32,
+    pub bone:        i32,
+    pub damage:      i32,
+    pub trajectory:  i32,
+    pub kbg:         i32,
+    pub wk:          i32,
+    pub bkb:         i32,
+    pub effect:      HitBoxEffect,
+    pub unk0:        f32,
+    pub unk1:        f32,
+    pub unk2:        f32,
+    pub unk3:        i32,
+    pub sfx:         HitBoxSound,
+    pub grab_target: GrabTarget,
+    pub unk4:        bool,
+    pub unk5:        bool,
+    pub i_frames:    i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct ApplyThrow {
+    pub unk0: i32,
+    pub bone: i32,
+    pub unk1: Variable,
+    pub unk2: Variable,
+    pub unk3: Variable,
 }
 
 #[derive(Serialize, Clone, Debug)]
