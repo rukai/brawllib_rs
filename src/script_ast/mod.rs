@@ -11,11 +11,12 @@ use variable_ast::VariableAst;
 #[derive(Serialize, Clone, Debug)]
 pub struct ScriptAst {
     pub block:  Block,
-    pub offset: u32,
+    pub offset: i32,
 }
 
 impl ScriptAst {
     pub fn new(script: &Script) -> ScriptAst {
+        //info!("{:#?}", script);
         let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter().peekable()) {
             events
         } else {

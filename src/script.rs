@@ -3,7 +3,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec<Script> {
     let mut result = vec!();
     for i in 0..num {
-        let offset = (&offset_data[i * 4..]).read_i32::<BigEndian>().unwrap() as usize;
+        let offset = (&offset_data[i * 4..]).read_i32::<BigEndian>().unwrap();
         result.push(new_script(parent_data, offset));
     }
     result
@@ -30,16 +30,16 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
                     let mut is_action = false;
                     'outer: for check_scripts in known_scripts.iter() {
                         for check_script in check_scripts.iter() {
-                            if check_script.offset == *offset as u32 {
+                            if check_script.offset == *offset {
                                 is_action = true;
                                 break 'outer;
                             }
                         }
                     }
-                    let already_added = fragments.iter().any(|x| x.offset == *offset as u32);
+                    let already_added = fragments.iter().any(|x| x.offset == *offset);
 
                     if !is_action && !already_added {
-                        fragments.push(new_script(parent_data, *offset as usize));
+                        fragments.push(new_script(parent_data, *offset));
                     }
                 }
             }
@@ -48,16 +48,16 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
     fragments
 }
 
-fn new_script(parent_data: &[u8], offset: usize) -> Script {
-    let events = if offset > 0 && offset < parent_data.len() {
+fn new_script(parent_data: &[u8], offset: i32) -> Script {
+    let events = if offset > 0 && (offset as i64) < (parent_data.len() as i64) {
         let mut events = vec!();
         let mut event_offset = offset;
         loop {
-            let namespace     = parent_data[event_offset];
-            let code          = parent_data[event_offset + 1];
-            let num_arguments = parent_data[event_offset + 2];
-            let unk1          = parent_data[event_offset + 3];
-            let raw_id = (&parent_data[event_offset ..]).read_u32::<BigEndian>().unwrap();
+            let namespace     = parent_data[event_offset as usize];
+            let code          = parent_data[event_offset as usize+ 1];
+            let num_arguments = parent_data[event_offset as usize + 2];
+            let unk1          = parent_data[event_offset as usize + 3];
+            let raw_id = (&parent_data[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
 
             if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
                 break
@@ -66,7 +66,7 @@ fn new_script(parent_data: &[u8], offset: usize) -> Script {
             // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
             // and brawlbox just skips arguments on events that have one of these ID's
             if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
-                let argument_offset = (&parent_data[event_offset + 4 ..]).read_u32::<BigEndian>().unwrap();
+                let argument_offset = (&parent_data[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
                 // TODO: This only occurs when called by fragment_scripts triggered by subroutines
                 //       Track down which subroutines are pointing at weird data
                 //       Looks like the data is offset by 4 bytes, we are getting an argument_offset of 0xFADEF00D, 0x0b000200, 0x60a0800 which are valid events
@@ -83,13 +83,13 @@ fn new_script(parent_data: &[u8], offset: usize) -> Script {
                 });
             }
 
-            event_offset += EVENT_SIZE;
+            event_offset += EVENT_SIZE as i32;
         }
         events
     } else {
         vec!()
     };
-    Script { events, offset: offset as u32 }
+    Script { events, offset }
 }
 
 
@@ -129,7 +129,7 @@ fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -
 #[derive(Clone, Debug)]
 pub struct Script {
     pub events: Vec<Event>,
-    pub offset: u32
+    pub offset: i32,
 }
 
 // Events are like lines of code in a script

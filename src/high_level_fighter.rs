@@ -49,10 +49,10 @@ impl HighLevelFighter {
         let fighter_animations = fighter.get_animations();
 
         let fragment_scripts_fighter: Vec<ScriptAst> = fighter_data.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_main:          Vec<ScriptAst> = fighter_data.subaction_main .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_gfx:           Vec<ScriptAst> = fighter_data.subaction_gfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_sfx:           Vec<ScriptAst> = fighter_data.subaction_sfx  .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_other:         Vec<ScriptAst> = fighter_data.subaction_other.iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_main:           Vec<ScriptAst> = fighter_data.subaction_main  .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_gfx:            Vec<ScriptAst> = fighter_data.subaction_gfx   .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_sfx:            Vec<ScriptAst> = fighter_data.subaction_sfx   .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_other:          Vec<ScriptAst> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
 
         let fragment_scripts_common: Vec<ScriptAst> = fighter_data_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
         let entry_actions: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x))
