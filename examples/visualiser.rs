@@ -60,7 +60,7 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_dir = matches.opt_str("m").map_or(None, |x| fs::read_dir(x).ok());
+    let mod_dir = matches.opt_str("m").map_or(None, |x| Some(fs::read_dir(x).expect("Provided mod directory is invalid")));
 
     let fighter_name = if let Some(fighter_name) = matches.opt_str("f") {
         fighter_name

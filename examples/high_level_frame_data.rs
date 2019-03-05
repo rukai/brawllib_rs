@@ -45,7 +45,7 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_dir = matches.opt_str("m").map_or(None, |x| fs::read_dir(x).ok());
+    let mod_dir = matches.opt_str("m").map_or(None, |x| Some(fs::read_dir(x).expect("Provided mod directory is invalid")));
     let fighter_filter = matches.opt_str("f");
     let subaction_filter = matches.opt_str("a");
     let frame_filter = matches.opt_str("i").map_or(None, |x| x.parse::<usize>().ok());
