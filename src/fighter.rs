@@ -374,7 +374,7 @@ struct FighterData {
 #[derive(Debug)]
 pub enum ModType {
     /// Original brawl fighter.
-    /// All .pac files are the unmodified from brawl.
+    /// All .pac files are unmodified from brawl.
     NotMod,
     /// Original brawl fighter that has been modified.
     /// Its .pac files overwrite those of the existing character, but if .pac files are missing existing ones are used.
