@@ -11,7 +11,7 @@ use crate::arc;
 use crate::bres::BresChildData;
 use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
-use crate::sakurai::SectionData;
+use crate::sakurai::{SectionData, SectionScript};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
 
@@ -43,7 +43,8 @@ impl Fighter {
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
         fighter_datas(brawl_fighter_dir, mod_fighter_dir)
-            .into_par_iter()
+            //.into_par_iter()
+            .into_iter()
             .filter_map(|x| Fighter::load_single(x, single_model))
             .collect()
     }
@@ -151,6 +152,24 @@ impl Fighter {
             }
         }
         None
+    }
+
+    /// retrieves the script sections from fighter data common
+    pub fn get_fighter_data_common_scripts(&self) -> Vec<&SectionScript> {
+        let mut scripts = vec!();
+        for sub_arc in &self.moveset_common.children {
+            match &sub_arc.data {
+                &ArcChildData::Sakurai (ref data) => {
+                    for section in &data.sections {
+                        if let &SectionData::Script (ref script) = &section.data {
+                            scripts.push(script);
+                        }
+                    }
+                }
+                _ => { }
+            }
+        }
+        scripts
     }
 
     /// retrieves the bones from a character model

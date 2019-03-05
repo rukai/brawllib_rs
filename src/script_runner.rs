@@ -603,11 +603,11 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::Subroutine (offset) => {
+            &EventAst::Subroutine (ref offset) => {
                 // TODO: Maybe I should implement a protection similar to visited_gotos for subroutines.
                 // If that turns out to be a bad idea document why.
                 for script in all_scripts.iter() {
-                    if script.offset == offset {
+                    if script.offset == offset.offset {
                         if script.block.events.len() > 0 && &script.block.events[0] as *const _ == event as *const _ {
                             error!("Avoided hard Subroutine infinite loop (attempted to jump to the same location)");
                         }
@@ -621,11 +621,11 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::Return => {
                 return StepEventResult::Return;
             }
-            &EventAst::Goto (offset) => {
-                if !self.visited_gotos.iter().any(|x| *x == offset) {
-                    self.visited_gotos.push(offset);
+            &EventAst::Goto (ref offset) => {
+                if !self.visited_gotos.iter().any(|x| *x == offset.offset) {
+                    self.visited_gotos.push(offset.offset);
                     for script in all_scripts.iter() {
-                        if script.offset == offset {
+                        if script.offset == offset.offset {
                             return StepEventResult::Goto (&script.block);
                         }
                     }
@@ -648,9 +648,9 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::Case (_) => { }
             &EventAst::DefaultCase => { }
             &EventAst::LoopRest => { error!("LoopRest: This means the code is expected to infinite loop") } // TODO: Handle infinite loops better
-            &EventAst::CallEveryFrame { thread_id, offset } => {
+            &EventAst::CallEveryFrame { thread_id, ref offset } => {
                 for script in all_scripts.iter() {
-                    if script.offset == offset {
+                    if script.offset == offset.offset {
                         return StepEventResult::CallEveryFrame { thread_id, block: &script.block };
                     }
                 }

@@ -4,6 +4,7 @@ use rayon::prelude::*;
 use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
+use crate::sakurai::SectionScript;
 use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox};
 use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
@@ -45,6 +46,7 @@ impl HighLevelFighter {
         info!("Generating HighLevelFighter for {}", fighter.cased_name);
         let fighter_data = fighter.get_fighter_data().unwrap();
         let fighter_data_common = fighter.get_fighter_data_common().unwrap();
+        let fighter_data_common_scripts = fighter.get_fighter_data_common_scripts();
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
@@ -55,6 +57,22 @@ impl HighLevelFighter {
         let subaction_other:          Vec<ScriptAst> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
 
         let fragment_scripts_common: Vec<ScriptAst> = fighter_data_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+
+        struct SectionScriptAst {
+            name:   String,
+            script: ScriptAst,
+        }
+        impl SectionScriptAst {
+            fn new(section_script: &SectionScript) -> SectionScriptAst {
+                SectionScriptAst {
+                    name:   section_script.name.clone(),
+                    script: ScriptAst::new(&section_script.script),
+                }
+            }
+        }
+
+        let scripts_common: Vec<SectionScriptAst> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x)).collect();
+        // TODO: BLAGGHHH I think this is WRONG! I need to splitup common and non common scripts so they can correctly call their own subroutines
         let entry_actions: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x))
             .chain(fighter_data.entry_actions.iter().map(|x| ScriptAst::new(x)))
             .collect();
@@ -68,10 +86,17 @@ impl HighLevelFighter {
             .chain(subaction_gfx.iter())
             .chain(subaction_sfx.iter())
             .chain(subaction_other.iter())
+        {
+            all_scripts.push(script);
+        }
+
+        let mut common_scripts = vec!();
+        for script in fragment_scripts_common.iter()
+            .chain(scripts_common.iter().map(|x| &x.script))
             .chain(entry_actions.iter())
             .chain(exit_actions.iter())
         {
-            all_scripts.push(script);
+            common_scripts.push(script);
         }
 
         let mut subaction_scripts = vec!();

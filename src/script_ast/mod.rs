@@ -1,4 +1,4 @@
-use crate::script::{Script, Event, Requirement, Variable, Argument};
+use crate::script::{Script, Event, Requirement, Variable, Argument, Offset};
 use crate::script;
 
 use std::iter::Iterator;
@@ -16,7 +16,6 @@ pub struct ScriptAst {
 
 impl ScriptAst {
     pub fn new(script: &Script) -> ScriptAst {
-        //info!("{:#?}", script);
         let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter().peekable()) {
             events
         } else {
@@ -59,9 +58,9 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x05, None, None, None) => { // End loop
                 return ProcessedBlock::EndForLoop (Block { events: event_asts })
             }
-            (0x00, 0x07, Some(&Offset(v0)), None, None) => EventAst::Subroutine (v0),
-            (0x00, 0x08, None,              None, None) => EventAst::Return,
-            (0x00, 0x09, Some(&Offset(v0)), None, None) => EventAst::Goto (v0),
+            (0x00, 0x07, Some(&Offset(ref v0)), None, None) => EventAst::Subroutine (v0.clone()),
+            (0x00, 0x08, None,                  None, None) => EventAst::Return,
+            (0x00, 0x09, Some(&Offset(ref v0)), None, None) => EventAst::Goto (v0.clone()),
             (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
                 if let Some(mut test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
                     match process_block(events) {
@@ -135,13 +134,13 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts }, boolean_expressions } }
-            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)),  None) => EventAst::Switch (v0, v1),
-            (0x00, 0x11, Some(&Value(v0)), None,              None) => EventAst::Case (v0),
-            (0x00, 0x11, None,             None,              None) => EventAst::DefaultCase,
-            (0x00, 0x13, None,             None,              None) => EventAst::EndSwitch,
-            (0x01, 0x01, None,             None,              None) => EventAst::LoopRest,
-            (0x0D, 0x00, Some(&Value(v0)), Some(&Offset(v1)), None) => EventAst::CallEveryFrame { thread_id: v0, offset: v1 },
-            (0x0D, 0x01, Some(&Value(v0)), None,              None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
+            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)),      None) => EventAst::Switch (v0, v1),
+            (0x00, 0x11, Some(&Value(v0)), None,                  None) => EventAst::Case (v0),
+            (0x00, 0x11, None,             None,                  None) => EventAst::DefaultCase,
+            (0x00, 0x13, None,             None,                  None) => EventAst::EndSwitch,
+            (0x01, 0x01, None,             None,                  None) => EventAst::LoopRest,
+            (0x0D, 0x00, Some(&Value(v0)), Some(&Offset(ref v1)), None) => EventAst::CallEveryFrame { thread_id: v0, offset: v1.clone() },
+            (0x0D, 0x01, Some(&Value(v0)), None,                  None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
 
             // change action
             (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
@@ -750,11 +749,11 @@ pub enum EventAst {
     /// Execute the block of code N times.
     ForLoop (ForLoop),
     /// Enter the event routine specified and return after ending.
-    Subroutine (i32),
+    Subroutine (Offset),
     /// Return from a Subroutine.
     Return,
     /// Goto the event location specified and execute.
-    Goto (i32),
+    Goto (Offset),
     /// An expression decides which block of code to execute.
     IfStatement (IfStatement),
     /// Begin a multiple case Switch block.
@@ -768,7 +767,7 @@ pub enum EventAst {
     /// Briefly return execution back to the system to prevent crashes during infinite loops.
     LoopRest,
     /// Runs a subroutine once per frame for the current action.
-    CallEveryFrame { thread_id: i32, offset: i32 },
+    CallEveryFrame { thread_id: i32, offset: Offset },
     /// Stops the execution of a loop created with CallEveryFrame
     RemoveCallEveryFrame { thread_id: i32 },
     /// Enables the given Status ID

@@ -15,18 +15,18 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
     for scripts in known_scripts.iter() {
         for script in scripts.iter() {
             for event in &script.events {
-                let mut offset = None;
+                let mut found_offset = None;
                 if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) { // if the event is a subroutine or goto
-                    if let Some(Argument::Offset(value)) = event.arguments.get(0) {
-                        offset = Some(value);
+                    if let Some(Argument::Offset (Offset { offset, .. })) = event.arguments.get(0) {
+                        found_offset = Some(offset);
                     }
                 }
                 if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
-                    if let Some(Argument::Offset(value)) = event.arguments.get(1) {
-                        offset = Some(value);
+                    if let Some(Argument::Offset (Offset { offset, .. })) = event.arguments.get(1) {
+                        found_offset = Some(offset);
                     }
                 }
-                if let Some(offset) = offset {
+                if let Some(offset) = found_offset {
                     let mut is_action = false;
                     'outer: for check_scripts in known_scripts.iter() {
                         for check_script in check_scripts.iter() {
@@ -54,13 +54,13 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
     fragments
 }
 
-fn new_script(parent_data: &[u8], offset: i32) -> Script {
+pub fn new_script(parent_data: &[u8], offset: i32) -> Script {
     let events = if offset > 0 && (offset as i64) < (parent_data.len() as i64) {
         let mut events = vec!();
         let mut event_offset = offset;
         loop {
             let namespace     = parent_data[event_offset as usize];
-            let code          = parent_data[event_offset as usize+ 1];
+            let code          = parent_data[event_offset as usize + 1];
             let num_arguments = parent_data[event_offset as usize + 2];
             let unk1          = parent_data[event_offset as usize + 3];
             let raw_id = (&parent_data[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
@@ -102,14 +102,14 @@ fn new_script(parent_data: &[u8], offset: i32) -> Script {
 fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -> Vec<Argument> {
     let mut arguments = vec!();
     for i in 0..num_arguments as usize {
-        let argument_offset = argument_offset as usize + i * ARGUMENT_SIZE;
+        let argument_offset = argument_offset + i * ARGUMENT_SIZE;
         let ty   = (&parent_data[argument_offset     ..]).read_i32::<BigEndian>().unwrap();
         let data = (&parent_data[argument_offset + 4 ..]).read_i32::<BigEndian>().unwrap();
 
         let argument = match ty {
             0 => Argument::Value (data),
             1 => Argument::Scalar (data as f32 / 60000.0),
-            2 => Argument::Offset (data),
+            2 => Argument::Offset (Offset { offset: data, origin: argument_offset as i32 + 4}),
             3 => Argument::Bool (data == 1),
             4 => Argument::File (data),
             5 => {
@@ -161,7 +161,7 @@ const ARGUMENT_SIZE: usize = 0x8;
 pub enum Argument {
     Value (i32),
     Scalar (f32),
-    Offset (i32),
+    Offset (Offset),
     Bool (bool),
     File (i32),
     Variable (Variable),
@@ -174,6 +174,12 @@ pub struct Variable {
     pub memory_type: VariableMemoryType,
     pub data_type: VariableDataType,
     pub address: u32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct Offset {
+    pub offset: i32,
+    pub origin: i32,
 }
 
 #[derive(Serialize, Clone, Debug)]
