@@ -59,6 +59,7 @@ pub struct ScriptRunner<'a> {
     pub damage:               f32,
     pub airbourne:            bool,
     pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
+    pub reverse_direction:    bool,
     pub change_subaction:     ChangeSubaction,
     /// Children of these bones are also visible
     pub invisible_bones:      Vec<i32>,
@@ -380,6 +381,7 @@ impl<'a> ScriptRunner<'a> {
             damage:               0.0,
             airbourne:            false,
             edge_slide:           EdgeSlide::SlideOff,
+            reverse_direction:    false,
             change_subaction:     ChangeSubaction::Continue,
             change_actions:       vec!(),
             hitbox_sets_rehit:    [false; 10],
@@ -687,7 +689,9 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SetEdgeSlide (ref v0) => {
                 self.edge_slide = v0.clone();
             }
-            &EventAst::ReverseDirection => { }
+            &EventAst::ReverseDirection => {
+                self.reverse_direction = !self.reverse_direction;
+            }
 
             // hitboxes
             &EventAst::CreateHitBox (ref args) => {
