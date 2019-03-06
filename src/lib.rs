@@ -26,6 +26,7 @@ pub mod bres;
 pub mod chr0;
 pub mod fighter;
 pub mod high_level_fighter;
+pub mod high_level_fighter_common;
 pub mod mbox;
 pub mod mdl0;
 pub mod resources;

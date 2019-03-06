@@ -51,11 +51,11 @@ pub fn action_name(index: usize) -> String {
         0x030 => String::from("AttackHi4Start"),
         0x031 => String::from("AttackHi4Hold"),
         0x032 => String::from("AttackHi4"),
-        0x033 => String::from(""),
+        //0x033 => String::from(""),
         0x034 => String::from("Catch"),
         0x035 => String::from("CatchWait"),
         0x036 => String::from("CatchDash"),
-        0x037 => String::from(""),
+        //0x037 => String::from(""),
         0x038 => String::from("CatchTurn"),
         0x039 => String::from("CatchWait"),
         0x03a => String::from("CatchAttack"),
@@ -295,6 +295,6 @@ pub fn action_name(index: usize) -> String {
         0x114 => String::from("SpecialHi"),
         0x115 => String::from("SpecialLw"),
         0x116 => String::from("Final"),
-        _     => index.to_string(),
+        _     => format!("0x{:x}", index),
     }
 }

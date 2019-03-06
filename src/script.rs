@@ -182,6 +182,21 @@ pub struct Offset {
     pub origin: i32,
 }
 
+//impl Offset {
+//    fn offset_type(&self) -> OffsetType {
+//    }
+//
+//    fn name(&self) -> String {
+//        println!("{:x}", self.offset);
+//    }
+//}
+
+#[derive(Debug)]
+pub enum OffsetType {
+    Internal (i32),
+    External (String, ),
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub enum VariableMemoryType {
     /// Known as IC in existing tools
