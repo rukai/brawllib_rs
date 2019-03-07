@@ -10,20 +10,24 @@ pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec
 }
 
 /// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
-pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) -> Vec<Script> {
+pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], ignore_origins: &[i32]) -> Vec<Script> {
     let mut fragments: Vec<Script> = vec!();
     for scripts in known_scripts.iter() {
         for script in scripts.iter() {
             for event in &script.events {
                 let mut found_offset = None;
                 if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) { // if the event is a subroutine or goto
-                    if let Some(Argument::Offset (Offset { offset, .. })) = event.arguments.get(0) {
-                        found_offset = Some(offset);
+                    if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(0) {
+                        if !ignore_origins.contains(origin) {
+                            found_offset = Some(offset);
+                        }
                     }
                 }
                 if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
-                    if let Some(Argument::Offset (Offset { offset, .. })) = event.arguments.get(1) {
-                        found_offset = Some(offset);
+                    if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(1) {
+                        if !ignore_origins.contains(origin) {
+                            found_offset = Some(offset);
+                        }
                     }
                 }
                 if let Some(offset) = found_offset {
@@ -45,11 +49,12 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]]) 
             }
         }
     }
+
     if fragments.len() > 0 {
         // the fragment scripts may refer to their own fragment scripts
         let mut all = known_scripts.to_vec();
         all.push(&fragments);
-        fragments.extend(fragment_scripts(parent_data, &all));
+        fragments.extend(fragment_scripts(parent_data, &all, ignore_origins));
     }
     fragments
 }
@@ -69,8 +74,9 @@ pub fn new_script(parent_data: &[u8], offset: i32) -> Script {
                 break
             }
 
-            // Dont really understand what FADEF00D or 0xFADE0D8A means but it's apparently added by PSA
-            // and brawlbox just skips arguments on events that have one of these ID's
+            // PSA fills empty space with these bytes:
+            // const long FADEDATA = 0xFADE0D8A; // Constant for the tag FADE0D8A representing the end of useable space.
+            // const long FADEFOOD = 0xFADEF00D; // Constant for the tag FADEF00D representing empty, useable space.
             if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
                 let argument_offset = (&parent_data[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
                 // TODO: This only occurs when called by fragment_scripts triggered by subroutines
@@ -181,15 +187,6 @@ pub struct Offset {
     pub offset: i32,
     pub origin: i32,
 }
-
-//impl Offset {
-//    fn offset_type(&self) -> OffsetType {
-//    }
-//
-//    fn name(&self) -> String {
-//        println!("{:x}", self.offset);
-//    }
-//}
 
 #[derive(Debug)]
 pub enum OffsetType {

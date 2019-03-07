@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
-use crate::sakurai::SectionScript;
+use crate::sakurai::{SectionScript, ExternalSubroutine};
 use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox};
 use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
@@ -34,6 +34,7 @@ pub struct HighLevelFighter {
     pub ledge_grabs:              Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
     pub scripts_fragment_fighter: Vec<ScriptAst>,
     pub scripts_fragment_common:  Vec<ScriptAst>,
+    pub scripts_section:          Vec<SectionScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -44,34 +45,23 @@ impl HighLevelFighter {
     // Will need to benchmark any such changes.
     pub fn new(fighter: &Fighter) -> HighLevelFighter {
         info!("Generating HighLevelFighter for {}", fighter.cased_name);
+        let fighter_sakurai = fighter.get_fighter_sakurai().unwrap();
+        let fighter_sakurai_common = fighter.get_fighter_sakurai_common().unwrap();
         let fighter_data = fighter.get_fighter_data().unwrap();
         let fighter_data_common = fighter.get_fighter_data_common().unwrap();
         let fighter_data_common_scripts = fighter.get_fighter_data_common_scripts();
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
-        let fragment_scripts_fighter: Vec<ScriptAst> = fighter_data.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_fighter: Vec<ScriptAst> = fighter_sakurai.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
         let subaction_main:           Vec<ScriptAst> = fighter_data.subaction_main  .iter().map(|x| ScriptAst::new(x)).collect();
         let subaction_gfx:            Vec<ScriptAst> = fighter_data.subaction_gfx   .iter().map(|x| ScriptAst::new(x)).collect();
         let subaction_sfx:            Vec<ScriptAst> = fighter_data.subaction_sfx   .iter().map(|x| ScriptAst::new(x)).collect();
         let subaction_other:          Vec<ScriptAst> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
 
-        let fragment_scripts_common: Vec<ScriptAst> = fighter_data_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_common: Vec<ScriptAst> = fighter_sakurai_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
 
-        struct SectionScriptAst {
-            name:   String,
-            script: ScriptAst,
-        }
-        impl SectionScriptAst {
-            fn new(section_script: &SectionScript) -> SectionScriptAst {
-                SectionScriptAst {
-                    name:   section_script.name.clone(),
-                    script: ScriptAst::new(&section_script.script),
-                }
-            }
-        }
-
-        let scripts_section_common: Vec<SectionScriptAst> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x)).collect();
+        let scripts_section: Vec<SectionScriptAst> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x, &fighter_sakurai.external_subroutines)).collect();
 
         let entry_actions_common: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
         let entry_actions:        Vec<ScriptAst> = fighter_data       .entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
@@ -92,7 +82,7 @@ impl HighLevelFighter {
 
         let mut common_scripts = vec!();
         for script in fragment_scripts_common.iter()
-            .chain(scripts_section_common.iter().map(|x| &x.script))
+            .chain(scripts_section.iter().map(|x| &x.script))
             .chain(entry_actions_common.iter())
             .chain(exit_actions_common.iter())
         {
@@ -110,11 +100,22 @@ impl HighLevelFighter {
         }
 
         let mut actions = vec!();
+        for i in 0..entry_actions_common.len() {
+            // TODO: Handle override tab stuff here
+            actions.push(HighLevelAction {
+                name:         format!("{} (Common)", crate::action_names::action_name(i)),
+                script_entry: entry_actions_common[i].clone(),
+                script_exit:  exit_actions_common[i].clone(),
+                common:       true,
+            });
+        }
+
         for i in 0..entry_actions.len() {
             actions.push(HighLevelAction {
                 name:         crate::action_names::action_name(0x112 + i),
                 script_entry: entry_actions[i].clone(),
                 script_exit:  exit_actions[i].clone(),
+                common:       false,
             });
         }
 
@@ -318,6 +319,7 @@ impl HighLevelFighter {
             ledge_grabs:              fighter_data.misc.ledge_grabs.clone(),
             scripts_fragment_fighter: fragment_scripts_fighter,
             scripts_fragment_common:  fragment_scripts_common,
+            scripts_section,
             attributes,
             actions,
             subactions,
@@ -393,6 +395,8 @@ pub struct HighLevelAction {
     pub name:         String,
     pub script_entry: ScriptAst,
     pub script_exit:  ScriptAst,
+    /// This is needed to determine where Goto/Subroutine events are pointing
+    pub common: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1016,3 +1020,21 @@ pub fn get_bone_index(index: i32) -> i32 {
         index
     }
 }
+
+#[derive(Serialize, Clone, Debug)]
+pub struct SectionScriptAst {
+    pub name:    String,
+    pub script:  ScriptAst,
+    pub callers: Vec<i32>,
+}
+
+impl SectionScriptAst {
+    fn new(section_script: &SectionScript, external_subroutines: &[ExternalSubroutine]) -> SectionScriptAst {
+        SectionScriptAst {
+            name:    section_script.name.clone(),
+            script:  ScriptAst::new(&section_script.script),
+            callers: external_subroutines.iter().filter(|x| x.name == section_script.name).map(|x| x.offset).collect(),
+        }
+    }
+}
+

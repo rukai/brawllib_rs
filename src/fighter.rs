@@ -11,7 +11,7 @@ use crate::arc;
 use crate::bres::BresChildData;
 use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
-use crate::sakurai::{SectionData, SectionScript};
+use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
 
@@ -118,6 +118,32 @@ impl Fighter {
             modded_by_psa,
             mod_type,
         })
+    }
+
+    /// retrieves the ArcSakurai
+    pub fn get_fighter_sakurai(&self) -> Option<&ArcSakurai> {
+        for sub_arc in &self.moveset.children {
+            match &sub_arc.data {
+                &ArcChildData::Sakurai (ref sakurai) => {
+                    return Some(sakurai);
+                }
+                _ => { }
+            }
+        }
+        None
+    }
+
+    /// retrieves the common ArcSakurai
+    pub fn get_fighter_sakurai_common(&self) -> Option<&ArcSakurai> {
+        for sub_arc in &self.moveset_common.children {
+            match &sub_arc.data {
+                &ArcChildData::Sakurai (ref sakurai) => {
+                    return Some(sakurai);
+                }
+                _ => { }
+            }
+        }
+        None
     }
 
     /// retrieves the fighter data

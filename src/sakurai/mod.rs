@@ -21,35 +21,13 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     let external_subroutines_offset = sections_offset + section_count as usize * ARC_SAKURAI_SECTION_HEADER_SIZE;
     let string_table_offset = external_subroutines_offset + external_subroutine_count as usize * EXTERNAL_SUBROUTINE_SIZE;
 
+    let parent_data = &data[ARC_SAKURAI_HEADER_SIZE ..];
+
     let mut lookup_entries = vec!();
     for i in 0..lookup_entry_count {
         let offset = lookup_entry_offset as usize + i as usize * 4;
         let entry_offset = (&data[offset..]).read_i32::<BigEndian>().unwrap();
         lookup_entries.push(entry_offset);
-    }
-
-    let mut sections = vec!();
-    for i in 0..section_count {
-        let offset = sections_offset + i as usize * ARC_SAKURAI_SECTION_HEADER_SIZE;
-        let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
-        let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
-        let name = String::from(util::parse_str(&data[string_table_offset + string_offset as usize ..]).unwrap());
-
-        let parent_data = &data[ARC_SAKURAI_HEADER_SIZE ..];
-        let data = &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize..];
-        let mut section_data = match name.as_str() {
-            "data"       => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data)),
-            "dataCommon" => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data)),
-            _            => SectionData::None
-        };
-
-        if name.starts_with("gameAnimCmd_") || name.starts_with("effectAnimCmd_") || name.starts_with("statusAnimCmdGroup_") || name.starts_with("statusAnimCmdPre_") {
-            section_data = SectionData::Script(SectionScript {
-                name:   name.clone(),
-                script: script::new_script(parent_data, data_offset)
-            });
-        }
-        sections.push(ArcSakuraiSection { name, data: section_data });
     }
 
     let mut external_subroutines = vec!();
@@ -68,7 +46,59 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
         external_subroutines.push(ExternalSubroutine { name, offset: data_offset });
     }
 
-    ArcSakurai { lookup_entries, sections, external_subroutines }
+    let mut sections = vec!();
+    for i in 0..section_count {
+        let offset = sections_offset + i as usize * ARC_SAKURAI_SECTION_HEADER_SIZE;
+        let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
+        let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
+        let name = String::from(util::parse_str(&data[string_table_offset + string_offset as usize ..]).unwrap());
+
+        let data = &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize..];
+        let mut section_data = match name.as_str() {
+            "data"       => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data)),
+            "dataCommon" => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data)),
+            _            => SectionData::None
+        };
+
+        if name.starts_with("gameAnimCmd_") || name.starts_with("effectAnimCmd_") || name.starts_with("statusAnimCmdGroup_") || name.starts_with("statusAnimCmdPre_") {
+            section_data = SectionData::Script(SectionScript {
+                name:   name.clone(),
+                script: script::new_script(parent_data, data_offset),
+            });
+        }
+        sections.push(ArcSakuraiSection { name, data: section_data });
+    }
+
+    // locate all script fragments called by subroutines etc.
+    let mut all_scripts = vec!();
+    let mut all_scripts_sub = vec!();
+    for section in &sections {
+        match &section.data {
+            SectionData::FighterData(data) => {
+                all_scripts.push(data.entry_actions.as_slice());
+                all_scripts.push(data.exit_actions.as_slice());
+                all_scripts.push(data.subaction_main.as_slice());
+                all_scripts.push(data.subaction_gfx.as_slice());
+                all_scripts.push(data.subaction_sfx.as_slice());
+                all_scripts.push(data.subaction_other.as_slice());
+            }
+            SectionData::FighterDataCommon(data_common) => {
+                all_scripts.push(data_common.entry_actions.as_slice());
+                all_scripts.push(data_common.exit_actions.as_slice());
+            }
+            SectionData::Script(script) => {
+                all_scripts_sub.push(script.script.clone());
+            }
+            _ => { }
+        }
+    }
+    all_scripts.push(all_scripts_sub.as_slice());
+
+    let ignore_origins: Vec<_> = external_subroutines.iter().map(|x| x.offset).collect();
+    let mut fragment_scripts = script::fragment_scripts(parent_data, all_scripts.as_slice(), &ignore_origins);
+    fragment_scripts.sort_by_key(|x| x.offset);
+
+    ArcSakurai { lookup_entries, sections, external_subroutines, fragment_scripts }
 }
 
 const ARC_SAKURAI_HEADER_SIZE: usize = 0x20;
@@ -77,6 +107,7 @@ pub struct ArcSakurai {
     lookup_entries:           Vec<i32>,
     pub sections:             Vec<ArcSakuraiSection>,
     pub external_subroutines: Vec<ExternalSubroutine>,
+    pub fragment_scripts:     Vec<Script>,
 }
 
 const ARC_SAKURAI_SECTION_HEADER_SIZE: usize = 0x8;
