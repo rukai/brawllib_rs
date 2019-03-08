@@ -1,4 +1,4 @@
-use crate::high_level_fighter::CollisionBoxValues;
+use crate::high_level_fighter::{CollisionBoxValues, SectionScriptAst};
 use crate::high_level_fighter;
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::script::{Requirement, VariableDataType};
@@ -30,8 +30,10 @@ use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
     pub call_stacks:          Vec<CallStack<'a>>,
-    pub all_scripts:          &'a [&'a ScriptAst],
-    pub call_every_frame:     HashMap<i32, &'a Block>,
+    pub fighter_scripts:      &'a [&'a ScriptAst],
+    pub common_scripts:       &'a [&'a ScriptAst],
+    pub section_scripts:      &'a [SectionScriptAst],
+    pub call_every_frame:     HashMap<i32, CallEveryFrame<'a>>,
     pub visited_gotos:        Vec<i32>,
     pub frame_index:          f32,
     pub interruptible:        bool,
@@ -151,6 +153,7 @@ pub struct Call<'a> {
     pub block: &'a Block,
     pub index: usize,
     pub subroutine: bool,
+    pub external: bool,
 }
 
 pub enum ChangeSubaction {
@@ -234,17 +237,18 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_scripts: &[&'a ScriptAst], all_scripts: &'a [&'a ScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
+    pub fn new(subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
                 block: &script.block,
                 index: 0,
-                subroutine: false
+                subroutine: false,
+                external: false,
             });
             call_stacks.push(CallStack {
                 calls,
-                wait_until: -1.0
+                wait_until: -1.0,
             });
         }
 
@@ -358,7 +362,9 @@ impl<'a> ScriptRunner<'a> {
 
         let mut runner = ScriptRunner {
             call_stacks,
-            all_scripts,
+            fighter_scripts,
+            common_scripts,
+            section_scripts,
             call_every_frame:     HashMap::new(),
             visited_gotos:        vec!(),
             frame_index:          0.0,
@@ -501,15 +507,16 @@ impl<'a> ScriptRunner<'a> {
         }
 
         // create a callstack for CallEveryFrame block
-        for block in self.call_every_frame.values() {
+        for call_every_frame in self.call_every_frame.values() {
             let calls = vec!(Call {
-                block: block,
+                block: call_every_frame.block,
                 index: 0,
-                subroutine: false
+                subroutine: false,
+                external: call_every_frame.external,
             });
             self.call_stacks.push(CallStack {
                 calls,
-                wait_until: -1.0
+                wait_until: -1.0,
             });
         }
 
@@ -525,23 +532,24 @@ impl<'a> ScriptRunner<'a> {
                 let call = self.call_stacks[i].calls.last().unwrap();
                 if let Some(event) = call.block.events.get(call.index) {
                     self.call_stacks[i].calls.last_mut().unwrap().index += 1;
-                    match self.step_event(event, self.all_scripts, action_name) {
+                    let external = self.call_stacks[i].calls.last().unwrap().external;
+                    match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts, action_name) {
                         StepEventResult::WaitUntil (value) => {
                             self.call_stacks[i].wait_until = value;
                         }
                         StepEventResult::NewForLoop { block, iterations } => {
                             for _ in 0..iterations {
-                                self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
+                                self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
                             }
                         }
-                        StepEventResult::NewCall (block) => {
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
+                        StepEventResult::NewCall { block } => {
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
                         }
-                        StepEventResult::Subroutine (block) => {
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: true });
+                        StepEventResult::Subroutine { block, external } => {
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: true, external });
                         }
-                        StepEventResult::CallEveryFrame { block, thread_id } => {
-                            self.call_every_frame.insert(thread_id, block);
+                        StepEventResult::CallEveryFrame { block, thread_id, external } => {
+                            self.call_every_frame.insert(thread_id, CallEveryFrame { block, external });
                         }
                         StepEventResult::Return => {
                             let mut run = false;
@@ -549,9 +557,9 @@ impl<'a> ScriptRunner<'a> {
                                 run = self.call_stacks[i].calls.pop().map(|x| !x.subroutine).unwrap_or(false);
                             }
                         }
-                        StepEventResult::Goto (block) => {
+                        StepEventResult::Goto { block, external } => {
                             self.call_stacks[i].calls.pop();
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false });
+                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
                         }
                         StepEventResult::None => { }
                     }
@@ -584,7 +592,7 @@ impl<'a> ScriptRunner<'a> {
     }
 
     /// Returns the wait_until value
-    fn step_event<'b>(&mut self, event: &'b EventAst, all_scripts: &[&'b ScriptAst], action_name: &str) -> StepEventResult<'b> {
+    fn step_event<'b>(&mut self, event: &'b EventAst, external: bool, fighter_scripts: &[&'b ScriptAst], common_scripts: &[&'b ScriptAst], section_scripts: &'b [SectionScriptAst], action_name: &str) -> StepEventResult<'b> {
         match event {
             &EventAst::SyncWait (ref value) => {
                 return StepEventResult::WaitUntil (self.frame_index + *value);
@@ -599,11 +607,18 @@ impl<'a> ScriptRunner<'a> {
                     }
                     Iterations::Infinite => {
                         // obviously an infinite loop should not be attempted :P
-                        return StepEventResult::NewCall (&for_loop.block);
+                        return StepEventResult::NewCall { block: &for_loop.block };
                     }
                 }
             }
             &EventAst::Subroutine (ref offset) => {
+                if !external {
+                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
+                        return StepEventResult::Subroutine { block: &script.script.block, external: true };
+                    }
+                }
+
+                let all_scripts = if external { common_scripts } else { fighter_scripts };
                 // TODO: Maybe I should implement a protection similar to visited_gotos for subroutines.
                 // If that turns out to be a bad idea document why.
                 for script in all_scripts.iter() {
@@ -612,7 +627,7 @@ impl<'a> ScriptRunner<'a> {
                             error!("Avoided hard Subroutine infinite loop (attempted to jump to the same location)");
                         }
                         else {
-                            return StepEventResult::Subroutine (&script.block);
+                            return StepEventResult::Subroutine { block: &script.block, external };
                         }
                     }
                 }
@@ -622,11 +637,18 @@ impl<'a> ScriptRunner<'a> {
                 return StepEventResult::Return;
             }
             &EventAst::Goto (ref offset) => {
+                if !external {
+                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
+                        return StepEventResult::Goto { block: &script.script.block, external: true };
+                    }
+                }
+
+                let all_scripts = if external { common_scripts } else { fighter_scripts };
                 if !self.visited_gotos.iter().any(|x| *x == offset.offset) {
                     self.visited_gotos.push(offset.offset);
                     for script in all_scripts.iter() {
                         if script.offset == offset.offset {
-                            return StepEventResult::Goto (&script.block);
+                            return StepEventResult::Goto { block: &script.block, external };
                         }
                     }
                     error!("Couldnt find Goto offset");
@@ -635,11 +657,11 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::IfStatement (ref if_statement) => {
                 if self.evaluate_expression(&if_statement.test).unwrap_bool() {
-                    return StepEventResult::NewCall (&if_statement.then_branch);
+                    return StepEventResult::NewCall { block: &if_statement.then_branch };
                 }
                 else {
                     if let Some(else_branch) = &if_statement.else_branch {
-                        return StepEventResult::NewCall (else_branch);
+                        return StepEventResult::NewCall { block: else_branch };
                     }
                 }
             }
@@ -649,9 +671,16 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::DefaultCase => { }
             &EventAst::LoopRest => { error!("LoopRest: This means the code is expected to infinite loop") } // TODO: Handle infinite loops better
             &EventAst::CallEveryFrame { thread_id, ref offset } => {
+                if !external {
+                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
+                        return StepEventResult::CallEveryFrame { thread_id, block: &script.script.block, external: true };
+                    }
+                }
+
+                let all_scripts = if external { common_scripts } else { fighter_scripts };
                 for script in all_scripts.iter() {
                     if script.offset == offset.offset {
-                        return StepEventResult::CallEveryFrame { thread_id, block: &script.block };
+                        return StepEventResult::CallEveryFrame { thread_id, block: &script.block, external };
                     }
                 }
             }
@@ -1363,12 +1392,17 @@ impl<'a> ScriptRunner<'a> {
 enum StepEventResult<'a> {
     WaitUntil      (f32),
     NewForLoop     { block: &'a Block, iterations: i32 },
-    NewCall        (&'a Block),
-    Goto           (&'a Block),
-    Subroutine     (&'a Block),
-    CallEveryFrame { block: &'a Block, thread_id: i32 },
+    NewCall        { block: &'a Block },
+    Goto           { block: &'a Block, external: bool },
+    Subroutine     { block: &'a Block, external: bool },
+    CallEveryFrame { block: &'a Block, external: bool, thread_id: i32 },
     Return,
     None
+}
+
+pub struct CallEveryFrame<'a> {
+    pub block:    &'a Block,
+    pub external: bool,
 }
 
 #[derive(Debug)]

@@ -10,7 +10,7 @@ use fighter_data::ArcFighterData;
 use fighter_data_common::ArcFighterDataCommon;
 
 pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
-    let _size                     = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
+    let size                      = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
     let lookup_entry_offset       = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
     let lookup_entry_count        = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
     let section_count             = (&data[0x0c..]).read_i32::<BigEndian>().unwrap();
@@ -32,18 +32,21 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
 
     let mut external_subroutines = vec!();
     for i in 0..external_subroutine_count {
+        let mut offsets = vec!();
         let offset = external_subroutines_offset + i as usize * EXTERNAL_SUBROUTINE_SIZE;
-        let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
+        let mut offset_linked_list = (&data[offset..]).read_i32::<BigEndian>().unwrap();
         let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
         let name = String::from(util::parse_str(&data[string_table_offset + string_offset as usize ..]).unwrap());
 
-        // Some of these point directly at the offset argument used by a script, we compare it with the offsets location later on.
-        // Others do not, I don't know what they are pointing at.
-        // Use this to investigate what the other data is.
-        //let data = &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize - 4..]; // start 4 bytes behind to see the argument type
-        //info!("{} {} {}", util::hex_dump(&data[..0x50]), data_offset, name);
+        // The offset_linked_list is a pointer to the offset argument used by a subroutine/goto call that is making an external call.
+        // However the since the value in subroutine/goto offset argument has no purpose as its an external call, it is instead used to point to another value subroutine/goto offset argument.
+        // This forms a linked list between all the subroutine/goto offset arguments that make the same external call.
+        while offset_linked_list > 0 && offset_linked_list < size {
+            offsets.push(offset_linked_list);
+            offset_linked_list = (&data[ARC_SAKURAI_HEADER_SIZE + offset_linked_list as usize..]).read_i32::<BigEndian>().unwrap();
+        }
 
-        external_subroutines.push(ExternalSubroutine { name, offset: data_offset });
+        external_subroutines.push(ExternalSubroutine { name, offsets });
     }
 
     let mut sections = vec!();
@@ -94,8 +97,8 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     }
     all_scripts.push(all_scripts_sub.as_slice());
 
-    let ignore_origins: Vec<_> = external_subroutines.iter().map(|x| x.offset).collect();
-    let mut fragment_scripts = script::fragment_scripts(parent_data, all_scripts.as_slice(), &ignore_origins);
+    let ignore_origins: Vec<_> = external_subroutines.iter().flat_map(|x| x.offsets.iter().cloned()).collect();
+    let mut fragment_scripts = script::fragment_scripts(parent_data, all_scripts.as_slice(), ignore_origins.as_slice());
     fragment_scripts.sort_by_key(|x| x.offset);
 
     ArcSakurai { lookup_entries, sections, external_subroutines, fragment_scripts }
@@ -136,5 +139,5 @@ const EXTERNAL_SUBROUTINE_SIZE: usize = 0x8;
 #[derive(Debug)]
 pub struct ExternalSubroutine {
     pub name: String,
-    pub offset: i32,
+    pub offsets: Vec<i32>,
 }

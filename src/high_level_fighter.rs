@@ -68,7 +68,7 @@ impl HighLevelFighter {
         let exit_actions_common:  Vec<ScriptAst> = fighter_data_common.exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
         let exit_actions:         Vec<ScriptAst> = fighter_data       .exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
 
-        let mut all_scripts = vec!();
+        let mut fighter_scripts = vec!();
         for script in fragment_scripts_fighter.iter()
             .chain(subaction_main.iter())
             .chain(subaction_gfx.iter())
@@ -77,7 +77,7 @@ impl HighLevelFighter {
             .chain(entry_actions.iter())
             .chain(exit_actions.iter())
         {
-            all_scripts.push(script);
+            fighter_scripts.push(script);
         }
 
         let mut common_scripts = vec!();
@@ -146,7 +146,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(&action_scripts, &all_scripts, &fighter_data);
+                let mut script_runner = ScriptRunner::new(&action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -1033,7 +1033,7 @@ impl SectionScriptAst {
         SectionScriptAst {
             name:    section_script.name.clone(),
             script:  ScriptAst::new(&section_script.script),
-            callers: external_subroutines.iter().filter(|x| x.name == section_script.name).map(|x| x.offset).collect(),
+            callers: external_subroutines.iter().find(|x| x.name == section_script.name).map(|x| x.offsets.clone()).unwrap_or_default(),
         }
     }
 }
