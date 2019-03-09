@@ -1,4 +1,4 @@
-use crate::script::{Script, Event, Requirement, Variable, Argument, Offset};
+use crate::script::{Script, Event, Requirement, Argument, Offset};
 use crate::script;
 
 use std::iter::Iterator;
@@ -238,6 +238,46 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x06, 0x2B, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
+                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
+                        let v12u = v12 as u32;
+                        EventAst::ThrownHitBox (HitBoxArguments {
+                            bone_index:                  (v0 >> 16) as i16,
+                            set_id:                      (v0 >> 8)  as u8,
+                            hitbox_id:                    v0        as u8,
+                            damage:                       v1,
+                            trajectory:                   v2,
+                            weight_knockback:            (v3 >> 16) as i16,
+                            kbg:                          v3        as i16,
+                            shield_damage:               (v4 >> 16) as i16,
+                            bkb:                          v4        as i16,
+                            size:                         v5,
+                            x_offset:                     v6,
+                            y_offset:                     v7,
+                            z_offset:                     v8,
+                            tripping_rate:                v9,
+                            hitlag_mult:                  v10,
+                            di_mult:                      v11,
+                            effect:     HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                            unk1:                        (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                            sound_level:                ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                            unk2:                       ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                            sound:      HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
+                            unk3:                       ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                            ground:                      (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                            aerial:                      (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                            unk4:                       ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                            sse_type: HitBoxSseType::new((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
+                            clang:                       (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk5:                        (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            direct:                      (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk6:                      ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                        })
+                    }
+                    _ => EventAst::Unknown (event.clone())
+                }
+            }
             (0x06, 0x15, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Value(v14))) => {
@@ -382,9 +422,9 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     EventAst::ApplyThrow (ApplyThrow {
                         unk0: v0,
                         bone: v1,
-                        unk1: v2.clone(),
-                        unk2: v3.clone(),
-                        unk3: v4.clone(),
+                        unk1: VariableAst::new(v2),
+                        unk2: VariableAst::new(v3),
+                        unk3: VariableAst::new(v4),
                     })
                 } else {
                     EventAst::Unknown(event.clone())
@@ -638,6 +678,47 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x1A, 0x00, Some(&Value(v0)), None, None) => EventAst::ScreenShake { magnitude: v0 },
+            (0x1A, 0x04, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
+                if let (Some(&Scalar(v3)), Some(&Scalar(v4))) = (args.get(3), args.get(4)) {
+                    EventAst::CameraCloseup (CameraCloseup {
+                        zoom_time: v0,
+                        unk: v1,
+                        distance: v2,
+                        x_angle: v3,
+                        y_angle: v4,
+                    })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x1A, 0x08, None,             None,             None) => EventAst::CameraNormal,
+            (0x1F, 0x00, Some(&Value(v0)), None,             None) => EventAst::ItemPickup { unk1: v0, unk2: None, unk3: None, unk4: None },
+            (0x1F, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ItemPickup { unk1: v0, unk2: Some(v1), unk3: None, unk4: None },
+            (0x1F, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => 
+                if let Some(&Value(v3)) = args.get(3) {
+                    EventAst::ItemPickup { unk1: v0, unk2: Some(v1), unk3: Some(v2), unk4: Some(v3) }
+                } else {
+                    EventAst::Unknown (event.clone())
+                },
+            (0x1F, 0x01, Some(&Variable(ref v0)), Some(&Variable(ref v1)), Some(&Variable(ref v2))) =>
+                if let (Some(&Variable(ref v3)), Some(&Variable(ref v4))) = (args.get(3), args.get(4)) {
+                    EventAst::ItemThrow { unk1: VariableAst::new(v0), unk2: VariableAst::new(v1), unk3: VariableAst::new(v2), unk4: Some(VariableAst::new(v3)), unk5: Some(VariableAst::new(v4)) }
+                } else {
+                    EventAst::Unknown (event.clone())
+                },
+            (0x1F, 0x0E, Some(&Variable(ref v0)), Some(&Variable(ref v1)), Some(&Variable(ref v2)))
+                => EventAst::ItemThrow { unk1: VariableAst::new(v0), unk2: VariableAst::new(v1), unk3: VariableAst::new(v2), unk4: None, unk5: None },
+            (0x1F, 0x01, Some(&Scalar(v0)), Some(&Scalar(v1)), Some(&Variable(ref v2))) =>
+                    EventAst::ItemThrow2 { unk1: v0, unk2: v1, unk3: VariableAst::new(v2) },
+            (0x1F, 0x02, None,             None,              None) => EventAst::ItemDrop,
+            (0x1F, 0x03, Some(&Value(v0)), None,              None) => EventAst::ItemConsume { unk: v0 },
+            (0x1F, 0x04, Some(&Value(v0)), Some(&Scalar(v1)), None) => EventAst::ItemSetProperty { unk1: v0, unk2: v1 },
+            (0x1F, 0x05, None,             None,              None) => EventAst::FireWeapon,
+            (0x1F, 0x06, None,             None,              None) => EventAst::FireProjectile,
+            (0x1F, 0x07, Some(&Value(v0)), None,              None) => EventAst::Item1F { unk: v0 },
+            (0x1F, 0x08, Some(&Value(v0)), None,              None) => EventAst::ItemCreate { unk: v0 },
+            (0x1F, 0x09, Some(&Bool(v0)),  None,              None) => EventAst::ItemVisibility (v0),
+            (0x1F, 0x0C, Some(&Value(v0)), None,              None) => EventAst::BeamSwordTrail { unk: v0 },
             _ => EventAst::Unknown (event.clone())
         };
         // Brawlbox has some extra parameter types it uses to handle some special cases:
@@ -796,6 +877,9 @@ pub enum EventAst {
     ReverseDirection,
     /// Create a hitbox with the specified parameters.
     CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
+    /// Create a hitbox with the specified parameters on the character to be thrown. The hitbox can not hit the throwing character or the thrown character.
+    /// TODO: I actually dont understand this at all, it seems characters without this still have hitboxes regardless of who throws who.
+    ThrownHitBox (HitBoxArguments),
     /// Remove all currently present hitboxes.
     DeleteAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     /// Create a hitbox with the even more parameters.
@@ -938,6 +1022,34 @@ pub enum EventAst {
     AestheticWindEffect (AestheticWindEffect),
     /// Shakes the screen.
     ScreenShake { magnitude: i32 },
+    /// Zoom the camera on the character.
+    CameraCloseup (CameraCloseup),
+    /// Return the camera to its normal settings.
+    CameraNormal,
+    /// Cause the character to receive the closest item in range.
+    ItemPickup { unk1: i32, unk2: Option<i32>, unk3: Option<i32>, unk4: Option<i32> },
+    /// Cause the character to throw the currently held item.
+    ItemThrow { unk1: VariableAst, unk2: VariableAst, unk3: VariableAst, unk4: Option<VariableAst>, unk5: Option<VariableAst> },
+    /// Cause the character to throw the currently held item.
+    ItemThrow2 { unk1: f32, unk2: f32, unk3: VariableAst },
+    /// Cause the character to drop any currently held item.
+    ItemDrop,
+    /// Cause the character to consume the currently held item.
+    ItemConsume { unk: i32 },
+    /// Set a property of the currently held item.
+    ItemSetProperty { unk1: i32, unk2: f32 },
+    /// Fires a shot from the currently held item.
+    FireWeapon,
+    /// Fires a projectile.
+    FireProjectile,
+    /// Used when firing a cracker launcher.
+    Item1F { unk: i32 },
+    /// Create an item in the characters hand.
+    ItemCreate { unk: i32 },
+    /// Determines the visibility of the currently held item.
+    ItemVisibility (bool),
+    /// Creates a beam sword trail. Probably has more uses among battering weapons.
+    BeamSwordTrail { unk: i32 },
     /// Unknown event.
     Unknown (Event)
 }
@@ -1453,9 +1565,9 @@ pub struct SpecifyThrow {
 pub struct ApplyThrow {
     pub unk0: i32,
     pub bone: i32,
-    pub unk1: Variable,
-    pub unk2: Variable,
-    pub unk3: Variable,
+    pub unk1: VariableAst,
+    pub unk2: VariableAst,
+    pub unk3: VariableAst,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1638,4 +1750,13 @@ pub struct AestheticWindEffect {
 pub struct ChangeAction {
     pub action: i32,
     pub test:   Expression
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct CameraCloseup {
+    pub zoom_time: i32,
+    pub unk:       i32,
+    pub distance:  f32,
+    pub x_angle:   f32,
+    pub y_angle:   f32,
 }

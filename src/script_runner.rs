@@ -756,6 +756,7 @@ impl<'a> ScriptRunner<'a> {
                     error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }
             }
+            &EventAst::ThrownHitBox (_) => { }
             &EventAst::CreateSpecialHitBox (ref args) => {
                 if args.hitbox_args.hitbox_id < self.hitboxes.len() as u8 {
                     // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
@@ -1044,6 +1045,20 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::ModelChanger { .. } => {
                 // TODO: Model visibility change
             }
+            &EventAst::CameraCloseup (_) => { }
+            &EventAst::CameraNormal => { }
+            &EventAst::ItemPickup { .. } => { }
+            &EventAst::ItemThrow { .. } => { }
+            &EventAst::ItemThrow2 { .. } => { }
+            &EventAst::ItemDrop => { }
+            &EventAst::ItemConsume { .. } => { }
+            &EventAst::ItemSetProperty { .. } => { }
+            &EventAst::Item1F { .. } => { }
+            &EventAst::ItemCreate { .. } => { }
+            &EventAst::BeamSwordTrail { .. } => { }
+            &EventAst::ItemVisibility (_) => { }
+            &EventAst::FireWeapon => { }
+            &EventAst::FireProjectile => { }
 
             // do nothing
             &EventAst::Unknown (ref event) => {
