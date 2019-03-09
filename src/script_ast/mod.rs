@@ -395,7 +395,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15), args.get(16)) {
                     (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), Some(&Value(v6)), Some(&Value(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Value(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Bool(v14)), Some(&Bool(v15)), Some(&Value(v16))) => {
                         EventAst::SpecifyThrow (SpecifyThrow {
-                            id:          v0,
+                            throw_use:   ThrowUse::new(v0),
                             bone:        v1,
                             damage:      v2,
                             trajectory:  v3,
@@ -1542,7 +1542,7 @@ impl GrabTarget {
 #[derive(Serialize, Clone, Debug)]
 pub struct SpecifyThrow {
     /// ID of throw data. Seemingly, a "0" indicates this is the throw data, while a "1" indicates this is used if the opponent escapes during the throw. "2" has also been seen (by Light Arrow)."
-    pub id:          i32,
+    pub throw_use:   ThrowUse,
     pub bone:        i32,
     pub damage:      i32,
     pub trajectory:  i32,
@@ -1559,6 +1559,23 @@ pub struct SpecifyThrow {
     pub unk4:        bool,
     pub unk5:        bool,
     pub i_frames:    i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum ThrowUse {
+    Throw,
+    GrabInterrupt,
+    Unknown (i32),
+}
+
+impl ThrowUse {
+    fn new(value: i32) -> ThrowUse {
+        match value {
+            0 => ThrowUse::Throw,
+            1 => ThrowUse::GrabInterrupt,
+            v => ThrowUse::Unknown (v),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]

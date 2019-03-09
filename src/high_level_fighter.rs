@@ -253,7 +253,24 @@ impl HighLevelFighter {
                         };
                         let ecb = gen_ecb(&frame_bones, &fighter_data.misc.ecb_bones, min_ecb);
 
+                        let mut throw = None;
+                        if let Some(ref specify_throw) = script_runner.throw {
+                            if script_runner.throw_activate {
+                                throw = Some(HighLevelThrow {
+                                    damage:      specify_throw.damage,
+                                    trajectory:  specify_throw.trajectory,
+                                    kbg:         specify_throw.kbg,
+                                    wk:          specify_throw.wk,
+                                    bkb:         specify_throw.bkb,
+                                    effect:      specify_throw.effect.clone(),
+                                    sfx:         specify_throw.sfx.clone(),
+                                    i_frames:    specify_throw.i_frames,
+                                });
+                            }
+                        }
+
                         frames.push(HighLevelFrame {
+                            throw,
                             ecb,
                             x_pos,
                             y_pos,
@@ -262,16 +279,17 @@ impl HighLevelFighter {
                             x_vel_temp,
                             y_vel_temp,
                             hurt_boxes,
-                            hit_boxes:           hl_hit_boxes,
-                            interruptible:       script_runner.interruptible,
-                            landing_lag:         script_runner.landing_lag,
-                            edge_slide:          script_runner.edge_slide.clone(),
-                            airbourne:           script_runner.airbourne,
-                            hitbox_sets_rehit:   script_runner.hitbox_sets_rehit,
-                            slope_contour_stand: script_runner.slope_contour_stand,
-                            slope_contour_full:  script_runner.slope_contour_full,
-                            rumble:              script_runner.rumble,
-                            rumble_loop:         script_runner.rumble_loop,
+                            hit_boxes:             hl_hit_boxes,
+                            interruptible:         script_runner.interruptible,
+                            landing_lag:           script_runner.landing_lag,
+                            edge_slide:            script_runner.edge_slide.clone(),
+                            airbourne:             script_runner.airbourne,
+                            hitbox_sets_rehit:     script_runner.hitbox_sets_rehit,
+                            slope_contour_stand:   script_runner.slope_contour_stand,
+                            slope_contour_full:    script_runner.slope_contour_full,
+                            rumble:                script_runner.rumble,
+                            rumble_loop:           script_runner.rumble_loop,
+                            grab_interrupt_damage: script_runner.grab_interrupt_damage,
                         });
 
                         if iasa.is_none() && script_runner.interruptible {
@@ -471,21 +489,37 @@ pub struct HighLevelScripts {
 }
 
 #[derive(Serialize, Clone, Debug)]
+pub struct HighLevelThrow {
+    // TODO: I imagine the bone is used to determine the location the character is thrown from.
+    // Transform the bone into an xy offset.
+    pub damage:      i32,
+    pub trajectory:  i32,
+    pub kbg:         i32,
+    pub wk:          i32,
+    pub bkb:         i32,
+    pub effect:      HitBoxEffect,
+    pub sfx:         HitBoxSound,
+    pub i_frames:    i32,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFrame {
-    pub hurt_boxes:          Vec<HighLevelHurtBox>,
-    pub hit_boxes:           Vec<HighLevelHitBox>,
-    pub x_pos:               f32,
-    pub y_pos:               f32,
-    pub interruptible:       bool,
-    pub edge_slide:          EdgeSlide,
-    pub airbourne:           bool,
-    pub landing_lag:         bool,
-    pub ecb:                 ECB,
-    pub hitbox_sets_rehit:   [bool; 10],
-    pub slope_contour_stand: Option<i32>,
-    pub slope_contour_full:  Option<(i32, i32)>,
-    pub rumble:              Option<(i32, i32)>,
-    pub rumble_loop:         Option<(i32, i32)>,
+    pub hurt_boxes:            Vec<HighLevelHurtBox>,
+    pub hit_boxes:             Vec<HighLevelHitBox>,
+    pub x_pos:                 f32,
+    pub y_pos:                 f32,
+    pub interruptible:         bool,
+    pub edge_slide:            EdgeSlide,
+    pub airbourne:             bool,
+    pub landing_lag:           bool,
+    pub ecb:                   ECB,
+    pub hitbox_sets_rehit:     [bool; 10],
+    pub slope_contour_stand:   Option<i32>,
+    pub slope_contour_full:    Option<(i32, i32)>,
+    pub rumble:                Option<(i32, i32)>,
+    pub rumble_loop:           Option<(i32, i32)>,
+    pub grab_interrupt_damage: Option<i32>,
+    pub throw:                 Option<HighLevelThrow>,
     /// Affects the next frames velocity
     pub x_vel_modify: VelModify,
     /// Affects the next frames velocity

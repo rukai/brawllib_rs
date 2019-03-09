@@ -18,6 +18,8 @@ use crate::script_ast::{
     Expression,
     ComparisonOperator,
     ChangeAction,
+    SpecifyThrow,
+    ThrowUse,
 };
 use crate::script_ast::variable_ast::{
     VariableAst,
@@ -44,34 +46,38 @@ pub struct ScriptRunner<'a> {
     pub frame_speed_modifier: f32,
     pub tag_display:          bool,
     /// State is maintained across frames
-    pub x:                    f32,
+    pub x: f32,
     /// State is maintained across frames
-    pub y:                    f32,
+    pub y: f32,
     /// State is maintained across frames
-    pub x_vel:                f32,
+    pub x_vel: f32,
     /// State is maintained across frames
-    pub y_vel:                f32,
+    pub y_vel: f32,
     /// Reset to None before processing each frame
-    pub x_vel_modify:         VelModify,
+    pub x_vel_modify: VelModify,
     /// Reset to None before processing each frame
-    pub y_vel_modify:         VelModify,
-    pub disable_movement:     DisableMovement,
-    pub armor_type:           ArmorType,
-    pub armor_tolerance:      f32,
-    pub damage:               f32,
-    pub airbourne:            bool,
-    pub edge_slide:           EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
-    pub reverse_direction:    bool,
-    pub change_subaction:     ChangeSubaction,
+    pub y_vel_modify: VelModify,
+    pub disable_movement:  DisableMovement,
+    pub armor_type:        ArmorType,
+    pub armor_tolerance:   f32,
+    pub damage:            f32,
+    pub airbourne:         bool,
+    pub edge_slide:        EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
+    pub reverse_direction: bool,
+    pub change_subaction:  ChangeSubaction,
     /// Children of these bones are also visible
-    pub invisible_bones:      Vec<i32>,
+    pub invisible_bones: Vec<i32>,
     /// Each ChangeAction is rechecked every frame after being created
-    pub change_actions:       Vec<ChangeAction>,
-    pub hitbox_sets_rehit:    [bool; 10],
-    pub slope_contour_stand:  Option<i32>,
-    pub slope_contour_full:   Option<(i32, i32)>,
-    pub rumble:               Option<(i32, i32)>,
-    pub rumble_loop:          Option<(i32, i32)>,
+    pub change_actions:        Vec<ChangeAction>,
+    pub hitbox_sets_rehit:     [bool; 10],
+    pub slope_contour_stand:   Option<i32>,
+    pub slope_contour_full:    Option<(i32, i32)>,
+    pub rumble:                Option<(i32, i32)>,
+    pub rumble_loop:           Option<(i32, i32)>,
+    pub grab_interrupt_damage: Option<i32>,
+    pub throw:                 Option<SpecifyThrow>,
+    /// Reset to false before processing each frame.
+    pub throw_activate: bool,
 
     // LongtermAccessInt
     pub jumps_used: i32,
@@ -365,36 +371,39 @@ impl<'a> ScriptRunner<'a> {
             fighter_scripts,
             common_scripts,
             section_scripts,
-            call_every_frame:     HashMap::new(),
-            visited_gotos:        vec!(),
-            frame_index:          0.0,
-            interruptible:        false,
-            hitboxes:             [None, None, None, None, None, None, None],
-            hurtbox_state_all:    HurtBoxState::Normal,
-            hurtbox_states:       HashMap::new(),
-            ledge_grab_enable:    LedgeGrabEnable::Disable,
-            frame_speed_modifier: 1.0,
-            tag_display:          true,
-            x:                    0.0,
-            y:                    0.0,
-            x_vel:                0.0,
-            y_vel:                0.0,
-            x_vel_modify:         VelModify::None,
-            y_vel_modify:         VelModify::None,
-            disable_movement:     DisableMovement::Enable,
-            armor_type:           ArmorType::None,
-            armor_tolerance:      0.0,
-            damage:               0.0,
-            airbourne:            false,
-            edge_slide:           EdgeSlide::SlideOff,
-            reverse_direction:    false,
-            change_subaction:     ChangeSubaction::Continue,
-            change_actions:       vec!(),
-            hitbox_sets_rehit:    [false; 10],
-            slope_contour_stand:  None,
-            slope_contour_full:   None,
-            rumble:               None,
-            rumble_loop:          None,
+            call_every_frame:      HashMap::new(),
+            visited_gotos:         vec!(),
+            frame_index:           0.0,
+            interruptible:         false,
+            hitboxes:              [None, None, None, None, None, None, None],
+            hurtbox_state_all:     HurtBoxState::Normal,
+            hurtbox_states:        HashMap::new(),
+            ledge_grab_enable:     LedgeGrabEnable::Disable,
+            frame_speed_modifier:  1.0,
+            tag_display:           true,
+            x:                     0.0,
+            y:                     0.0,
+            x_vel:                 0.0,
+            y_vel:                 0.0,
+            x_vel_modify:          VelModify::None,
+            y_vel_modify:          VelModify::None,
+            disable_movement:      DisableMovement::Enable,
+            armor_type:            ArmorType::None,
+            armor_tolerance:       0.0,
+            damage:                0.0,
+            airbourne:             false,
+            edge_slide:            EdgeSlide::SlideOff,
+            reverse_direction:     false,
+            change_subaction:      ChangeSubaction::Continue,
+            change_actions:        vec!(),
+            hitbox_sets_rehit:     [false; 10],
+            slope_contour_stand:   None,
+            slope_contour_full:    None,
+            rumble:                None,
+            rumble_loop:           None,
+            grab_interrupt_damage: None,
+            throw:                 None,
+            throw_activate:        false,
             invisible_bones,
 
             // LongtermAccessInt
@@ -486,6 +495,7 @@ impl<'a> ScriptRunner<'a> {
         for rehit in self.hitbox_sets_rehit.iter_mut() {
             *rehit = false;
         }
+        self.throw_activate = false;
         self.rumble = None; // TODO: I guess rumble_loop shouldnt be reset?
         self.visited_gotos.clear();
         self.x_vel_modify = VelModify::None;
@@ -853,11 +863,20 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::SpecifyThrow (_) => {
-                // TODO
+            &EventAst::SpecifyThrow (ref throw) => {
+                match throw.throw_use {
+                    ThrowUse::Throw => {
+                        self.throw = Some(throw.clone());
+                    }
+                    ThrowUse::GrabInterrupt => {
+                        // The only known value in the specifier that affects the grab interrupt is damage
+                        self.grab_interrupt_damage = Some(throw.damage);
+                    }
+                    ThrowUse::Unknown (_) => { }
+                }
             }
             &EventAst::ApplyThrow (_) => {
-                // TODO
+                self.throw_activate = true;
             }
 
             // hurtboxes
