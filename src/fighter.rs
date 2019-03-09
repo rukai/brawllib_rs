@@ -43,8 +43,7 @@ impl Fighter {
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
         fighter_datas(brawl_fighter_dir, mod_fighter_dir)
-            //.into_par_iter()
-            .into_iter()
+            .into_par_iter()
             .filter_map(|x| Fighter::load_single(x, single_model))
             .collect()
     }
