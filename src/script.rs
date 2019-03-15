@@ -19,14 +19,20 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
                 if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) { // if the event is a subroutine or goto
                     if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(0) {
                         if !ignore_origins.contains(origin) {
-                            found_offset = Some(offset);
+                            found_offset = Some(*offset);
                         }
                     }
+                    // TODO: The values starting with 0x90 are gecko psa injections.
+                    // They seem to be always done with Argument::Value but I didnt check too closely.
+                    // Commented out because theres no way to handle gecko psa injections.
+                    //if let Some(Argument::Value (offset)) = event.arguments.get(0) {
+                    //    found_offset = Some(*offset);
+                    //}
                 }
                 if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
                     if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(1) {
                         if !ignore_origins.contains(origin) {
-                            found_offset = Some(offset);
+                            found_offset = Some(*offset);
                         }
                     }
                 }
@@ -34,16 +40,16 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
                     let mut is_action = false;
                     'outer: for check_scripts in known_scripts.iter() {
                         for check_script in check_scripts.iter() {
-                            if check_script.offset == *offset {
+                            if check_script.offset == offset {
                                 is_action = true;
                                 break 'outer;
                             }
                         }
                     }
-                    let already_added = fragments.iter().any(|x| x.offset == *offset);
+                    let already_added = fragments.iter().any(|x| x.offset == offset);
 
                     if !is_action && !already_added {
-                        fragments.push(new_script(parent_data, *offset));
+                        fragments.push(new_script(parent_data, offset));
                     }
                 }
             }

@@ -59,8 +59,10 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 return ProcessedBlock::EndForLoop (Block { events: event_asts })
             }
             (0x00, 0x07, Some(&Offset(ref v0)), None, None) => EventAst::Subroutine (v0.clone()),
+            (0x00, 0x07, Some(&Value (ref v0)), None, None) => EventAst::Subroutine (script::Offset { offset: *v0, origin: -1 }),
             (0x00, 0x08, None,                  None, None) => EventAst::Return,
             (0x00, 0x09, Some(&Offset(ref v0)), None, None) => EventAst::Goto (v0.clone()),
+            (0x00, 0x09, Some(&Value (ref v0)), None, None) => EventAst::Goto (script::Offset { offset: *v0, origin: -1 }),
             (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
                 if let Some(mut test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
                     match process_block(events) {
