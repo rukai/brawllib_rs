@@ -70,7 +70,7 @@ pub(crate) fn chr0(data: &[u8]) -> Chr0 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Chr0 {
     pub name: String,
     size: i32,
@@ -86,7 +86,7 @@ pub struct Chr0 {
 }
 
 const CHR0_CHILD_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Chr0Child {
     string_offset: i32,
     pub name: String,
@@ -112,7 +112,7 @@ impl Chr0Child {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Chr0ChildCode {
     value: u32,
 }
@@ -173,7 +173,7 @@ fn f(value: u32) -> Chr0Format {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Chr0Format {
     None,
     Interpolated4,
@@ -224,7 +224,7 @@ fn keyframe_holder(child_data: &[u8], data_offset: &mut usize, exists: bool, iso
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum KeyframeHolder {
     Isotropic (Keyframe),
     Individual { x: Keyframe, y: Keyframe, z: Keyframe },
@@ -246,7 +246,7 @@ impl KeyframeHolder {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Keyframe {
     Fixed (f32),
     Interpolated4 (Interpolated4Header),
@@ -405,7 +405,7 @@ impl Keyframe {
 }
 
 const INTERPOLATED_4_HEADER_SIZE: usize = 0x10;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated4Header {
     pub entries: u16,
     pub unk: u16,
@@ -416,7 +416,7 @@ pub struct Interpolated4Header {
 }
 
 const INTERPOLATED_4_ENTRY_SIZE: usize = 0x4;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated4Entry {
     pub data: u32,
 }
@@ -437,7 +437,7 @@ impl Interpolated4Entry {
 }
 
 const INTERPOLATED_6_HEADER_SIZE: usize = 0x10;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated6Header {
     pub num_frames: u16,
     pub unk: u16,
@@ -448,7 +448,7 @@ pub struct Interpolated6Header {
 }
 
 const INTERPOLATED_6_ENTRY_SIZE: usize = 0x6;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated6Entry {
     frame_index: u16,
     pub step: u16,
@@ -461,7 +461,7 @@ impl Interpolated6Entry {
 }
 
 const INTERPOLATED_12_HEADER_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated12Header {
     pub num_frames: u16,
     pub unk: u16,
@@ -470,7 +470,7 @@ pub struct Interpolated12Header {
 }
 
 const INTERPOLATED_12_ENTRY_SIZE: usize = 0xc;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Interpolated12Entry {
     pub frame_index: f32,
     pub value: f32,
@@ -485,7 +485,7 @@ pub struct InterpolatedNEntry {
 }
 
 const LINEAR_1_HEADER_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Linear1Header {
     pub step: f32,
     pub base: f32,
@@ -493,7 +493,7 @@ pub struct Linear1Header {
 }
 
 const LINEAR_2_HEADER_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Linear2Header {
     pub step: f32,
     pub base: f32,

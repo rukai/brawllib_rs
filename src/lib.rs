@@ -1,14 +1,20 @@
-//! In the below example we:
-//! *   Create a Fighter from an exported brawl fighter directory.
-//!     This is the raw data from the fighter folder, stored in a tree of structs
-//! *   Create a HighLevelFighter from an exported brawl fighter directory.
-//!     This contains processed data from the Fighter struct, stored in a tree of structs
-//! ```rust,no_run
-//! use brawllib_rs::fighter::Fighter;
-//! use brawllib_rs::high_level_fighter::HighLevelFighter;
-//! use std::fs;
+//! In this example we:
+//! *   Create a `BrawlMod` from a brawl mod sd card folder and a brawl dump folder.
+//! *   Load `Fighter`s from the brawl_mod.
+//!     This is the raw data from the fighter folder, stored in a tree of structs.
+//! *   Create a `HighLevelFighter` from an exported brawl fighter directory.
+//!     This contains processed data from the `Fighter` struct, stored in a tree of structs.
 //!
-//! for fighter in Fighter::load(fs::read_dir("some/real/dir/fighter").unwrap(), None, false) {
+//! ```rust,no_run
+//! use brawllib_rs::brawl_mod::BrawlMod;
+//! use brawllib_rs::high_level_fighter::HighLevelFighter;
+//! use std::path::PathBuf;
+//!
+//! let brawl_path = PathBuf::from("path/to/a/brawl/dump/folder");
+//! let mod_path = PathBuf::from("path/to/a/brawl/mod/sd/card/folder");
+//! let brawl_mod = BrawlMod::new(&brawl_path, Some(&mod_path));
+//!
+//! for fighter in brawl_mod.load_fighters(false).unwrap() {
 //!     println!("Fighter name: {}", fighter.cased_name);
 //!     println!("The name of the first model file name: {}", fighter.models[0].name);
 //!
@@ -23,6 +29,7 @@
 
 pub mod arc;
 pub mod bres;
+pub mod brawl_mod;
 pub mod chr0;
 pub mod fighter;
 pub mod high_level_fighter;

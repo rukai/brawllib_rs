@@ -28,14 +28,14 @@ pub(crate) fn definitions(data: &[u8], resources: Vec<Resource>) -> Vec<Definiti
 
 const DEFINITION_SIZE: usize = 0x8;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Definition {
     pub name: String,
 
     pub draw_calls: Vec<DrawCall>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DrawCall {
     pub material: u16,
     pub object: u16,

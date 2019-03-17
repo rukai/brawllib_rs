@@ -170,7 +170,7 @@ fn fighter_attributes(data: &[u8]) -> FighterAttributes {
 }
 
 const _ARC_FIGHTER_DATA_HEADER_SIZE: usize = 0x7c;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArcFighterData {
     pub subaction_flags: Vec<SubactionFlags>,
     pub attributes: FighterAttributes,
@@ -318,7 +318,7 @@ fn subaction_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<Subaction
 }
 
 const SUB_ACTION_FLAGS_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SubactionFlags {
     pub in_translation_time: u8,
     pub animation_flags:     AnimationFlags,
@@ -389,25 +389,25 @@ fn model_visibility(parent_data: &[u8], model_visibility_start: i32) -> ModelVis
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ModelVisibility {
     pub references: Vec<VisibilityReference>,
     pub defaults:   Vec<VisibilityDefault>,
 }
 
 const VISIBILITY_REFERENCE_SIZE: usize = 0x4;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VisibilityReference {
     pub bone_switches: Vec<VisibilityBoneSwitch>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VisibilityBoneSwitch {
     pub groups: Vec<VisibilityGroup>,
 }
 
 /// Enabling a `VisibilityGroup` will disable all other groups in the same `VisibilityBoneSwitch`
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VisibilityGroup {
     pub bones: Vec<i32>,
 }
@@ -415,7 +415,7 @@ pub struct VisibilityGroup {
 const VISIBILITY_DEFAULT_SIZE: usize = 0x8;
 /// Enables the `VisibilityGroup` with the matching `switch_index` and `group_index` for all `VisibilityReferences`s.
 /// When a new subaction is started, everything is set invisible and then all `VisibilityDefault`s are run.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct VisibilityDefault {
     pub switch_index: i32,
     pub group_index: i32,
@@ -435,7 +435,7 @@ fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {
 }
 
 const ACTION_FLAGS_SIZE: usize = 0x10;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ActionFlags {
     pub flag1: u32,
     pub flag2: u32,

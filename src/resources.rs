@@ -35,7 +35,7 @@ pub(crate) fn resources(data: &[u8]) -> Vec<Resource> {
 const RESOURCE_HEADER_SIZE: usize = 0x8;
 
 const RESOURCE_SIZE: usize = 0x10;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Resource {
     id: u16,
     flag: u16,

@@ -58,14 +58,14 @@ fn arc_child(data: &[u8]) -> ArcChild {
 
 const ARC_HEADER_SIZE: usize = 0x40;
 /// Arc is for archive not to be confused with an atomic reference count
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Arc {
     pub name: String,
     pub children: Vec<ArcChild>,
 }
 
 const ARC_CHILD_HEADER_SIZE: usize = 0x20;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArcChild {
     ty: i16,
     index: i16,
@@ -75,7 +75,7 @@ pub struct ArcChild {
     pub data: ArcChildData,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum ArcChildData {
     Arc (Arc),
     Sakurai (ArcSakurai),

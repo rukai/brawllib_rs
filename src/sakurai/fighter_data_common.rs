@@ -84,7 +84,7 @@ pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8]) -> ArcFig
 }
 
 const _ARC_FIGHTER_DATA_COMMON_HEADER_SIZE: usize = 0x68;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArcFighterDataCommon {
     pub global_ics: i32,
     pub global_ics_sse: i32,

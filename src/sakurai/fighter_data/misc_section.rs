@@ -181,7 +181,7 @@ fn unk7(data: &[u8]) -> Unk7 {
     Unk7 { unk1, unk2, unk3, unk4, unk5, unk6, unk7, unk8, unk9, unk10, unk11, unk12, unk13, unk14 }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct MiscSection {
     pub ecb_bones: Vec<i32>,
     pub final_smash_auras: Vec<FinalSmashAura>,
@@ -201,7 +201,7 @@ pub struct MiscSection {
 }
 
 pub const FINAL_SMASH_AURA_SIZE: usize = 0x14;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct FinalSmashAura {
     pub bone_index: i32,
     pub x: f32,
@@ -239,7 +239,7 @@ pub struct LedgeGrab {
 }
 
 pub const UNK7_SIZE: usize = 0x20;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Unk7 {
     unk1: u8,
     unk2: u8,
@@ -260,13 +260,13 @@ pub struct Unk7 {
     unk14: f32,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Crawl {
     pub forward: f32,
     pub backward: f32,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Tether {
     pub num_hang_frame: i32,
     unk1: f32,

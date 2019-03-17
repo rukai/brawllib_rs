@@ -21,14 +21,14 @@ pub(crate) fn textures(data: &[u8], resources: Vec<Resource>) -> Vec<Texture> {
     textures
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Texture {
     pub name: String,
     pub references: Vec<TextureRef>,
 }
 
 const TEXTURE_REF_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct TextureRef {
     pub material_offset: i32,
     pub reference_offset: i32,

@@ -12,22 +12,22 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
     let mut pointer_address = 0x80000000;
 
     for code in codeset {
-        match code {
+        match code.clone() {
             WiiRDCode::WriteAndFill32 { base_address: use_base_address, address, value } => {
-                let mem_address = if *use_base_address {
-                    (base_address & 0xFE000000) + *address
+                let mem_address = if use_base_address {
+                    (base_address & 0xFE000000) + address
                 } else {
-                    pointer_address + *address
+                    pointer_address + address
                 };
 
                 if mem_address > buffer_ram_location && mem_address < buffer_ram_location + buffer.len() as u32 {
                     let buffer_offset = mem_address - buffer_ram_location;
 
-                    BigEndian::write_u32(&mut buffer[buffer_offset as usize..], *value);
+                    BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
                 }
             }
             WiiRDCode::LoadBaseAddress { add_result, add_mem_address, add_mem_address_gecko_register, mem_address } => {
-                let mut actual_address = *mem_address;
+                let mut actual_address = mem_address;
                 match add_mem_address {
                     AddAddress::BaseAddress    => actual_address += base_address,
                     AddAddress::PointerAddress => actual_address += pointer_address,
@@ -35,10 +35,10 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_mem_address_gecko_register {
-                    actual_address += gecko_registers[*gecko_register as usize];
+                    actual_address += gecko_registers[gecko_register as usize];
                 }
 
-                if *add_result {
+                if add_result {
                     base_address += memory.get(&actual_address).cloned().unwrap_or_default();
                 }
                 else {
@@ -46,7 +46,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
             }
             WiiRDCode::SetBaseAddress { add_result, add, add_gecko_register, value } => {
-                let mut value = *value;
+                let mut value = value;
                 match add {
                     AddAddress::BaseAddress    => value += base_address,
                     AddAddress::PointerAddress => value += pointer_address,
@@ -54,10 +54,10 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_gecko_register {
-                    value += gecko_registers[*gecko_register as usize];
+                    value += gecko_registers[gecko_register as usize];
                 }
 
-                if *add_result {
+                if add_result {
                     base_address += value;
                 }
                 else {
@@ -65,7 +65,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
             }
             WiiRDCode::StoreBaseAddress { add_mem_address, add_mem_address_gecko_register, mem_address } => {
-                let mut actual_address = *mem_address;
+                let mut actual_address = mem_address;
                 match add_mem_address {
                     AddAddress::BaseAddress    => actual_address += base_address,
                     AddAddress::PointerAddress => actual_address += pointer_address,
@@ -73,7 +73,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_mem_address_gecko_register {
-                    actual_address += gecko_registers[*gecko_register as usize];
+                    actual_address += gecko_registers[gecko_register as usize];
                 }
 
                 memory.insert(actual_address, base_address);
@@ -83,7 +83,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 base_address = 0;
             }
             WiiRDCode::LoadPointerAddress { add_result, add_mem_address, add_mem_address_gecko_register, mem_address } => {
-                let mut actual_address = *mem_address;
+                let mut actual_address = mem_address;
                 match add_mem_address {
                     AddAddress::BaseAddress    => actual_address += base_address,
                     AddAddress::PointerAddress => actual_address += pointer_address,
@@ -91,18 +91,17 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_mem_address_gecko_register {
-                    actual_address += gecko_registers[*gecko_register as usize];
+                    actual_address += gecko_registers[gecko_register as usize];
                 }
 
-                if *add_result {
+                if add_result {
                     pointer_address += memory.get(&actual_address).cloned().unwrap_or_default();
                 }
                 else {
                     pointer_address = memory.get(&actual_address).cloned().unwrap_or_default();
                 }
             }
-            WiiRDCode::SetPointerAddress { add_result, add, add_gecko_register, value } => {
-                let mut value = *value;
+            WiiRDCode::SetPointerAddress { add_result, add, add_gecko_register, mut value } => {
                 match add {
                     AddAddress::BaseAddress    => value += base_address,
                     AddAddress::PointerAddress => value += pointer_address,
@@ -110,10 +109,10 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_gecko_register {
-                    value += gecko_registers[*gecko_register as usize];
+                    value += gecko_registers[gecko_register as usize];
                 }
 
-                if *add_result {
+                if add_result {
                     pointer_address += value;
                 }
                 else {
@@ -121,7 +120,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
             }
             WiiRDCode::StorePointerAddress { add_mem_address, add_mem_address_gecko_register, mem_address } => {
-                let mut actual_address = *mem_address;
+                let mut actual_address = mem_address;
                 match add_mem_address {
                     AddAddress::BaseAddress    => actual_address += base_address,
                     AddAddress::PointerAddress => actual_address += pointer_address,
@@ -129,7 +128,7 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 }
 
                 if let Some(gecko_register) = add_mem_address_gecko_register {
-                    actual_address += gecko_registers[*gecko_register as usize];
+                    actual_address += gecko_registers[gecko_register as usize];
                 }
 
                 memory.insert(actual_address, pointer_address);
@@ -141,26 +140,25 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
             WiiRDCode::FullTerminator { base_address_high, pointer_address_high} => {
                 // TODO: clear code execution status
 
-                if *base_address_high != 0 {
-                    base_address = (*base_address_high as u32) << 16
+                if base_address_high != 0 {
+                    base_address = (base_address_high as u32) << 16
                 }
-                if *pointer_address_high != 0 {
-                    pointer_address = (*pointer_address_high as u32) << 16
+                if pointer_address_high != 0 {
+                    pointer_address = (pointer_address_high as u32) << 16
                 }
             }
-            WiiRDCode::SetGeckoRegister { add_result, add, register, value } => {
-                let mut value = *value;
+            WiiRDCode::SetGeckoRegister { add_result, add, register, mut value } => {
                 match add {
                     AddAddress::BaseAddress    => value += base_address,
                     AddAddress::PointerAddress => value += pointer_address,
                     AddAddress::None => { }
                 }
 
-                if *add_result {
-                    gecko_registers[*register as usize] += value;
+                if add_result {
+                    gecko_registers[register as usize] += value;
                 }
                 else {
-                    gecko_registers[*register as usize] = value;
+                    gecko_registers[register as usize] = value;
                 }
             }
             _ => { }

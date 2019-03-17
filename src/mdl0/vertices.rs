@@ -50,7 +50,7 @@ pub(crate) fn vertices(data: &[u8], resources: Vec<Resource>) -> Vec<Vertices> {
 }
 
 const _VERTICES_SIZE: usize = 0x40;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Vertices {
     pub name: String,
     pub data: Vec<u8>,
@@ -65,7 +65,7 @@ pub struct Vertices {
     pub e_max: Vector3<f32>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum VertexComponentType {
     U8,
     I8,

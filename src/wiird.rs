@@ -5,7 +5,10 @@ use std::path::Path;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-pub fn wiird_load_txt(codeset_path: &Path) -> Option<Vec<WiiRDCode>> {
+use failure::Error;
+use failure::bail;
+
+pub fn wiird_load_txt(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
     match fs::read_to_string(codeset_path) {
         Ok(text) => {
             let mut data = vec!();
@@ -16,16 +19,13 @@ pub fn wiird_load_txt(codeset_path: &Path) -> Option<Vec<WiiRDCode>> {
 
                     // error checking
                     if hex_chars.iter().any(|x| !x.is_digit(16)) {
-                        error!("text codeset '{:?}' contains a non-hex character in a code", codeset_path);
-                        return None;
+                        bail!("text codeset {:?} contains a non-hex character in a code", codeset_path);
                     }
                     if hex_chars.len() > 16 {
-                        error!("text codeset '{:?}' contains a code that has more than 16 digits", codeset_path);
-                        return None;
+                        bail!("text codeset {:?} contains a code that has more than 16 digits", codeset_path);
                     }
                     if hex_chars.len() < 16 {
-                        error!("text codeset '{:?}' contains a code that has less than 16 digits", codeset_path);
-                        return None;
+                        bail!("text codeset {:?} contains a code that has less than 16 digits", codeset_path);
                     }
 
                     // convert hex string to sequence of bytes
@@ -37,26 +37,35 @@ pub fn wiird_load_txt(codeset_path: &Path) -> Option<Vec<WiiRDCode>> {
                 }
             }
 
-            Some(wiird_codes(&data))
+            Ok(wiird_codes(&data))
         }
         Err(err) => {
             match err.kind() {
                 ErrorKind::InvalidData => {
-                    println!("Failed to read {:?}: Please reencode the file as utf8.", codeset_path);
-                    None
+                    bail!("Failed to read WiiRD codeset {:?}: Please reencode the file as utf8.", codeset_path);
                 }
-                ErrorKind::NotFound => None,
-                _ => panic!("Failed to read {:?}: {:?}", codeset_path, err),
+                _ => bail!("Cannot read WiiRD codeset {:?}: {:?}", codeset_path, err),
             }
         }
     }
 }
 
-pub fn wiird_load_gct(codeset_path: &Path) -> Option<Vec<WiiRDCode>> {
+pub fn wiird_load_gct(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
     let mut data: Vec<u8> = vec!();
-    File::open(&codeset_path).ok()?.read_to_end(&mut data).ok()?;
+    match File::open(&codeset_path) {
+        Ok(mut file) => {
+            if let Err(err) = file.read_to_end(&mut data) {
+                bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err);
+            }
+        }
+        Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
+    }
 
-    Some(wiird_codes(&data[8..])) // Skip the header
+    if data.len() < 8 {
+        bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+    }
+
+    Ok(wiird_codes(&data[8..])) // Skip the header
 }
 
 pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
@@ -410,7 +419,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
     codes
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum WiiRDCode {
     /// 00
     WriteAndFill8 { base_address: bool, address: u32, value: u8, length: u32 },
@@ -470,15 +479,14 @@ pub enum WiiRDCode {
     FullTerminator { base_address_high: u16, pointer_address_high: u16 },
 }
 
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum JumpFlag {
     WhenTrue,
     WhenFalse,
     Always,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum AddAddress {
     BaseAddress,
     PointerAddress,

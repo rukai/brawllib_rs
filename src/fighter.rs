@@ -14,8 +14,6 @@ use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
-use crate::wiird;
-use crate::wiird_runner;
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -30,7 +28,6 @@ pub struct Fighter {
 }
 
 impl Fighter {
-    /// This is the main entry point of the library.
     /// Call this function to get Fighter structs that correspond to each fighters folder in the 'fighter' directory
     ///
     /// brawl_fighter_dir must point at an exported Brawl 'fighter' directory.
@@ -39,18 +36,18 @@ impl Fighter {
     ///
     /// If single_model is true then only one model for each fighter is loaded, otherwise all models are loaded.
     /// It's much faster to only process one model so set this to true if you only need one.
-    pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, single_model: bool) -> Vec<Fighter> {
+    pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, common_fighter: &Arc, single_model: bool) -> Vec<Fighter> {
         // TODO: Could probably make this faster by beginning processing of a fighter_data immediately after it is read from disk.
         // However it might actually slow things down because all the threads are reading from disk at once.
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
         fighter_datas(brawl_fighter_dir, mod_fighter_dir)
             .into_par_iter()
-            .filter_map(|x| Fighter::load_single(x, single_model))
+            .filter_map(|x| Fighter::load_single(x, common_fighter, single_model))
             .collect()
     }
 
-    fn load_single(fighter_data: FighterData, single_model: bool) -> Option<Fighter> {
+    fn load_single(fighter_data: FighterData, common_fighter: &Arc, single_model: bool) -> Option<Fighter> {
         info!("Parsing fighter: {}", fighter_data.cased_name);
         let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
         let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
@@ -60,12 +57,7 @@ impl Fighter {
             return None;
         };
 
-        let moveset_common = if let Some(data) = fighter_data.data.get("Fighter.pac") {
-            arc::arc(data)
-        } else {
-            error!("Failed to load {}, missing moveset file: Fighter.pac", fighter_data.cased_name);
-            return None;
-        };
+        let moveset_common = common_fighter.clone();
 
         let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
         let modded_by_psa = fighter_data.data.get(&moveset_file_name)
@@ -303,7 +295,6 @@ impl Fighter {
 /// Replaces brawl fighter data with mod fighter data
 fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -> Vec<FighterData> {
     let mut fighter_datas = vec!();
-    let mut common_fighter = None;
     for fighter_path in brawl_fighter_dir {
         let fighter_path = fighter_path.unwrap();
         let file_type = fighter_path.file_type().unwrap();
@@ -311,36 +302,6 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
             if let Some(mut fighter_data) = fighter_data(&fighter_path.path()) {
                 fighter_data.read_from_vanilla = true;
                 fighter_datas.push(fighter_data);
-            }
-        }
-        else if file_type.is_file() && fighter_path.path().ends_with("Fighter.pac") {
-            // TODO: This should really be moved out of fighter loading.
-            // Then a reference should be passed into Fighter::load or HighLevelFighter::new
-            //
-            // This is a problem because the api doesnt actually specify to the user that the
-            // folders must be layed out as this requires.
-            // It just says pass in a fighter folder, but secretly it will read stuff from the
-            // parent folders.
-            assert!(common_fighter.is_none());
-            if let Ok(mut fighter_file) = File::open(fighter_path.path()) {
-                let mut file_data: Vec<u8> = vec!();
-                fighter_file.read_to_end(&mut file_data).unwrap();
-
-                // wiird injections
-                if let Some(mod_dir) = fighter_path.path().parent().unwrap().parent().unwrap().parent() { // TODO: DO NOT COMMIT THIS, will panic when no parent
-                    let txt_path = mod_dir.join("PM3.6/codeset.txt"); // TODO: AGAIN DO NOT COMMIT THIS, COMPLETE HACK
-                    let gct_path = mod_dir.join("PM3.6/RSBE01.gct");
-
-                    let wiird = wiird::wiird_load_txt(&txt_path)
-                        .or_else(|| wiird::wiird_load_gct(&gct_path));
-
-                    if let Some(wiird) = &wiird {
-                        let fighter_pac_offset = 0x80F9FC20;
-                        wiird_runner::process(wiird, &mut file_data, fighter_pac_offset);
-                    }
-                }
-
-                common_fighter = Some(file_data);
             }
         }
     }
@@ -370,13 +331,6 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
                     }
                 }
             }
-        }
-    }
-
-    // add Fighter.pac to all fighters
-    if let Some(common_fighter) = common_fighter {
-        for fighter_data in &mut fighter_datas {
-            fighter_data.data.insert(String::from("Fighter.pac"), common_fighter.clone());
         }
     }
 

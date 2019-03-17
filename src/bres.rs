@@ -39,13 +39,13 @@ fn bres_group(data: &[u8]) -> Bres {
 // Brawlbox has this split into three structs: BRESHeader, BRESEntry and ROOTHeader
 // BRESEntry is commented out, so that appears wrong
 // BRESHeader and RootHeader are combined because without BRESEntry they appear to be sequential
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Bres {
     pub children: Vec<BresChild>
 }
 
 const ROOT_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct BresChild {
     string_offset: i32,
     data_offset: i32,
@@ -53,7 +53,7 @@ pub struct BresChild {
     pub data: BresChildData
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum BresChildData {
     Chr0 (Chr0),
     Mdl0 (Mdl0),

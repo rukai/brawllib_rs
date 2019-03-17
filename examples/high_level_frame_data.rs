@@ -1,10 +1,10 @@
-use brawllib_rs::fighter::Fighter;
+use brawllib_rs::brawl_mod::BrawlMod;
 use brawllib_rs::high_level_fighter::HighLevelFighter;
 
 use getopts::Options;
 
-use std::fs;
 use std::env;
+use std::path::PathBuf;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -31,30 +31,33 @@ fn main() {
         }
     };
 
-    let brawl_dir = if let Some(path) = matches.opt_str("d") {
-        match fs::read_dir(path) {
-            Ok(dir) => dir,
-            Err(_) => {
-                println!("The passed brawl directory does not exist.");
-                print_usage(program, opts);
-                return;
-            }
-        }
+    let brawl_path = if let Some(path) = matches.opt_str("d") {
+        PathBuf::from(path)
     } else {
-        println!("Need to pass a brawl directory");
+        println!("Need to pass a brawl directory\n");
         print_usage(program, opts);
         return;
     };
-    let mod_dir = matches.opt_str("m").map_or(None, |x| Some(fs::read_dir(x).expect("Provided mod directory is invalid")));
+    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+
     let fighter_filter = matches.opt_str("f");
     let subaction_filter = matches.opt_str("a");
     let frame_filter = matches.opt_str("i").map_or(None, |x| x.parse::<usize>().ok());
     let data_level = matches.opt_str("l").unwrap_or(String::from("fighter")).to_lowercase();
 
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let fighters = match brawl_mod.load_fighters(true) {
+        Ok(fighters) => fighters,
+        Err(err) => {
+            println!("Failed to load brawl mod: {}", err);
+            return;
+        }
+    };
+
     // display frame data
     match data_level.as_ref() {
         "frame" => {
-            for fighter in Fighter::load(brawl_dir, mod_dir, true) {
+            for fighter in fighters {
                 if let &Some(ref fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;
@@ -83,7 +86,7 @@ fn main() {
             }
         }
         "subaction" => {
-            for fighter in Fighter::load(brawl_dir, mod_dir, true) {
+            for fighter in fighters {
                 if let &Some(ref fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;
@@ -111,7 +114,7 @@ fn main() {
             }
         }
         "fighter" => {
-            for fighter in Fighter::load(brawl_dir, mod_dir, true) {
+            for fighter in fighters {
                 if let &Some(ref fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;

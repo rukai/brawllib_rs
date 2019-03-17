@@ -133,7 +133,7 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Mdl0 {
     pub name: String,
     version: i32,
@@ -153,7 +153,7 @@ pub struct Mdl0 {
     pub palette_refs: Option<Vec<Palette>>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Mdl0Props {
     header_len: u32,
     mdl0offset: i32,

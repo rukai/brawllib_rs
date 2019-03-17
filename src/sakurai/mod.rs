@@ -105,7 +105,7 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
 }
 
 const ARC_SAKURAI_HEADER_SIZE: usize = 0x20;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArcSakurai {
     lookup_entries:           Vec<i32>,
     pub sections:             Vec<ArcSakuraiSection>,
@@ -114,14 +114,14 @@ pub struct ArcSakurai {
 }
 
 const ARC_SAKURAI_SECTION_HEADER_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ArcSakuraiSection {
     /// TODO: Remove this field when all SectionData's are implemented
     pub name: String,
     pub data: SectionData,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SectionData {
     FighterData (ArcFighterData),
     FighterDataCommon (ArcFighterDataCommon),
@@ -129,14 +129,14 @@ pub enum SectionData {
     None,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SectionScript {
     pub name:   String,
     pub script: Script,
 }
 
 const EXTERNAL_SUBROUTINE_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExternalSubroutine {
     pub name: String,
     pub offsets: Vec<i32>,

@@ -22,14 +22,14 @@ pub(crate) fn palettes(data: &[u8], resources: Vec<Resource>) -> Vec<Palette> {
     palettes
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Palette {
     pub name: String,
     pub references: Vec<PaletteRef>,
 }
 
 const PALETTE_REF_SIZE: usize = 0x8;
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct PaletteRef {
     pub material_offset: i32,
     pub reference_offset: i32,
