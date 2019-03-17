@@ -34,6 +34,8 @@ pub mod script;
 pub mod script_ast;
 pub mod script_runner;
 pub mod math;
+pub mod wiird;
+pub mod wiird_runner;
 mod util;
 mod action_names;
 mod fighter_names;

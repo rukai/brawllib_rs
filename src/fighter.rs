@@ -14,6 +14,8 @@ use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
+use crate::wiird;
+use crate::wiird_runner;
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -312,10 +314,32 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
             }
         }
         else if file_type.is_file() && fighter_path.path().ends_with("Fighter.pac") {
+            // TODO: This should really be moved out of fighter loading.
+            // Then a reference should be passed into Fighter::load or HighLevelFighter::new
+            //
+            // This is a problem because the api doesnt actually specify to the user that the
+            // folders must be layed out as this requires.
+            // It just says pass in a fighter folder, but secretly it will read stuff from the
+            // parent folders.
             assert!(common_fighter.is_none());
             if let Ok(mut fighter_file) = File::open(fighter_path.path()) {
                 let mut file_data: Vec<u8> = vec!();
                 fighter_file.read_to_end(&mut file_data).unwrap();
+
+                // wiird injections
+                if let Some(mod_dir) = fighter_path.path().parent().unwrap().parent().unwrap().parent() { // TODO: DO NOT COMMIT THIS, will panic when no parent
+                    let txt_path = mod_dir.join("PM3.6/codeset.txt"); // TODO: AGAIN DO NOT COMMIT THIS, COMPLETE HACK
+                    let gct_path = mod_dir.join("PM3.6/RSBE01.gct");
+
+                    let wiird = wiird::wiird_load_txt(&txt_path)
+                        .or_else(|| wiird::wiird_load_gct(&gct_path));
+
+                    if let Some(wiird) = &wiird {
+                        let fighter_pac_offset = 0x80F9FC20;
+                        wiird_runner::process(wiird, &mut file_data, fighter_pac_offset);
+                    }
+                }
+
                 common_fighter = Some(file_data);
             }
         }
