@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::fighter::Fighter;
-use crate::wiird::WiiRDCode;
+use crate::wiird::WiiRDBlock;
 use crate::wiird;
 use crate::wiird_runner;
 use crate::arc;
@@ -81,7 +81,7 @@ impl BrawlMod {
         Ok(Fighter::load(brawl_fighter_dir, mod_fighter_dir, &common_fighter, single_model))
     }
 
-    pub fn load_wiird_codeset(&self) -> Result<Vec<WiiRDCode>, Error> {
+    pub fn load_wiird_codeset(&self) -> Result<WiiRDBlock, Error> {
         if let Some(mod_path) = &self.mod_path {
             wiird::wiird_load_gct(&mod_path.join("codes/RSBE01.gct"))
         } else {

@@ -8,7 +8,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use failure::Error;
 use failure::bail;
 
-pub fn wiird_load_txt(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
+pub fn wiird_load_txt(codeset_path: &Path) -> Result<WiiRDBlock, Error> {
     match fs::read_to_string(codeset_path) {
         Ok(text) => {
             let mut data = vec!();
@@ -50,7 +50,7 @@ pub fn wiird_load_txt(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
     }
 }
 
-pub fn wiird_load_gct(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
+pub fn wiird_load_gct(codeset_path: &Path) -> Result<WiiRDBlock, Error> {
     let mut data: Vec<u8> = vec!();
     match File::open(&codeset_path) {
         Ok(mut file) => {
@@ -68,16 +68,27 @@ pub fn wiird_load_gct(codeset_path: &Path) -> Result<Vec<WiiRDCode>, Error> {
     Ok(wiird_codes(&data[8..])) // Skip the header
 }
 
-pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
+pub fn wiird_codes(data: &[u8]) -> WiiRDBlock {
     // TODO: Extend the length of data to avoid panics due to out of bounds accesses.
 
+    if let ProcessedBlock::Finished(block) = process_block(data, false) {
+        block
+    } else {
+        error!("A block in the script did not terminate, or a termination occured without a block.");
+        WiiRDBlock { codes: vec!() }
+    }
+}
+
+fn process_block(data: &[u8], is_nested: bool) -> ProcessedBlock {
     let mut codes = vec!();
     let mut offset = 0;
     while offset < data.len() {
         // Not every code type uses this, but its safe to just create these for if we need them.
         let use_base_address = data[offset] & 0b00010000 == 0;
         let address = (&data[offset ..]).read_u32::<BigEndian>().unwrap() & 0x1FFFFFF;
-        match data[offset] & 0b11101110 {
+
+        let code = data[offset] & 0b11101110;
+        match code {
             0x00 => {
                 let value = data[offset + 7];
                 let length = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap() as u32 + 1;
@@ -120,37 +131,62 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 codes.push(WiiRDCode::SerialWrite { use_base_address, address, initial_value, value_size, count, address_increment, value_increment });
                 offset += 16;
             }
-            0x20 => {
-                codes.push(WiiRDCode::StartIf);
+            0x20 | 0x22 | 0x24 | 0x26 | 0x28 | 0x2A | 0x2C | 0x2E => {
+                let value = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
+                let lhs_mask = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
+                let rhs_value = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
+
+                let insert_endif = address & 1 != 0;
+                let address = address & 0xFFFFFFFE;
+
+                if insert_endif {
+                    // TODO: Handle this case, will be very tricky will need to do something like
+                    // this instead of codes.push(WiiRDCode::IfStatement { .. }
+                    //return ProcessedBlock::EndIfIf { .. }
+                }
+
+                let test = match code {
+                    0x20 => IfTest::IsEqual { use_base_address, address, value },
+                    0x22 => IfTest::IsNotEqual { use_base_address, address, value },
+                    0x24 => IfTest::IsGreaterThan { use_base_address, address, value },
+                    0x26 => IfTest::IsLessThan { use_base_address, address, value },
+                    0x28 => IfTest::IsEqualMask { use_base_address, address, lhs_mask, rhs_value },
+                    0x2A => IfTest::IsNotEqualMask { use_base_address, address, lhs_mask, rhs_value },
+                    0x2C => IfTest::IsGreaterThanMask { use_base_address, address, lhs_mask, rhs_value },
+                    0x2E => IfTest::IsLessThanMask { use_base_address, address, lhs_mask, rhs_value },
+                    _    => unreachable!(),
+                };
                 offset += 8;
-            }
-            0x22 => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x24 => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x26 => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x28 => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x2A => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x2C => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
-            }
-            0x2E => {
-                codes.push(WiiRDCode::StartIf);
-                offset += 8;
+
+                match process_block(&data[offset..], true) {
+                    ProcessedBlock::EndIf { count, then_branch, bytes_processed, reset_base_address_high, reset_pointer_address_high } => {
+                        offset += bytes_processed;
+                        let else_branch = None;
+                        codes.push(WiiRDCode::IfStatement { test, then_branch, else_branch, reset_base_address_high, reset_pointer_address_high });
+
+                        let count = match count {
+                            EndIfCount::Infinite   => EndIfCount::Infinite,
+                            EndIfCount::Finite (x) => EndIfCount::Finite (x - 1),
+                        };
+                        let multi_endif = match count {
+                            EndIfCount::Infinite => true,
+                            EndIfCount::Finite (ref x) => *x > 0,
+                        };
+
+                        if multi_endif && is_nested {
+                            let then_branch = WiiRDBlock { codes };
+                            return ProcessedBlock::EndIf { count, then_branch, bytes_processed: offset, reset_base_address_high, reset_pointer_address_high };
+                        }
+                        else {
+                            codes.push(WiiRDCode::ResetAddressHigh { reset_base_address_high, reset_pointer_address_high });
+                        }
+                    }
+                    _ => {
+                        // Need to terminate as we have no idea how many bytes were meant to be processed
+                        error!("IfStatement {} did not terminate", code);
+                        return ProcessedBlock::Finished (WiiRDBlock { codes: vec!() })
+                    }
+                };
             }
             0x40 => {
                 let add_result = data[offset + 1] & 0b00010000 != 0;
@@ -308,7 +344,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                     0x20 => JumpFlag::Always,
                     flag => {
                         error!("Unknown jump flag '{}' in return", flag);
-                        return codes;
+                        return ProcessedBlock::Finished (WiiRDBlock { codes });
                     }
                 };
                 let block_id = data[offset + 7] & 0xF;
@@ -322,7 +358,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                     0x20 => JumpFlag::Always,
                     flag => {
                         error!("Unknown jump flag '{}' in goto", flag);
-                        return codes;
+                        return ProcessedBlock::Finished (WiiRDBlock { codes });
                     }
                 };
                 let offset_lines = (&data[offset + 2..]).read_i16::<BigEndian>().unwrap();
@@ -336,7 +372,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                     0x20 => JumpFlag::Always,
                     flag => {
                         error!("Unknown jump flag '{}' in subroutine", flag);
-                        return codes;
+                        return ProcessedBlock::Finished (WiiRDBlock { codes });
                     }
                 };
                 let offset_lines = (&data[offset + 2..]).read_i16::<BigEndian>().unwrap();
@@ -446,19 +482,32 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 offset += 8 + count * 8;
             }
             0xE0 => {
-                let base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
-                let pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
-                codes.push(WiiRDCode::FullTerminator { base_address_high, pointer_address_high });
+                let reset_base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
+                let reset_pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
+
                 offset += 8;
+
+                if is_nested {
+                    return ProcessedBlock::EndIf { count: EndIfCount::Infinite, then_branch: WiiRDBlock { codes }, bytes_processed: offset, reset_base_address_high, reset_pointer_address_high };
+                }
+                else {
+                    codes.push(WiiRDCode::ResetAddressHigh { reset_base_address_high, reset_pointer_address_high });
+                }
             }
             0xE2 => {
-                let else_branch = data[offset + 1] & 0x10 != 0;
+                let _else_branch = data[offset + 1] & 0x10 != 0;
                 let count = data[offset + 3];
-                let base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
-                let pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
+                let reset_base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
+                let reset_pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
 
-                codes.push(WiiRDCode::EndIf { else_branch, count, base_address_high, pointer_address_high });
                 offset += 8;
+                if is_nested {
+                    return ProcessedBlock::EndIf { count: EndIfCount::Finite(count), then_branch: WiiRDBlock { codes }, bytes_processed: offset, reset_base_address_high, reset_pointer_address_high };
+
+                }
+                else {
+                    codes.push(WiiRDCode::ResetAddressHigh { reset_base_address_high, reset_pointer_address_high });
+                }
             }
             0xF0 => {
                 // End of codes
@@ -467,18 +516,31 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 // Can't really continue processing because we dont know what the correct offset should be.
                 // Report an error and return what we have so far.
                 error!("Cannot process WiiRD code starting with 0x{:x}", unknown);
-                return codes;
+                return ProcessedBlock::Finished (WiiRDBlock { codes });
             }
         }
     }
 
-    for code in &codes {
-        println!("{:x?}", code);
-    }
-    codes
+    ProcessedBlock::Finished(WiiRDBlock { codes })
 }
 
-#[derive(Clone, Debug)]
+enum ProcessedBlock {
+    Finished     (WiiRDBlock),
+    EndIf        { count: EndIfCount, then_branch: WiiRDBlock, bytes_processed: usize, reset_base_address_high: u16, reset_pointer_address_high: u16 },
+}
+
+#[derive(Clone)]
+pub enum EndIfCount {
+    Infinite,
+    Finite (u8),
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub struct WiiRDBlock {
+    pub codes: Vec<WiiRDCode>,
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub enum WiiRDCode {
     /// 00
     WriteAndFill8 { use_base_address: bool, address: u32, value: u8, length: u32 },
@@ -490,21 +552,19 @@ pub enum WiiRDCode {
     StringWrite { use_base_address: bool, address: u32, values: Vec<u8> },
     /// 08
     SerialWrite { use_base_address: bool, address: u32, initial_value: u32, value_size: u8, count: u16, address_increment: u16, value_increment: u32 },
-    /// 20
-    /// 22
-    /// 24
-    /// 26
-    /// 28
-    /// 2A
-    /// 2C
-    /// 2E
-    StartIf,
+    /// 20 or 22 or 24 or 26 or 28 or 2A or 2C or 2E
+    IfStatement {
+        test: IfTest,
+        then_branch: WiiRDBlock,
+        else_branch: Option<Box<WiiRDBlock>>,
+        reset_base_address_high: u16,
+        reset_pointer_address_high: u16
+    },
     /// 40
     LoadBaseAddress { add_result: bool, add_mem_address: AddAddress, add_mem_address_gecko_register: Option<u8>, mem_address: u32 },
     /// 42
     SetBaseAddress { add_result: bool, add: AddAddress, add_gecko_register: Option<u8>, value: u32 },
     /// 44
-    /// Store Base Address at
     StoreBaseAddress { add_mem_address: AddAddress, add_mem_address_gecko_register: Option<u8>, mem_address: u32 },
     /// 46
     /// Put next code's location into the Base Address
@@ -551,27 +611,37 @@ pub enum WiiRDCode {
     ExecutePPC { instruction_data: Vec<u8> },
     /// C2
     InsertPPC { use_base_address: bool, address: u32, instruction_data: Vec<u8> },
-    /// E0
-    FullTerminator { base_address_high: u16, pointer_address_high: u16 },
-    /// E2
-    EndIf { else_branch: bool, count: u8, base_address_high: u16, pointer_address_high: u16 },
+    /// E0 or E2
+    ResetAddressHigh { reset_base_address_high: u16, reset_pointer_address_high: u16 },
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
+pub enum IfTest {
+    IsEqual { use_base_address: bool, address: u32, value: u32 },
+    IsNotEqual { use_base_address: bool, address: u32, value: u32 },
+    IsGreaterThan { use_base_address: bool, address: u32, value: u32 },
+    IsLessThan { use_base_address: bool, address: u32, value: u32 },
+    IsEqualMask { use_base_address: bool, address: u32, lhs_mask: u16, rhs_value: u16 },
+    IsNotEqualMask { use_base_address: bool, address: u32, lhs_mask: u16, rhs_value: u16 },
+    IsGreaterThanMask { use_base_address: bool, address: u32, lhs_mask: u16, rhs_value: u16 },
+    IsLessThanMask { use_base_address: bool, address: u32, lhs_mask: u16, rhs_value: u16 },
+}
+
+#[derive(Serialize, Clone, Debug)]
 pub enum JumpFlag {
     WhenTrue,
     WhenFalse,
     Always,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum AddAddress {
     BaseAddress,
     PointerAddress,
     None
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub enum GeckoOperation {
     Add,
     Mul,

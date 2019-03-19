@@ -2,17 +2,27 @@ use std::collections::HashMap;
 
 use byteorder::{BigEndian, ByteOrder};
 
-use crate::wiird::{WiiRDCode, AddAddress};
+use crate::wiird::{WiiRDBlock, WiiRDCode, AddAddress, JumpFlag};
 
-pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u32) {
+pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32) {
     // TODO: HashMap is completely wrong, needs to be an array or else overlapping reads/writes dont work.
     let mut memory = HashMap::new();
     let mut gecko_registers = [0_u32; 0x10];
     let mut base_address    = 0x80000000;
     let mut pointer_address = 0x80000000;
 
-    for code in codeset {
-        match code.clone() {
+    // TODO: The if statement ast thing will never work properly... How to get to the right line
+    // Well hang on when goto does: "The code handler jumps to (next line of code + XXXX lines). XXXX is signed.
+    // What does a line even mean. Does it mean exactly 8 bytes every time or does it refer to an individual code?
+    // If its 16 bytes, then that even breaks simple enum processing!
+    // Do I need to include a line number for each code!!??!?
+
+    let mut line = 0;
+    while line < codeset.codes.len() {
+        let code = codeset.codes[line].clone();
+        println!("{:?}", code);
+
+        match code {
             WiiRDCode::WriteAndFill8 { use_base_address, address, value, length } => {
                 let mem_address = if use_base_address {
                     (base_address & 0xFE000000) + address
@@ -181,24 +191,20 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 // Mess up the value so writes can be ignored while in this state
                 pointer_address = 0;
             }
-            WiiRDCode::FullTerminator { base_address_high, pointer_address_high } => {
-                // TODO: clear code execution status
-
-                if base_address_high != 0 {
-                    base_address = (base_address_high as u32) << 16
-                }
-                if pointer_address_high != 0 {
-                    pointer_address = (pointer_address_high as u32) << 16
+            WiiRDCode::Goto { flag, offset_lines } => {
+                match flag {
+                    JumpFlag::Always => {
+                        line += offset_lines as usize;
+                    }
+                    _ => { }
                 }
             }
-            WiiRDCode::EndIf { base_address_high, pointer_address_high, .. } => {
-                // TODO: clear code execution status
-
-                if base_address_high != 0 {
-                    base_address = (base_address_high as u32) << 16
+            WiiRDCode::ResetAddressHigh { reset_base_address_high, reset_pointer_address_high } => {
+                if reset_base_address_high != 0 {
+                    base_address = (reset_base_address_high as u32) << 16
                 }
-                if pointer_address_high != 0 {
-                    pointer_address = (pointer_address_high as u32) << 16
+                if reset_pointer_address_high != 0 {
+                    pointer_address = (reset_pointer_address_high as u32) << 16
                 }
             }
             WiiRDCode::SetGeckoRegister { add_result, add, register, mut value } => {
@@ -217,5 +223,6 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
             }
             _ => { }
         }
+        line += 1;
     }
 }
