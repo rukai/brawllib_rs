@@ -69,7 +69,10 @@ impl BrawlMod {
 
             if self.mod_path.is_some() {
                 let codeset = self.load_wiird_codeset()?;
-                let fighter_pac_offset = 0x80F9FC20;
+                let sakurai_ram_offset = 0x80F9FC20;
+                let sakurai_fighter_pac_offset = 0x78;
+                let fighter_pac_offset = sakurai_ram_offset - sakurai_fighter_pac_offset;
+
                 wiird_runner::process(&codeset, &mut file_data, fighter_pac_offset);
             }
 

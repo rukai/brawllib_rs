@@ -443,9 +443,16 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 EventAst::UnchangeHurtBoxStateSpecific
             }
 
-            // misc
+            // controller
+            (0x07, 0x00, None,              None,              None) => EventAst::ControllerClearBuffer,
+            (0x07, 0x01, None,              None,              None) => EventAst::ControllerUnk01,
+            (0x07, 0x02, None,              None,              None) => EventAst::ControllerUnk02,
+            (0x07, 0x06, Some(&Bool(v0)),   None,              None) => EventAst::ControllerUnk06 (v0),
+            (0x07, 0x06, None,              None,              None) => EventAst::ControllerUnk0C,
             (0x07, 0x07, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::Rumble { unk1: v0, unk2: v1 },
             (0x07, 0x0B, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
+
+            // misc
             (0x18, 0x00, Some(&Value(v0)),  None,              None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
             (0x18, 0x01, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
             (0x10, 0x00, Some(&Value(v0)),  None,              None) => EventAst::GenerateArticle { article_id: v0, subaction_only: true }, // TODO: subaction_only?
@@ -910,6 +917,16 @@ pub enum EventAst {
     ChangeHurtBoxStateSpecific { bone: i32, state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox to the global value.
     UnchangeHurtBoxStateSpecific,
+    /// Possibly clears the controller buffer.
+    ControllerClearBuffer,
+    /// Unknown controller event
+    ControllerUnk01,
+    /// Unknown controller event
+    ControllerUnk02,
+    /// Unknown controller event
+    ControllerUnk06 (bool),
+    /// Unknown controller event
+    ControllerUnk0C,
     /// Undefined. Affects the rumble feature of the controller.
     Rumble { unk1: i32, unk2: i32 },
     /// Creates a rumble loop on the controller.

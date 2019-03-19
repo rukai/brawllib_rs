@@ -20,7 +20,6 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
     let mut line = 0;
     while line < codeset.codes.len() {
         let code = codeset.codes[line].clone();
-        println!("{:?}", code);
 
         match code {
             WiiRDCode::WriteAndFill8 { use_base_address, address, value, length } => {
@@ -32,7 +31,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for i in 0..length {
                     let current_address = mem_address + i;
-                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                    if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         buffer[buffer_offset as usize] = value;
                     }
@@ -47,7 +46,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for i in 0..length {
                     let current_address = mem_address + i * 2;
-                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                    if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         BigEndian::write_u16(&mut buffer[buffer_offset as usize..], value);
                     }
@@ -60,7 +59,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                     pointer_address + address
                 };
 
-                if mem_address > buffer_ram_location && mem_address < buffer_ram_location + buffer.len() as u32 {
+                if mem_address >= buffer_ram_location && mem_address < buffer_ram_location + buffer.len() as u32 {
                     let buffer_offset = mem_address - buffer_ram_location;
                     BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
                 }
@@ -74,7 +73,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for (i, value) in values.iter().enumerate() {
                     let current_address = mem_address + i as u32;
-                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                    if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         buffer[buffer_offset as usize] = *value;
                     }

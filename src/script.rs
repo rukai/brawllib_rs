@@ -76,7 +76,7 @@ pub fn new_script(parent_data: &[u8], offset: i32) -> Script {
             let unk1          = parent_data[event_offset as usize + 3];
             let raw_id = (&parent_data[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
 
-            if code == 0 && namespace == 0 { // seems hacky but its what brawlbox does
+            if code == 0 && namespace == 0 { // end of script
                 break
             }
 
@@ -85,14 +85,11 @@ pub fn new_script(parent_data: &[u8], offset: i32) -> Script {
             // const long FADEFOOD = 0xFADEF00D; // Constant for the tag FADEF00D representing empty, useable space.
             if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
                 let argument_offset = (&parent_data[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
-                // TODO: This only occurs when called by fragment_scripts triggered by subroutines
-                //       Track down which subroutines are pointing at weird data
-                //       Looks like the data is offset by 4 bytes, we are getting an argument_offset of 0xFADEF00D, 0x0b000200, 0x60a0800 which are valid events
-                if argument_offset as usize >= parent_data.len() {
-                    debug!("(raw_id, argument_offset) = (0x{:08x}, 0x{:08x})", raw_id, argument_offset);
-                    break
-                }
-                let arguments = arguments(parent_data, argument_offset as usize, num_arguments as usize);
+                let arguments = if argument_offset as usize >= parent_data.len() {
+                    vec!() // TODO: Look up in wiird memory
+                } else {
+                    arguments(parent_data, argument_offset as usize, num_arguments as usize)
+                };
                 events.push(Event {
                     namespace,
                     code,

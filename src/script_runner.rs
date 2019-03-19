@@ -890,13 +890,20 @@ impl<'a> ScriptRunner<'a> {
                 self.hurtbox_states.clear();
             }
 
-            // misc
+            // controller
+            &EventAst::ControllerClearBuffer => { }
+            &EventAst::ControllerUnk01 => { }
+            &EventAst::ControllerUnk02 => { }
+            &EventAst::ControllerUnk06 (_) => { }
+            &EventAst::ControllerUnk0C => { }
             &EventAst::Rumble { unk1, unk2 } => {
                 self.rumble = Some((unk1, unk2))
             }
             &EventAst::RumbleLoop { unk1, unk2 } => {
                 self.rumble_loop = Some((unk1, unk2))
             }
+
+            // misc
             &EventAst::SlopeContourStand { leg_bone_parent } => {
                 if leg_bone_parent == 0 {
                     self.slope_contour_stand = None;
