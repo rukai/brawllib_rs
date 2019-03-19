@@ -1,16 +1,18 @@
 use byteorder::{BigEndian, ReadBytesExt};
 
-pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize) -> Vec<Script> {
+use crate::wii_memory::WiiMemory;
+
+pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize, wii_memory: &WiiMemory) -> Vec<Script> {
     let mut result = vec!();
     for i in 0..num {
-        let offset = (&offset_data[i * 4..]).read_i32::<BigEndian>().unwrap();
-        result.push(new_script(parent_data, offset));
+        let offset = (&offset_data[i * 4..]).read_u32::<BigEndian>().unwrap();
+        result.push(new_script(parent_data, offset, wii_memory));
     }
     result
 }
 
 /// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
-pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], ignore_origins: &[i32]) -> Vec<Script> {
+pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], ignore_origins: &[i32], wii_memory: &WiiMemory) -> Vec<Script> {
     let mut fragments: Vec<Script> = vec!();
     for scripts in known_scripts.iter() {
         for script in scripts.iter() {
@@ -22,12 +24,10 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
                             found_offset = Some(*offset);
                         }
                     }
-                    // TODO: The values starting with 0x90 are gecko psa injections.
-                    // They seem to be always done with Argument::Value but I didnt check too closely.
-                    // Commented out because theres no way to handle gecko psa injections.
-                    //if let Some(Argument::Value (offset)) = event.arguments.get(0) {
-                    //    found_offset = Some(*offset);
-                    //}
+
+                    if let Some(Argument::Value (offset)) = event.arguments.get(0) {
+                        found_offset = Some(*offset);
+                    }
                 }
                 if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
                     if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(1) {
@@ -49,7 +49,7 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
                     let already_added = fragments.iter().any(|x| x.offset == offset);
 
                     if !is_action && !already_added {
-                        fragments.push(new_script(parent_data, offset));
+                        fragments.push(new_script(parent_data, offset as u32, wii_memory));
                     }
                 }
             }
@@ -60,65 +60,78 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
         // the fragment scripts may refer to their own fragment scripts
         let mut all = known_scripts.to_vec();
         all.push(&fragments);
-        fragments.extend(fragment_scripts(parent_data, &all, ignore_origins));
+        fragments.extend(fragment_scripts(parent_data, &all, ignore_origins, wii_memory));
     }
     fragments
 }
 
-pub fn new_script(parent_data: &[u8], offset: i32) -> Script {
-    let events = if offset > 0 && (offset as i64) < (parent_data.len() as i64) {
-        let mut events = vec!();
-        let mut event_offset = offset;
-        loop {
-            let namespace     = parent_data[event_offset as usize];
-            let code          = parent_data[event_offset as usize + 1];
-            let num_arguments = parent_data[event_offset as usize + 2];
-            let unk1          = parent_data[event_offset as usize + 3];
-            let raw_id = (&parent_data[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
-
-            if code == 0 && namespace == 0 { // end of script
-                break
-            }
-
-            // PSA fills empty space with these bytes:
-            // const long FADEDATA = 0xFADE0D8A; // Constant for the tag FADE0D8A representing the end of useable space.
-            // const long FADEFOOD = 0xFADEF00D; // Constant for the tag FADEF00D representing empty, useable space.
-            if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
-                let argument_offset = (&parent_data[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
-                let arguments = if argument_offset as usize >= parent_data.len() {
-                    vec!() // TODO: Look up in wiird memory
-                } else {
-                    arguments(parent_data, argument_offset as usize, num_arguments as usize)
-                };
-                events.push(Event {
-                    namespace,
-                    code,
-                    unk1,
-                    arguments,
-                });
-            }
-
-            event_offset += EVENT_SIZE as i32;
-        }
-        events
+pub fn new_script(parent_data: &[u8], offset: u32, wii_memory: &WiiMemory) -> Script {
+    let buffer = if offset == 0 || offset as i32 == -1 {
+        return Script { events: vec!(), offset: offset as i32 }
+    } else if offset > 0 && offset < (parent_data.len() as u32) {
+        &parent_data[offset as usize ..]
+    } else if offset < 8000_0000 {
+        return Script { events: vec!(), offset: offset as i32 }
     } else {
-        vec!()
+        wii_memory.buffer_from(offset as usize)
     };
-    Script { events, offset }
+
+    let mut events = vec!();
+    let mut event_offset = 0;
+    loop {
+        let namespace     =   buffer[event_offset as usize];
+        let code          =   buffer[event_offset as usize + 1];
+        let num_arguments =   buffer[event_offset as usize + 2];
+        let unk1          =   buffer[event_offset as usize + 3];
+        let raw_id        = (&buffer[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
+
+        if code == 0 && namespace == 0 { // end of script
+            break
+        }
+
+        // PSA fills empty space with these bytes:
+        // const long FADEDATA = 0xFADE0D8A; // Constant for the tag FADE0D8A representing the end of useable space.
+        // const long FADEFOOD = 0xFADEF00D; // Constant for the tag FADEF00D representing empty, useable space.
+        if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
+            let argument_offset = (&buffer[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
+
+            let argument_buffer = if argument_offset as usize >= parent_data.len() {
+                wii_memory.buffer_from(argument_offset as usize)
+            } else {
+                &parent_data[argument_offset as usize..]
+            };
+
+            let arguments = arguments(argument_buffer, argument_offset, num_arguments as usize);
+            events.push(Event {
+                namespace,
+                code,
+                unk1,
+                arguments,
+            });
+        }
+
+        event_offset += EVENT_SIZE as u32;
+    }
+    Script { events, offset: offset as i32 }
 }
 
-
-fn arguments(parent_data: &[u8], argument_offset: usize, num_arguments: usize) -> Vec<Argument> {
+fn arguments(buffer: &[u8], origin: u32, num_arguments: usize) -> Vec<Argument> {
     let mut arguments = vec!();
-    for i in 0..num_arguments as usize {
-        let argument_offset = argument_offset + i * ARGUMENT_SIZE;
-        let ty   = (&parent_data[argument_offset     ..]).read_i32::<BigEndian>().unwrap();
-        let data = (&parent_data[argument_offset + 4 ..]).read_i32::<BigEndian>().unwrap();
+    for i in 0..num_arguments as i32 {
+        let argument_offset = i * ARGUMENT_SIZE as i32;
+
+        if argument_offset + 8 > buffer.len() as i32 {
+            error!("Script argument parsing tried to read out of bounds via offset {} into buffer of size {}", argument_offset, buffer.len());
+            break;
+        }
+
+        let ty   = (&buffer[argument_offset as usize     ..]).read_i32::<BigEndian>().unwrap();
+        let data = (&buffer[argument_offset as usize + 4 ..]).read_i32::<BigEndian>().unwrap();
 
         let argument = match ty {
             0 => Argument::Value (data),
             1 => Argument::Scalar (data as f32 / 60000.0),
-            2 => Argument::Offset (Offset { offset: data, origin: argument_offset as i32 + 4}),
+            2 => Argument::Offset (Offset { offset: data, origin: origin as i32 + argument_offset + 4}),
             3 => Argument::Bool (data == 1),
             4 => Argument::File (data),
             5 => {

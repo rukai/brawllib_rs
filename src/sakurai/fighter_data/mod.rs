@@ -5,9 +5,11 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crate::script::Script;
 use crate::script;
 use crate::util;
+use crate::wii_memory::WiiMemory;
+
 use misc_section::MiscSection;
 
-pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterData {
+pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8], wii_memory: &WiiMemory) -> ArcFighterData {
     let subaction_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
     let model_visibility_start     = (&data[4..]).read_i32::<BigEndian>().unwrap();
     let attribute_start            = (&data[8..]).read_i32::<BigEndian>().unwrap();
@@ -49,14 +51,14 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8]) -> ArcFighterDat
     let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
 
     let entry_actions_num = sizes.iter().find(|x| x.offset == entry_actions_start as usize).unwrap().size / 4; // divide by integer size
-    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num);
-    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num);
+    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num, wii_memory);
+    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num, wii_memory);
 
     let subaction_main_num = sizes.iter().find(|x| x.offset == subaction_main_start as usize).unwrap().size / 4; // divide by integer size
-    let subaction_main = script::scripts(parent_data, &parent_data[subaction_main_start as usize ..], subaction_main_num);
-    let subaction_gfx = script::scripts(parent_data, &parent_data[subaction_gfx_start as usize ..], subaction_main_num);
-    let subaction_sfx = script::scripts(parent_data, &parent_data[subaction_sfx_start as usize ..], subaction_main_num);
-    let subaction_other = script::scripts(parent_data, &parent_data[subaction_other_start as usize ..], subaction_main_num);
+    let subaction_main = script::scripts(parent_data, &parent_data[subaction_main_start as usize ..], subaction_main_num, wii_memory);
+    let subaction_gfx = script::scripts(parent_data, &parent_data[subaction_gfx_start as usize ..], subaction_main_num, wii_memory);
+    let subaction_sfx = script::scripts(parent_data, &parent_data[subaction_sfx_start as usize ..], subaction_main_num, wii_memory);
+    let subaction_other = script::scripts(parent_data, &parent_data[subaction_other_start as usize ..], subaction_main_num, wii_memory);
 
     let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
     let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);

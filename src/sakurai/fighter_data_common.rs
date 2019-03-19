@@ -3,8 +3,9 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crate::script::Script;
 use crate::script;
 use crate::util;
+use crate::wii_memory::WiiMemory;
 
-pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8]) -> ArcFighterDataCommon {
+pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8], wii_memory: &WiiMemory) -> ArcFighterDataCommon {
     let global_ics           = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
     let global_ics_sse       = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
     let ics                  = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
@@ -35,8 +36,8 @@ pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8]) -> ArcFig
     let sizes = get_sizes(data);
 
     let entry_actions_num = sizes.iter().find(|x| x.offset == entry_actions_start as usize).unwrap().size / 4; // divide by integer size
-    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num);
-    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num);
+    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num, wii_memory);
+    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num, wii_memory);
 
     let leg_bones_left_list = util::list_offset(&parent_data[leg_bones as usize..]);
     let mut leg_bones_left = vec!();

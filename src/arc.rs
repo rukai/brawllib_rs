@@ -4,8 +4,9 @@ use crate::bres::*;
 use crate::util;
 use crate::sakurai;
 use crate::sakurai::ArcSakurai;
+use crate::wii_memory::WiiMemory;
 
-pub(crate) fn arc(data: &[u8]) -> Arc {
+pub(crate) fn arc(data: &[u8], wii_memory: &WiiMemory) -> Arc {
     //read the main header
     let num_sub_headers = (&data[6..8]).read_u16::<BigEndian>().unwrap();
     let name = String::from(util::parse_str(&data[0x10..]).unwrap());
@@ -19,7 +20,7 @@ pub(crate) fn arc(data: &[u8]) -> Arc {
             let tag = util::parse_tag(&data[header_index + ARC_CHILD_HEADER_SIZE .. ]);
             let child_data = &data[header_index + ARC_CHILD_HEADER_SIZE ..];
             arc_child.data = match tag.as_ref() {
-                "ARC"  => ArcChildData::Arc(arc(&child_data)),
+                "ARC"  => ArcChildData::Arc(arc(&child_data, wii_memory)),
                 "EFLS" => ArcChildData::Efls,
                 "bres" => ArcChildData::Bres(bres(&child_data)),
                 "ATKD" => ArcChildData::Atkd,
@@ -27,7 +28,7 @@ pub(crate) fn arc(data: &[u8]) -> Arc {
                 "REFT" => ArcChildData::Reft,
                 "AIPD" => ArcChildData::Aipd,
                 "W"    => ArcChildData::W,
-                "" if i == 0 => ArcChildData::Sakurai(sakurai::arc_sakurai(&data[header_index + ARC_CHILD_HEADER_SIZE ..])),
+                "" if i == 0 => ArcChildData::Sakurai(sakurai::arc_sakurai(&data[header_index + ARC_CHILD_HEADER_SIZE ..], wii_memory)),
                 _ => ArcChildData::Unknown
             };
 

@@ -14,6 +14,7 @@ use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
+use crate::wii_memory::WiiMemory;
 
 #[derive(Debug)]
 pub struct Fighter {
@@ -36,22 +37,22 @@ impl Fighter {
     ///
     /// If single_model is true then only one model for each fighter is loaded, otherwise all models are loaded.
     /// It's much faster to only process one model so set this to true if you only need one.
-    pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, common_fighter: &Arc, single_model: bool) -> Vec<Fighter> {
+    pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, common_fighter: &Arc, wii_memory: &WiiMemory, single_model: bool) -> Vec<Fighter> {
         // TODO: Could probably make this faster by beginning processing of a fighter_data immediately after it is read from disk.
         // However it might actually slow things down because all the threads are reading from disk at once.
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
         fighter_datas(brawl_fighter_dir, mod_fighter_dir)
             .into_par_iter()
-            .filter_map(|x| Fighter::load_single(x, common_fighter, single_model))
+            .filter_map(|x| Fighter::load_single(x, common_fighter, single_model, wii_memory))
             .collect()
     }
 
-    fn load_single(fighter_data: FighterData, common_fighter: &Arc, single_model: bool) -> Option<Fighter> {
+    fn load_single(fighter_data: FighterData, common_fighter: &Arc, single_model: bool, wii_memory: &WiiMemory) -> Option<Fighter> {
         info!("Parsing fighter: {}", fighter_data.cased_name);
         let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
         let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
-            arc::arc(data)
+            arc::arc(data, wii_memory)
         } else {
             error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
             return None;
@@ -67,13 +68,13 @@ impl Fighter {
         let motion_etc_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
         let motion_file_name = format!("Fit{}Motion.pac", fighter_data.cased_name);
         let motion = if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
-            arc::arc(data)
+            arc::arc(data, wii_memory)
         } else {
             if let Some(data) = fighter_data.data.get(&motion_file_name) {
                 // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
                 // Currently I dont need that file at all (What does it even contain?)
                 // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
-                arc::arc(data)
+                arc::arc(data, wii_memory)
             } else {
                 // TODO: This is being hit because some fighters just use another fighters motion file
                 //       Handle this in the FighterFolder by duplicating the file in each special case.
@@ -85,7 +86,7 @@ impl Fighter {
         let mut models = vec!();
         for i in 0..100 {
             if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
-                models.push(arc::arc(&model_data));
+                models.push(arc::arc(&model_data, wii_memory));
                 if single_model {
                     break;
                 }

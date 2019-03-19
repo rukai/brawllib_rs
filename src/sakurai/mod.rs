@@ -6,10 +6,12 @@ use byteorder::{BigEndian, ReadBytesExt};
 use crate::script::Script;
 use crate::script;
 use crate::util;
+use crate::wii_memory::WiiMemory;
+
 use fighter_data::ArcFighterData;
 use fighter_data_common::ArcFighterDataCommon;
 
-pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
+pub(crate) fn arc_sakurai(data: &[u8], wii_memory: &WiiMemory) -> ArcSakurai {
     let size                      = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
     let lookup_entry_offset       = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
     let lookup_entry_count        = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
@@ -52,21 +54,21 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     let mut sections = vec!();
     for i in 0..section_count {
         let offset = sections_offset + i as usize * ARC_SAKURAI_SECTION_HEADER_SIZE;
-        let data_offset   = (&data[offset     ..]).read_i32::<BigEndian>().unwrap();
+        let data_offset   = (&data[offset     ..]).read_u32::<BigEndian>().unwrap();
         let string_offset = (&data[offset + 4 ..]).read_i32::<BigEndian>().unwrap();
         let name = String::from(util::parse_str(&data[string_table_offset + string_offset as usize ..]).unwrap());
 
         let data = &data[ARC_SAKURAI_HEADER_SIZE + data_offset as usize..];
         let mut section_data = match name.as_str() {
-            "data"       => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data)),
-            "dataCommon" => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data)),
+            "data"       => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data, wii_memory)),
+            "dataCommon" => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data, wii_memory)),
             _            => SectionData::None
         };
 
         if name.starts_with("gameAnimCmd_") || name.starts_with("effectAnimCmd_") || name.starts_with("statusAnimCmdGroup_") || name.starts_with("statusAnimCmdPre_") {
             section_data = SectionData::Script(SectionScript {
                 name:   name.clone(),
-                script: script::new_script(parent_data, data_offset),
+                script: script::new_script(parent_data, data_offset, wii_memory),
             });
         }
         sections.push(ArcSakuraiSection { name, data: section_data });
@@ -98,7 +100,7 @@ pub(crate) fn arc_sakurai(data: &[u8]) -> ArcSakurai {
     all_scripts.push(all_scripts_sub.as_slice());
 
     let ignore_origins: Vec<_> = external_subroutines.iter().flat_map(|x| x.offsets.iter().cloned()).collect();
-    let mut fragment_scripts = script::fragment_scripts(parent_data, all_scripts.as_slice(), ignore_origins.as_slice());
+    let mut fragment_scripts = script::fragment_scripts(parent_data, all_scripts.as_slice(), ignore_origins.as_slice(), wii_memory);
     fragment_scripts.sort_by_key(|x| x.offset);
 
     ArcSakurai { lookup_entries, sections, external_subroutines, fragment_scripts }

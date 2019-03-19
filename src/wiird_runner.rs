@@ -1,21 +1,25 @@
-use std::collections::HashMap;
-
 use byteorder::{BigEndian, ByteOrder};
 
 use crate::wiird::{WiiRDBlock, WiiRDCode, AddAddress, JumpFlag};
+use crate::wii_memory::WiiMemory;
 
-pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32) {
-    // TODO: HashMap is completely wrong, needs to be an array or else overlapping reads/writes dont work.
-    let mut memory = HashMap::new();
+pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32) -> WiiMemory {
+    let mut memory = WiiMemory::new();
     let mut gecko_registers = [0_u32; 0x10];
     let mut base_address    = 0x80000000;
     let mut pointer_address = 0x80000000;
+
+    // write buffer to memory
+    for (i, value) in buffer.iter().enumerate() {
+        memory.write_u8(buffer_ram_location as usize + i, *value);
+    }
 
     // TODO: The if statement ast thing will never work properly... How to get to the right line
     // Well hang on when goto does: "The code handler jumps to (next line of code + XXXX lines). XXXX is signed.
     // What does a line even mean. Does it mean exactly 8 bytes every time or does it refer to an individual code?
     // If its 16 bytes, then that even breaks simple enum processing!
     // Do I need to include a line number for each code!!??!?
+    //
 
     let mut line = 0;
     while line < codeset.codes.len() {
@@ -31,6 +35,11 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for i in 0..length {
                     let current_address = mem_address + i;
+
+                    // write to wii ram
+                    memory.write_u8(current_address as usize, value);
+
+                    // also write to the provided buffer if it would have been written to on a wii.
                     if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         buffer[buffer_offset as usize] = value;
@@ -46,6 +55,11 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for i in 0..length {
                     let current_address = mem_address + i * 2;
+
+                    // write to wii ram
+                    memory.write_u16(current_address as usize, value);
+
+                    // also write to the provided buffer if it would have been written to on a wii.
                     if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         BigEndian::write_u16(&mut buffer[buffer_offset as usize..], value);
@@ -60,6 +74,10 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                 };
 
                 if mem_address >= buffer_ram_location && mem_address < buffer_ram_location + buffer.len() as u32 {
+                    // write to wii ram
+                    memory.write_u32(mem_address as usize, value);
+
+                    // also write to the provided buffer if it would have been written to on a wii.
                     let buffer_offset = mem_address - buffer_ram_location;
                     BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
                 }
@@ -73,6 +91,11 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
 
                 for (i, value) in values.iter().enumerate() {
                     let current_address = mem_address + i as u32;
+
+                    // write to wii ram
+                    memory.write_u8(current_address as usize, *value);
+
+                    // also write to the provided buffer if it would have been written to on a wii.
                     if current_address >= buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
                         let buffer_offset = current_address - buffer_ram_location;
                         buffer[buffer_offset as usize] = *value;
@@ -92,10 +115,10 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                 }
 
                 if add_result {
-                    base_address += memory.get(&actual_address).cloned().unwrap_or_default();
+                    base_address += memory.read_u32(actual_address as usize);
                 }
                 else {
-                    base_address = memory.get(&actual_address).cloned().unwrap_or_default();
+                    base_address = memory.read_u32(actual_address as usize);
                 }
             }
             WiiRDCode::SetBaseAddress { add_result, add, add_gecko_register, value } => {
@@ -129,7 +152,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                     actual_address += gecko_registers[gecko_register as usize];
                 }
 
-                memory.insert(actual_address, base_address);
+                memory.write_u32(actual_address as usize, base_address);
             }
             WiiRDCode::SetBaseAddressToCodeLocation { .. } => {
                 // Mess up the value so writes can be ignored while in this state
@@ -148,10 +171,10 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                 }
 
                 if add_result {
-                    pointer_address += memory.get(&actual_address).cloned().unwrap_or_default();
+                    pointer_address += memory.read_u32(actual_address as usize);
                 }
                 else {
-                    pointer_address = memory.get(&actual_address).cloned().unwrap_or_default();
+                    pointer_address = memory.read_u32(actual_address as usize);
                 }
             }
             WiiRDCode::SetPointerAddress { add_result, add, add_gecko_register, mut value } => {
@@ -184,7 +207,7 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
                     actual_address += gecko_registers[gecko_register as usize];
                 }
 
-                memory.insert(actual_address, pointer_address);
+                memory.write_u32(actual_address as usize, pointer_address);
             }
             WiiRDCode::SetPointerAddressToCodeLocation { .. } => {
                 // Mess up the value so writes can be ignored while in this state
@@ -224,4 +247,6 @@ pub fn process(codeset: &WiiRDBlock, buffer: &mut [u8], buffer_ram_location: u32
         }
         line += 1;
     }
+
+    memory
 }
