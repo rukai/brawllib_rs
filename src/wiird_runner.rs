@@ -4,7 +4,7 @@ use byteorder::{BigEndian, ByteOrder};
 
 use crate::wiird::{WiiRDCode, AddAddress};
 
-pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u32) -> Vec<u8> {
+pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u32) {
     // TODO: HashMap is completely wrong, needs to be an array or else overlapping reads/writes dont work.
     let mut memory = HashMap::new();
     let mut gecko_registers = [0_u32; 0x10];
@@ -13,7 +13,37 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
 
     for code in codeset {
         match code.clone() {
-            WiiRDCode::WriteAndFill32 { base_address: use_base_address, address, value } => {
+            WiiRDCode::WriteAndFill8 { use_base_address, address, value, length } => {
+                let mem_address = if use_base_address {
+                    (base_address & 0xFE000000) + address
+                } else {
+                    pointer_address + address
+                };
+
+                for i in 0..length {
+                    let current_address = mem_address + i;
+                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                        let buffer_offset = current_address - buffer_ram_location;
+                        buffer[buffer_offset as usize] = value;
+                    }
+                }
+            }
+            WiiRDCode::WriteAndFill16 { use_base_address, address, value, length } => {
+                let mem_address = if use_base_address {
+                    (base_address & 0xFE000000) + address
+                } else {
+                    pointer_address + address
+                };
+
+                for i in 0..length {
+                    let current_address = mem_address + i * 2;
+                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                        let buffer_offset = current_address - buffer_ram_location;
+                        BigEndian::write_u16(&mut buffer[buffer_offset as usize..], value);
+                    }
+                }
+            }
+            WiiRDCode::WriteAndFill32 { use_base_address, address, value } => {
                 let mem_address = if use_base_address {
                     (base_address & 0xFE000000) + address
                 } else {
@@ -22,8 +52,22 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
 
                 if mem_address > buffer_ram_location && mem_address < buffer_ram_location + buffer.len() as u32 {
                     let buffer_offset = mem_address - buffer_ram_location;
-
                     BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
+                }
+            }
+            WiiRDCode::StringWrite { use_base_address, address, values } => {
+                let mem_address = if use_base_address {
+                    (base_address & 0xFE000000) + address
+                } else {
+                    pointer_address + address
+                };
+
+                for (i, value) in values.iter().enumerate() {
+                    let current_address = mem_address + i as u32;
+                    if current_address > buffer_ram_location && current_address < buffer_ram_location + buffer.len() as u32 {
+                        let buffer_offset = current_address - buffer_ram_location;
+                        buffer[buffer_offset as usize] = *value;
+                    }
                 }
             }
             WiiRDCode::LoadBaseAddress { add_result, add_mem_address, add_mem_address_gecko_register, mem_address } => {
@@ -137,7 +181,17 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
                 // Mess up the value so writes can be ignored while in this state
                 pointer_address = 0;
             }
-            WiiRDCode::FullTerminator { base_address_high, pointer_address_high} => {
+            WiiRDCode::FullTerminator { base_address_high, pointer_address_high } => {
+                // TODO: clear code execution status
+
+                if base_address_high != 0 {
+                    base_address = (base_address_high as u32) << 16
+                }
+                if pointer_address_high != 0 {
+                    pointer_address = (pointer_address_high as u32) << 16
+                }
+            }
+            WiiRDCode::EndIf { base_address_high, pointer_address_high, .. } => {
                 // TODO: clear code execution status
 
                 if base_address_high != 0 {
@@ -164,5 +218,4 @@ pub fn process(codeset: &[WiiRDCode], buffer: &mut [u8], buffer_ram_location: u3
             _ => { }
         }
     }
-    vec!()
 }

@@ -75,24 +75,24 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
     let mut offset = 0;
     while offset < data.len() {
         // Not every code type uses this, but its safe to just create these for if we need them.
-        let base_address = data[offset] & 0b00010000 == 0;
+        let use_base_address = data[offset] & 0b00010000 == 0;
         let address = (&data[offset ..]).read_u32::<BigEndian>().unwrap() & 0x1FFFFFF;
         match data[offset] & 0b11101110 {
             0x00 => {
                 let value = data[offset + 7];
                 let length = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap() as u32 + 1;
-                codes.push(WiiRDCode::WriteAndFill8 { base_address, address, value, length });
+                codes.push(WiiRDCode::WriteAndFill8 { use_base_address, address, value, length });
                 offset += 8;
             }
             0x02 => {
                 let value = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
                 let length = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap() as u32 + 1;
-                codes.push(WiiRDCode::WriteAndFill16 { base_address, address, value, length });
+                codes.push(WiiRDCode::WriteAndFill16 { use_base_address, address, value, length });
                 offset += 8;
             }
             0x04 => {
                 let value = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
-                codes.push(WiiRDCode::WriteAndFill32 { base_address, address, value });
+                codes.push(WiiRDCode::WriteAndFill32 { use_base_address, address, value });
                 offset += 8;
             }
             0x06 => {
@@ -101,7 +101,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 for i in 0..count {
                     values.push(data[offset + 8 + i]);
                 }
-                codes.push(WiiRDCode::StringWrite { base_address, address, values });
+                codes.push(WiiRDCode::StringWrite { use_base_address, address, values });
 
                 offset += 8 + count;
 
@@ -117,31 +117,39 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let count = ((&data[offset + 8..]).read_u16::<BigEndian>().unwrap() & 0x0FFF) + 1;
                 let address_increment = (&data[offset + 10..]).read_u16::<BigEndian>().unwrap();
                 let value_increment = (&data[offset + 12..]).read_u32::<BigEndian>().unwrap();
-                codes.push(WiiRDCode::SerialWrite { base_address, address, initial_value, value_size, count, address_increment, value_increment });
+                codes.push(WiiRDCode::SerialWrite { use_base_address, address, initial_value, value_size, count, address_increment, value_increment });
                 offset += 16;
             }
             0x20 => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x22 => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x24 => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x26 => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x28 => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x2A => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x2C => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x2E => {
+                codes.push(WiiRDCode::StartIf);
                 offset += 8;
             }
             0x40 => {
@@ -151,7 +159,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let mem_address = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add_mem_address = match (add_mem_address_bool, base_address) {
+                let add_mem_address = match (add_mem_address_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -173,7 +181,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let value = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add = match (add_bool, base_address) {
+                let add = match (add_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -194,7 +202,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let mem_address = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add_mem_address = match (add_mem_address_bool, base_address) {
+                let add_mem_address = match (add_mem_address_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -220,7 +228,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let mem_address = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add_mem_address = match (add_mem_address_bool, base_address) {
+                let add_mem_address = match (add_mem_address_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -242,7 +250,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let value = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add = match (add_bool, base_address) {
+                let add = match (add_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -263,7 +271,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let mem_address = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add_mem_address = match (add_mem_address_bool, base_address) {
+                let add_mem_address = match (add_mem_address_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -342,7 +350,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 let register = data[offset + 3] & 0xF;
                 let value = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
 
-                let add = match (add_bool, base_address) {
+                let add = match (add_bool, use_base_address) {
                     (true, true)  => AddAddress::BaseAddress,
                     (true, false) => AddAddress::PointerAddress,
                     (false, _)    => AddAddress::None,
@@ -364,15 +372,57 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 offset += 8;
             }
             0x86 => {
+                let operation_byte = data[offset + 1] & 0xF0;
+                let load_register  = data[offset + 1] & 0b00000001 != 0;
+                let load_value     = data[offset + 1] & 0b00000010 != 0;
+                let register       = data[offset + 3] & 0x0F;
+                let value          = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
+
+                let operation = GeckoOperation::new(operation_byte);
+
+                codes.push(WiiRDCode::OperationGeckoRegisterDirectValue { operation, load_register, load_value, register, value });
                 offset += 8;
             }
             0x88 => {
+                let operation_byte = data[offset + 1] & 0xF0;
+                let load_register1 = data[offset + 1] & 0b00000001 != 0;
+                let load_register2 = data[offset + 1] & 0b00000010 != 0;
+                let register1      = data[offset + 3] & 0x0F;
+                let register2      = data[offset + 7] & 0x0F;
+
+                let operation = GeckoOperation::new(operation_byte);
+
+                codes.push(WiiRDCode::OperationGeckoRegister { operation, load_register1, load_register2, register1, register2 });
                 offset += 8;
             }
             0x8A => {
+                let count           = (&data[offset + 1..]).read_u16::<BigEndian>().unwrap();
+                let source_register =   data[offset + 3] & 0xF0;
+                let dest_register   =   data[offset + 3] & 0x0F;
+                let dest_offset     = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
+
+                let dest_register = if dest_register == 0x0F {
+                    None
+                } else {
+                    Some(dest_register)
+                };
+
+                codes.push(WiiRDCode::MemoryCopy1 { use_base_address, count, source_register, dest_register, dest_offset });
                 offset += 8;
             }
             0x8C => {
+                let count           = (&data[offset + 1..]).read_u16::<BigEndian>().unwrap();
+                let source_register =   data[offset + 3] & 0xF0;
+                let dest_register   =   data[offset + 3] & 0x0F;
+                let source_offset   = (&data[offset + 4..]).read_u32::<BigEndian>().unwrap();
+
+                let source_register = if source_register == 0x0F {
+                    None
+                } else {
+                    Some(source_register)
+                };
+
+                codes.push(WiiRDCode::MemoryCopy2 { use_base_address, count, source_register, dest_register, source_offset });
                 offset += 8;
             }
             0xC0 => {
@@ -391,7 +441,7 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 for i in 0..count * 8 {
                     instruction_data.push(data[offset + 8 + i]);
                 }
-                codes.push(WiiRDCode::InsertPPC { base_address, address, instruction_data });
+                codes.push(WiiRDCode::InsertPPC { use_base_address, address, instruction_data });
 
                 offset += 8 + count * 8;
             }
@@ -402,6 +452,12 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
                 offset += 8;
             }
             0xE2 => {
+                let else_branch = data[offset + 1] & 0x10 != 0;
+                let count = data[offset + 3];
+                let base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
+                let pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
+
+                codes.push(WiiRDCode::EndIf { else_branch, count, base_address_high, pointer_address_high });
                 offset += 8;
             }
             0xF0 => {
@@ -416,21 +472,33 @@ pub fn wiird_codes(data: &[u8]) -> Vec<WiiRDCode> {
         }
     }
 
+    for code in &codes {
+        println!("{:x?}", code);
+    }
     codes
 }
 
 #[derive(Clone, Debug)]
 pub enum WiiRDCode {
     /// 00
-    WriteAndFill8 { base_address: bool, address: u32, value: u8, length: u32 },
+    WriteAndFill8 { use_base_address: bool, address: u32, value: u8, length: u32 },
     /// 02
-    WriteAndFill16 { base_address: bool, address: u32, value: u16, length: u32 },
+    WriteAndFill16 { use_base_address: bool, address: u32, value: u16, length: u32 },
     /// 04
-    WriteAndFill32 { base_address: bool, address: u32, value: u32 },
+    WriteAndFill32 { use_base_address: bool, address: u32, value: u32 },
     /// 06
-    StringWrite { base_address: bool, address: u32, values: Vec<u8> },
+    StringWrite { use_base_address: bool, address: u32, values: Vec<u8> },
     /// 08
-    SerialWrite { base_address: bool, address: u32, initial_value: u32, value_size: u8, count: u16, address_increment: u16, value_increment: u32 },
+    SerialWrite { use_base_address: bool, address: u32, initial_value: u32, value_size: u8, count: u16, address_increment: u16, value_increment: u32 },
+    /// 20
+    /// 22
+    /// 24
+    /// 26
+    /// 28
+    /// 2A
+    /// 2C
+    /// 2E
+    StartIf,
     /// 40
     LoadBaseAddress { add_result: bool, add_mem_address: AddAddress, add_mem_address_gecko_register: Option<u8>, mem_address: u32 },
     /// 42
@@ -471,12 +539,22 @@ pub enum WiiRDCode {
     LoadGeckoRegister { register: u8, mem_address: u32 },
     /// 84
     StoreGeckoRegister { register: u8, mem_address: u32 },
+    /// 86
+    OperationGeckoRegisterDirectValue { operation: GeckoOperation, load_register: bool, load_value: bool, register: u8, value: u32 },
+    /// 88
+    OperationGeckoRegister { operation: GeckoOperation, load_register1: bool, load_register2: bool, register1: u8, register2: u8 },
+    /// 8A
+    MemoryCopy1 { use_base_address: bool, count: u16, source_register: u8, dest_register: Option<u8>, dest_offset: u32 },
+    /// 8C
+    MemoryCopy2 { use_base_address: bool, count: u16, source_register: Option<u8>, dest_register: u8, source_offset: u32 },
     /// C0
     ExecutePPC { instruction_data: Vec<u8> },
     /// C2
-    InsertPPC { base_address: bool, address: u32, instruction_data: Vec<u8> },
+    InsertPPC { use_base_address: bool, address: u32, instruction_data: Vec<u8> },
     /// E0
     FullTerminator { base_address_high: u16, pointer_address_high: u16 },
+    /// E2
+    EndIf { else_branch: bool, count: u8, base_address_high: u16, pointer_address_high: u16 },
 }
 
 #[derive(Clone, Debug)]
@@ -491,4 +569,39 @@ pub enum AddAddress {
     BaseAddress,
     PointerAddress,
     None
+}
+
+#[derive(Clone, Debug)]
+pub enum GeckoOperation {
+    Add,
+    Mul,
+    Or,
+    And,
+    Xor,
+    ShiftLeft,
+    ShiftRight,
+    RotateLeft,
+    ArithmeticShiftRight,
+    FloatAdd,
+    FloatMul,
+    Unknown (u8),
+}
+
+impl GeckoOperation {
+    fn new(value: u8) -> Self {
+        match value {
+            0  => GeckoOperation::Add,
+            1  => GeckoOperation::Mul,
+            2  => GeckoOperation::Or,
+            3  => GeckoOperation::And,
+            4  => GeckoOperation::Xor,
+            5  => GeckoOperation::ShiftLeft,
+            6  => GeckoOperation::ShiftRight,
+            7  => GeckoOperation::RotateLeft,
+            8  => GeckoOperation::ArithmeticShiftRight,
+            10 => GeckoOperation::FloatAdd,
+            11 => GeckoOperation::FloatMul,
+            _  => GeckoOperation::Unknown (value),
+        }
+    }
 }
