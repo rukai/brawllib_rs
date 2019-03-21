@@ -32,7 +32,6 @@ impl ScriptAst {
 
 fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> ProcessedBlock {
     let mut event_asts = vec!();
-    let mut boolean_expressions = vec!();
     while let Some(event) = events.next() {
         let args = &event.arguments;
         use crate::script::Argument::*;
@@ -64,14 +63,12 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x09, Some(&Offset(ref v0)), None, None) => EventAst::Goto (v0.clone()),
             (0x00, 0x09, Some(&Value (ref v0)), None, None) => EventAst::Goto (script::Offset { offset: *v0, origin: -1 }),
             (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
-                if let Some(mut test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
                     match process_block(events) {
-                        ProcessedBlock::EndIf { then_branch, boolean_expressions } => {
-                            test.append_boolean_expressions(boolean_expressions);
+                        ProcessedBlock::EndIf { then_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
                         }
-                        ProcessedBlock::EndIfAndElse { then_branch, else_branch, boolean_expressions } => {
-                            test.append_boolean_expressions(boolean_expressions);
+                        ProcessedBlock::EndIfAndElse { then_branch, else_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch })
                         }
                         _ => {
@@ -85,10 +82,10 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             }
             (0x00, 0x0E, None, None, None) => { // Else
                 match process_block(events) {
-                    ProcessedBlock::EndIf { then_branch: else_branch, .. } => {
+                    ProcessedBlock::EndIf { then_branch: else_branch } => {
                         let then_branch = Block { events: event_asts };
                         let else_branch = Some(Box::new(else_branch));
-                        return ProcessedBlock::EndIfAndElse { then_branch, else_branch, boolean_expressions }
+                        return ProcessedBlock::EndIfAndElse { then_branch, else_branch }
                     }
                     _ => {
                         error!("IfStatement did not terminate");
@@ -97,30 +94,37 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x00, 0x0B, Some(&Requirement { ref ty, flip }), v1, v2) => { // And
-                if let Some(right) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
-                    boolean_expressions.push(AppendBooleanExpression { right, operator: ComparisonOperator::And });
-                    continue;
+                // It is tempting to combine this event with the previous IfStatement event.
+                // However that is a terrible idea, as an And/Or will alter the execution of the
+                // current IfStatement even if other events have occured since the IfStatement.
+                //
+                // e.g. If an IfStatement branch is currently running and an `And` is ran that
+                // means it would not have started running, execution of the block will end immediately.
+                // All events before the `And` are still executed.
+                // While all events after the `And` are not executed.
+                //
+                // I have tested this with Nop and FrameSpeedModifier events in between the IfStatement and And/Or.
+                // It would probably also occur with an And/Or at a Goto/Subroutine destination
+                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                    EventAst::IfStatementAnd (test)
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x00, 0x0C, Some(&Requirement { ref ty, flip }), v1, v2) => { // Or
-                if let Some(right) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
-                    boolean_expressions.push(AppendBooleanExpression { right, operator: ComparisonOperator::Or });
-                    continue;
+                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                    EventAst::IfStatementOr (test)
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x00, 0x0D, Some(&Requirement { ref ty, flip }), v1, v2) => { // Else If
-                if let Some(mut test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
                     let event = match process_block(events) {
-                        ProcessedBlock::EndIf { then_branch, boolean_expressions } => {
-                            test.append_boolean_expressions(boolean_expressions);
+                        ProcessedBlock::EndIf { then_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
                         }
-                        ProcessedBlock::EndIfAndElse { then_branch, else_branch, boolean_expressions } => {
-                            test.append_boolean_expressions(boolean_expressions);
+                        ProcessedBlock::EndIfAndElse { then_branch, else_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch })
                         }
                         _ => {
@@ -130,12 +134,12 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     };
                     let else_branch = Some(Box::new(Block { events: vec!(event) }));
                     let then_branch = Block { events: event_asts };
-                    return ProcessedBlock::EndIfAndElse { then_branch, else_branch, boolean_expressions };
+                    return ProcessedBlock::EndIfAndElse { then_branch, else_branch };
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts }, boolean_expressions } }
+            (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts } } }
             (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)),      None) => EventAst::Switch (v0, v1),
             (0x00, 0x11, Some(&Value(v0)), None,                  None) => EventAst::Case (v0),
             (0x00, 0x11, None,             None,                  None) => EventAst::DefaultCase,
@@ -147,71 +151,31 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             // change action
             (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
             (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
-                if let Some(mut test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
-                    // Additional Change Action Requirements can be added in the next events
-                    while let Some(peek_event) = events.peek() {
-                        if peek_event.namespace == 0x02 && peek_event.code == 0x04 {
-                            let args = &peek_event.arguments;
-                            if let Some(&Requirement { ref ty, flip }) = args.get(0) {
-                                if let Some(right) = Expression::from_args(ty, flip, args.get(1), args.get(2), args.get(3)) {
-                                    test = Expression::Binary(BinaryExpression { left: Box::new(test), right: Box::new(right), operator: ComparisonOperator::And });
-                                    events.next();
-                                }
-                                else {
-                                    error!("Invalid Additional Change Action Requirement: Expression::from_args failed");
-                                    return ProcessedBlock::Finished (Block { events: event_asts });
-                                }
-                            }
-                            else {
-                                error!("Invalid Additional Change Action Requirement: args.get(0) is not a requirement");
-                                return ProcessedBlock::Finished (Block { events: event_asts });
-                            }
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
+                if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
                     EventAst::ChangeAction (ChangeAction { status_id: Some(v0), action: v1, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x02, 0x01, Some(&Value(v0)), Some(&Requirement { ref ty, flip }), v2) => {
-                if let Some(mut test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
-                    // Additional Change Action Requirements can be added in the next events
-                    while let Some(peek_event) = events.peek() {
-                        if peek_event.namespace == 0x02 && peek_event.code == 0x04 {
-                            let args = &peek_event.arguments;
-                            if let Some(&Requirement { ref ty, flip }) = args.get(0) {
-                                if let Some(right) = Expression::from_args(ty, flip, args.get(1), args.get(2), args.get(3)) {
-                                    test = Expression::Binary(BinaryExpression { left: Box::new(test), right: Box::new(right), operator: ComparisonOperator::And });
-                                    events.next();
-                                }
-                                else {
-                                    error!("Invalid Additional Change Action Requirement: Expression::from_args failed");
-                                    return ProcessedBlock::Finished (Block { events: event_asts });
-                                }
-                            }
-                            else {
-                                error!("Invalid Additional Change Action Requirement: args.get(0) is not a requirement");
-                                return ProcessedBlock::Finished (Block { events: event_asts });
-                            }
-                        }
-                        else {
-                            break;
-                        }
-                    }
-
+                if let Some(test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
                     EventAst::ChangeAction (ChangeAction { status_id: None, action: v0, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x04, v0, v1, v2) => {
-                error!("Additional Change Action Requirement without a previous Change Action. v0: {:?} v1: {:?} v2: {:?}", v0, v1, v2);
-                //return ProcessedBlock::Finished (Block { events: event_asts });
-                EventAst::Unknown (event.clone())
+            (0x02, 0x04, Some(&Requirement { ref ty, flip }), v1, v2) => {
+                // It is tempting to combine this event with the previous ChangeAction event.
+                // However that is a terrible idea as a ChangeActionAdditionalRequirement will
+                // modify the last ChangeAction regardless of any events in between.
+                // I have tested this with Nop and FrameSpeedModifier events in between.
+                // It would probably also occur with a ChangeActionAdditionalRequirement in an IfStatement, at a Goto/Subroutine
+                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                    EventAst::ChangeActionAdditionalRequirement { test }
+                }
+                else {
+                    EventAst::Unknown (event.clone())
+                }
             }
             (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableActionStatusID (v0),
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
@@ -839,28 +803,11 @@ impl Expression {
     }
 }
 
-impl Expression {
-    fn append_boolean_expressions(&mut self, boolean_expressions: Vec<AppendBooleanExpression>) {
-        for boolean_expression in boolean_expressions {
-            *self = Expression::Binary (BinaryExpression {
-                left: Box::new(self.clone()),
-                right: Box::new(boolean_expression.right),
-                operator: boolean_expression.operator,
-            });
-        }
-    }
-}
-
-struct AppendBooleanExpression {
-    right:    Expression,
-    operator: ComparisonOperator,
-}
-
 enum ProcessedBlock {
     Finished     (Block),
     EndForLoop   (Block),
-    EndIf        { then_branch: Block, boolean_expressions: Vec<AppendBooleanExpression> },
-    EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>>, boolean_expressions: Vec<AppendBooleanExpression> },
+    EndIf        { then_branch: Block },
+    EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>> },
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -881,6 +828,20 @@ pub enum EventAst {
     Goto (Offset),
     /// An expression decides which block of code to execute.
     IfStatement (IfStatement),
+    /// An `And` to an If statement.
+    /// If the expression is false then execution of all events other than IfStatementOr are skipped.
+    /// Execution can be resumed by an IfStatementOr
+    ///
+    /// Has no effect outside of an IfStatement
+    /// Havent tested if it would affect execution when called within a subroutine, but I would assume it is.
+    IfStatementAnd (Expression),
+    /// An `Or` to an If statement.
+    /// If the expression is true then execution of all events is re-enabled
+    /// Execution can be stopped by an IfStatementAnd
+    ///
+    /// Has no effect outside of an IfStatement
+    /// Havent tested if it would affect execution when called within a subroutine, but I would assume it is.
+    IfStatementOr (Expression),
     /// Begin a multiple case Switch block.
     Switch (i32, i32),
     /// Handler for if the variable in the switch statement equals the specified value.
@@ -899,6 +860,8 @@ pub enum EventAst {
     EnableActionStatusID (i32),
     /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
     ChangeAction (ChangeAction),
+    /// Add an additional requirement to the preceeding Change Action statement.
+    ChangeActionAdditionalRequirement { test: Expression },
     /// Allow the current action to be interrupted by another action.
     AllowInterrupt,
     /// Change the current subaction.

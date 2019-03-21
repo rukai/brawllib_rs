@@ -17,6 +17,7 @@ use crate::script_ast::{
     EdgeSlide,
     Expression,
     ComparisonOperator,
+    BinaryExpression,
     ChangeAction,
     SpecifyThrow,
     ThrowUse,
@@ -157,9 +158,13 @@ pub struct CallStack<'a> {
 
 pub struct Call<'a> {
     pub block: &'a Block,
+    pub else_branch: Option<&'a Box<Block>>,
     pub index: usize,
     pub subroutine: bool,
     pub external: bool,
+    /// I have tested the `And` and `Or` events to have no effect outside of any if statement
+    pub if_statement: bool,
+    pub execute: bool,
 }
 
 pub enum ChangeSubaction {
@@ -248,9 +253,12 @@ impl<'a> ScriptRunner<'a> {
         for script in subaction_scripts {
             let calls = vec!(Call {
                 block: &script.block,
+                else_branch: None,
                 index: 0,
                 subroutine: false,
                 external: false,
+                if_statement: false,
+                execute: true,
             });
             call_stacks.push(CallStack {
                 calls,
@@ -520,9 +528,12 @@ impl<'a> ScriptRunner<'a> {
         for call_every_frame in self.call_every_frame.values() {
             let calls = vec!(Call {
                 block: call_every_frame.block,
+                else_branch: None,
                 index: 0,
                 subroutine: false,
                 external: call_every_frame.external,
+                if_statement: false,
+                execute: true,
             });
             self.call_stacks.push(CallStack {
                 calls,
@@ -543,38 +554,69 @@ impl<'a> ScriptRunner<'a> {
                 if let Some(event) = call.block.events.get(call.index) {
                     self.call_stacks[i].calls.last_mut().unwrap().index += 1;
                     let external = self.call_stacks[i].calls.last().unwrap().external;
-                    match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts, action_name) {
-                        StepEventResult::WaitUntil (value) => {
-                            self.call_stacks[i].wait_until = value;
-                        }
-                        StepEventResult::NewForLoop { block, iterations } => {
-                            for _ in 0..iterations {
-                                self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
+
+                    if self.call_stacks[i].calls.last().unwrap().execute {
+                        match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts, action_name) {
+                            StepEventResult::WaitUntil (value) => {
+                                self.call_stacks[i].wait_until = value;
                             }
-                        }
-                        StepEventResult::NewCall { block } => {
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
-                        }
-                        StepEventResult::Subroutine { block, external } => {
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: true, external });
-                        }
-                        StepEventResult::CallEveryFrame { block, thread_id, external } => {
-                            self.call_every_frame.insert(thread_id, CallEveryFrame { block, external });
-                        }
-                        StepEventResult::Return => {
-                            let mut run = false;
-                            while run {
-                                run = self.call_stacks[i].calls.pop().map(|x| !x.subroutine).unwrap_or(false);
+                            StepEventResult::NewForLoop { block, iterations } => {
+                                for _ in 0..iterations {
+                                    self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                                }
                             }
+                            StepEventResult::NewCall { block } => {
+                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                            }
+                            StepEventResult::NewIfStatement { then_branch, else_branch, execute } => {
+                                self.call_stacks[i].calls.push(Call { block: then_branch, else_branch, index: 0, subroutine: false, if_statement: true, execute, external });
+                            }
+                            StepEventResult::IfStatementDisableExecution => {
+                                if self.call_stacks[i].calls.last().unwrap().if_statement {
+                                    self.call_stacks[i].calls.last_mut().unwrap().execute = true;
+                                }
+                            }
+                            StepEventResult::Subroutine { block, external } => {
+                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: true, if_statement: false, execute: true, external });
+                            }
+                            StepEventResult::CallEveryFrame { block, thread_id, external } => {
+                                self.call_every_frame.insert(thread_id, CallEveryFrame { block, external });
+                            }
+                            StepEventResult::Return => {
+                                let mut run = false;
+                                while run {
+                                    run = self.call_stacks[i].calls.pop().map(|x| !x.subroutine).unwrap_or(false);
+                                }
+                            }
+                            StepEventResult::Goto { block, external } => {
+                                self.call_stacks[i].calls.pop();
+                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                            }
+                            StepEventResult::None => { }
                         }
-                        StepEventResult::Goto { block, external } => {
-                            self.call_stacks[i].calls.pop();
-                            self.call_stacks[i].calls.push(Call { block, index: 0, subroutine: false, external });
-                        }
-                        StepEventResult::None => { }
+                    }
+                    else {
+                        // when execution is disabled we run events that may resume execution, otherwise we do nothing
+                        let new_execution = match event {
+                            &EventAst::IfStatementOr (ref test) => {
+                                self.evaluate_expression(test).unwrap_bool() && self.call_stacks[i].calls.last().unwrap().if_statement
+                            }
+                            _ => false,
+                        };
+                        self.call_stacks[i].calls.last_mut().unwrap().execute = new_execution;
                     }
                 } else {
-                    self.call_stacks[i].calls.pop();
+                    // If there is an else branch, begin processing that as the main block, otherwise pop the call
+                    let call = self.call_stacks[i].calls.last_mut().unwrap();
+                    if let Some(else_branch) = call.else_branch {
+                        call.block = else_branch;
+                        call.index = 0;
+                        call.else_branch = None;
+                        call.execute = !call.execute;
+                    }
+                    else {
+                        self.call_stacks[i].calls.pop();
+                    }
                 }
             }
         }
@@ -666,15 +708,17 @@ impl<'a> ScriptRunner<'a> {
                 error!("Avoided Goto infinite loop");
             }
             &EventAst::IfStatement (ref if_statement) => {
-                if self.evaluate_expression(&if_statement.test).unwrap_bool() {
-                    return StepEventResult::NewCall { block: &if_statement.then_branch };
-                }
-                else {
-                    if let Some(else_branch) = &if_statement.else_branch {
-                        return StepEventResult::NewCall { block: else_branch };
-                    }
+                let then_branch = &if_statement.then_branch;
+                let else_branch = if_statement.else_branch.as_ref();
+                let execute = self.evaluate_expression(&if_statement.test).unwrap_bool();
+                return StepEventResult::NewIfStatement { then_branch, else_branch, execute };
+            }
+            &EventAst::IfStatementAnd (ref test) => {
+                if !self.evaluate_expression(test).unwrap_bool() {
+                    return StepEventResult::IfStatementDisableExecution;
                 }
             }
+            &EventAst::IfStatementOr (_) => { } // This is handled in the !execution branch
             &EventAst::Switch (_, _) => { } // TODO
             &EventAst::EndSwitch => { }
             &EventAst::Case (_) => { }
@@ -700,6 +744,14 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::EnableActionStatusID (_) => { } // TODO
             &EventAst::ChangeAction (ref change_action) => {
                 self.change_actions.push(change_action.clone());
+            }
+            &EventAst::ChangeActionAdditionalRequirement { ref test } => {
+                if let Some(change_action) = self.change_actions.last_mut() {
+                    let left = Box::new(change_action.test.clone());
+                    let right = Box::new(test.clone());
+                    let operator = ComparisonOperator::And;
+                    change_action.test = Expression::Binary(BinaryExpression { left, operator, right });
+                }
             }
             &EventAst::AllowInterrupt => {
                 self.interruptible = true;
@@ -1433,6 +1485,8 @@ enum StepEventResult<'a> {
     WaitUntil      (f32),
     NewForLoop     { block: &'a Block, iterations: i32 },
     NewCall        { block: &'a Block },
+    NewIfStatement { then_branch: &'a Block, else_branch: Option<&'a Box<Block>>, execute: bool },
+    IfStatementDisableExecution,
     Goto           { block: &'a Block, external: bool },
     Subroutine     { block: &'a Block, external: bool },
     CallEveryFrame { block: &'a Block, external: bool, thread_id: i32 },
