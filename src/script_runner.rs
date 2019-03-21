@@ -698,7 +698,6 @@ impl<'a> ScriptRunner<'a> {
                 self.call_every_frame.remove(&thread_id);
             }
             &EventAst::EnableActionStatusID (_) => { } // TODO
-            &EventAst::ChangeActionStatus { .. } => { } // TODO
             &EventAst::ChangeAction (ref change_action) => {
                 self.change_actions.push(change_action.clone());
             }

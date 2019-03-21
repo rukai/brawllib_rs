@@ -146,8 +146,37 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
 
             // change action
             (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
-            (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip }))
-             => EventAst::ChangeActionStatus { status_id: v0, action: v1, requirement: ty.clone(), flip },
+            (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
+                if let Some(mut test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
+                    // Additional Change Action Requirements can be added in the next events
+                    while let Some(peek_event) = events.peek() {
+                        if peek_event.namespace == 0x02 && peek_event.code == 0x04 {
+                            let args = &peek_event.arguments;
+                            if let Some(&Requirement { ref ty, flip }) = args.get(0) {
+                                if let Some(right) = Expression::from_args(ty, flip, args.get(1), args.get(2), args.get(3)) {
+                                    test = Expression::Binary(BinaryExpression { left: Box::new(test), right: Box::new(right), operator: ComparisonOperator::And });
+                                    events.next();
+                                }
+                                else {
+                                    error!("Invalid Additional Change Action Requirement: Expression::from_args failed");
+                                    return ProcessedBlock::Finished (Block { events: event_asts });
+                                }
+                            }
+                            else {
+                                error!("Invalid Additional Change Action Requirement: args.get(0) is not a requirement");
+                                return ProcessedBlock::Finished (Block { events: event_asts });
+                            }
+                        }
+                        else {
+                            break;
+                        }
+                    }
+
+                    EventAst::ChangeAction (ChangeAction { status_id: Some(v0), action: v1, test })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
             (0x02, 0x01, Some(&Value(v0)), Some(&Requirement { ref ty, flip }), v2) => {
                 if let Some(mut test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
                     // Additional Change Action Requirements can be added in the next events
@@ -174,15 +203,17 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         }
                     }
 
-                    EventAst::ChangeAction (ChangeAction { action: v0, test })
+                    EventAst::ChangeAction (ChangeAction { status_id: None, action: v0, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x04, _,  _, _) => {
-                error!("Additional Change Action Requirement without a previous Change Action");
-                return ProcessedBlock::Finished (Block { events: event_asts });
+            (0x02, 0x04, v0, v1, v2) => {
+                error!("Additional Change Action Requirement without a previous Change Action. v0: {:?} v1: {:?} v2: {:?}", v0, v1, v2);
+                //return ProcessedBlock::Finished (Block { events: event_asts });
+                EventAst::Unknown (event.clone())
             }
+            (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableActionStatusID (v0),
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
             (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
@@ -762,7 +793,7 @@ impl Expression {
                     &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
                     &Argument::Value(v1)        => Expression::Value(v1),
                     _ => {
-                        error!("Unhandled else if statement case: value: {:?}", v1);
+                        error!("Unhandled expression case: value: {:?}", v1);
                         return None;
                     }
                 });
@@ -774,7 +805,7 @@ impl Expression {
                     &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
                     &Argument::Value(v1)        => Expression::Value(v1),
                     _ => {
-                        error!("Unhandled else if statement case: left");
+                        error!("Unhandled expression case: left");
                         return None;
                     }
                 });
@@ -783,19 +814,23 @@ impl Expression {
                     &Argument::Variable(ref v3) => Expression::Variable(VariableAst::new(v3)),
                     &Argument::Value(v3)        => Expression::Value(v3),
                     _ => {
-                        error!("Unhandled else if statement case: right");
+                        error!("Unhandled expression case: right");
                         return None;
                     }
                 });
-                if let script::Requirement::Comparison = requirement {
-                    Expression::Binary (BinaryExpression { left, right, operator: ComparisonOperator::from_arg(v2) })
-                } else {
-                    error!("Unhandled else if statement case: comparison");
-                    return None;
+
+                match requirement {
+                    script::Requirement::Comparison => Expression::Binary (BinaryExpression { left, right, operator: ComparisonOperator::from_arg(v2) }),
+                    // Seems to be just modders using this as a quick hack.
+                    script::Requirement::Always => Expression::Nullary(requirement.clone()),
+                    _ => {
+                        error!("Unhandled expression case: comparison v0: {:?} v1: {:?} v2: {:?}: v3: {:?}", requirement, v1, v2, v3);
+                        return None;
+                    }
                 }
             }
             (v1, v2, v3) => {
-                error!("Unhandled else if statement case: {:?} {:?} {:?}", v1, v2, v3);
+                error!("Unhandled expression case: {:?} {:?} {:?}", v1, v2, v3);
                 return None;
             }
         };
@@ -862,8 +897,6 @@ pub enum EventAst {
     RemoveCallEveryFrame { thread_id: i32 },
     /// Enables the given Status ID
     EnableActionStatusID (i32),
-    /// Change the current action upon the specified requirement being met. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
-    ChangeActionStatus { status_id: i32, action: i32, requirement: Requirement, flip: bool },
     /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
     ChangeAction (ChangeAction),
     /// Allow the current action to be interrupted by another action.
@@ -1784,8 +1817,9 @@ pub struct AestheticWindEffect {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ChangeAction {
-    pub action: i32,
-    pub test:   Expression
+    pub status_id: Option<i32>,
+    pub action:    i32,
+    pub test:      Expression
 }
 
 #[derive(Serialize, Clone, Debug)]
