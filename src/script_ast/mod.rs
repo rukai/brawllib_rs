@@ -149,7 +149,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x0D, 0x01, Some(&Value(v0)), None,                  None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
 
             // change action
-            (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableActionStatusID (v0),
+            (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableInterruptID (v0),
             (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
                 if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
                     EventAst::ChangeAction (ChangeAction { status_id: Some(v0), action: v1, test })
@@ -177,7 +177,18 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     EventAst::Unknown (event.clone())
                 }
             }
+            (0x02, 0x05, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
+                if let Some(test) = Expression::from_args(ty, flip, v3, args.get(4), args.get(5)) {
+                    EventAst::ChangeActionInterruptID (ChangeAction { interrupt_id: v0, status_id: v1, test })
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x02, 0x08, Some(&Value(v0)),  None,             None) => EventAst::DisableActionStatusID (v0),
             (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableActionStatusID (v0),
+            (0x02, 0x09, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::InvertInterruptOrActionStatusID { interrupt_id: v0, status_id: v1 },
+            (0x02, 0x0B, Some(&Value(v0)),  None,             None) => EventAst::DisableInterrupt (v0),
+            (0x02, 0x0C, Some(&Value(v0)),  None,             None) => EventAst::DeleteInterrupt (v0),
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
             (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
@@ -856,8 +867,16 @@ pub enum EventAst {
     CallEveryFrame { thread_id: i32, offset: Offset },
     /// Stops the execution of a loop created with CallEveryFrame
     RemoveCallEveryFrame { thread_id: i32 },
+    /// Disables the given Status ID
+    DisableActionStatusID (i32),
     /// Enables the given Status ID
     EnableActionStatusID (i32),
+    /// Invert Interrupt or Action Status ID
+    InvertInterruptOrActionStatusID { interrupt_id: i32, status_id: i32 },
+    /// Closes the specific interruption window. Must be set to the same thing as the allow specific interrupt that you wish to cancel.
+    DisableInterrupt (i32),
+    /// Unregisters a previously created interrupt.
+    DeleteInterrupt (i32),
     /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
     ChangeAction (ChangeAction),
     /// Add an additional requirement to the preceeding Change Action statement.

@@ -741,7 +741,11 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::RemoveCallEveryFrame { thread_id } => {
                 self.call_every_frame.remove(&thread_id);
             }
+            &EventAst::DisableActionStatusID (_) => { } // TODO
             &EventAst::EnableActionStatusID (_) => { } // TODO
+            &EventAst::InvertInterruptOrActionStatusID { .. } => { } // TODO
+            &EventAst::DisableInterrupt (_) => { } // TODO
+            &EventAst::DeleteInterrupt (_) => { } // TODO
             &EventAst::ChangeAction (ref change_action) => {
                 self.change_actions.push(change_action.clone());
             }
