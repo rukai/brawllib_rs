@@ -18,7 +18,7 @@ use crate::script_ast::{
     Expression,
     ComparisonOperator,
     BinaryExpression,
-    ChangeAction,
+    Interrupt,
     SpecifyThrow,
     ThrowUse,
 };
@@ -68,8 +68,8 @@ pub struct ScriptRunner<'a> {
     pub change_subaction:  ChangeSubaction,
     /// Children of these bones are also visible
     pub invisible_bones: Vec<i32>,
-    /// Each ChangeAction is rechecked every frame after being created
-    pub change_actions:        Vec<ChangeAction>,
+    /// Each Interrupt is rechecked every frame after being created
+    pub interrupts:            Vec<Interrupt>,
     pub hitbox_sets_rehit:     [bool; 10],
     pub slope_contour_stand:   Option<i32>,
     pub slope_contour_full:    Option<(i32, i32)>,
@@ -173,7 +173,7 @@ pub enum ChangeSubaction {
     ChangeSubaction (i32),
     ChangeSubactionRestartFrame (i32),
     // TODO: Because we currently only operate at the subaction level, this is the best we can do.
-    ChangeAction (i32),
+    Interrupt (i32),
 }
 
 #[derive(Clone, Debug)]
@@ -403,7 +403,7 @@ impl<'a> ScriptRunner<'a> {
             edge_slide:            EdgeSlide::SlideOff,
             reverse_direction:     false,
             change_subaction:      ChangeSubaction::Continue,
-            change_actions:        vec!(),
+            interrupts:            vec!(),
             hitbox_sets_rehit:     [false; 10],
             slope_contour_stand:   None,
             slope_contour_full:    None,
@@ -517,10 +517,10 @@ impl<'a> ScriptRunner<'a> {
             }
         }
 
-        for change_action in self.change_actions.clone() {
-            if self.evaluate_expression(&change_action.test).unwrap_bool() {
+        for interrupt in self.interrupts.clone() {
+            if self.evaluate_expression(&interrupt.test).unwrap_bool() {
                 // TODO: Because we currently only operate at the subaction level, this is the best we can do.
-                self.change_subaction = ChangeSubaction::ChangeAction (change_action.action);
+                self.change_subaction = ChangeSubaction::Interrupt (interrupt.action);
             }
         }
 
@@ -741,23 +741,25 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::RemoveCallEveryFrame { thread_id } => {
                 self.call_every_frame.remove(&thread_id);
             }
-            &EventAst::DisableActionStatusID (_) => { } // TODO
-            &EventAst::EnableActionStatusID (_) => { } // TODO
-            &EventAst::InvertInterruptOrActionStatusID { .. } => { } // TODO
             &EventAst::DisableInterrupt (_) => { } // TODO
-            &EventAst::DeleteInterrupt (_) => { } // TODO
-            &EventAst::ChangeAction (ref change_action) => {
-                self.change_actions.push(change_action.clone());
+            &EventAst::EnableInterrupt (_) => { } // TODO
+            &EventAst::ToggleInterrupt { .. } => { } // TODO
+            &EventAst::EnableInterruptGroup (_) => { } // TODO
+            &EventAst::DisableInterruptGroup (_) => { } // TODO
+            &EventAst::ClearInterruptGroup (_) => { } // TODO
+            &EventAst::CreateInterrupt (ref interrupt) => {
+                self.interrupts.push(interrupt.clone());
             }
-            &EventAst::ChangeActionAdditionalRequirement { ref test } => {
-                if let Some(change_action) = self.change_actions.last_mut() {
-                    let left = Box::new(change_action.test.clone());
+            &EventAst::PreviousInterruptAddRequirement { ref test } => {
+                if let Some(interrupt) = self.interrupts.last_mut() {
+                    let left = Box::new(interrupt.test.clone());
                     let right = Box::new(test.clone());
                     let operator = ComparisonOperator::And;
-                    change_action.test = Expression::Binary(BinaryExpression { left, operator, right });
+                    interrupt.test = Expression::Binary(BinaryExpression { left, operator, right });
                 }
             }
-            &EventAst::AllowInterrupt => {
+            &EventAst::InterruptAddRequirement { .. } => { } // TODO
+            &EventAst::AllowInterrupts => {
                 self.interruptible = true;
             }
             &EventAst::ChangeSubaction (v0) => {

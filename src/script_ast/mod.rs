@@ -149,47 +149,47 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x0D, 0x01, Some(&Value(v0)), None,                  None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
 
             // change action
-            (0x02, 0x06, Some(&Value(v0)), None,             None) => EventAst::EnableInterruptID (v0),
             (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
                 if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
-                    EventAst::ChangeAction (ChangeAction { status_id: Some(v0), action: v1, test })
+                    EventAst::CreateInterrupt (Interrupt { interrupt_id: Some(v0), action: v1, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x02, 0x01, Some(&Value(v0)), Some(&Requirement { ref ty, flip }), v2) => {
                 if let Some(test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
-                    EventAst::ChangeAction (ChangeAction { status_id: None, action: v0, test })
+                    EventAst::CreateInterrupt (Interrupt { interrupt_id: None, action: v0, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x02, 0x04, Some(&Requirement { ref ty, flip }), v1, v2) => {
-                // It is tempting to combine this event with the previous ChangeAction event.
-                // However that is a terrible idea as a ChangeActionAdditionalRequirement will
-                // modify the last ChangeAction regardless of any events in between.
+                // It is tempting to combine this event with the previous CreateInterrupt event.
+                // However that is a terrible idea as a InterruptAddRequirement will
+                // modify the last CreateInterrupt regardless of any events in between.
                 // I have tested this with Nop and FrameSpeedModifier events in between.
-                // It would probably also occur with a ChangeActionAdditionalRequirement in an IfStatement, at a Goto/Subroutine
+                // It would probably also occur with a InterruptAddRequirement in an IfStatement, at a Goto/Subroutine
                 if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
-                    EventAst::ChangeActionAdditionalRequirement { test }
+                    EventAst::PreviousInterruptAddRequirement { test }
                 }
                 else {
                     EventAst::Unknown (event.clone())
                 }
             }
             (0x02, 0x05, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
-                if let Some(test) = Expression::from_args(ty, flip, v3, args.get(4), args.get(5)) {
-                    EventAst::ChangeActionInterruptID (ChangeAction { interrupt_id: v0, status_id: v1, test })
+                if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
+                    EventAst::InterruptAddRequirement { interrupt_type: InterruptType::new(v0), interrupt_id: v1, test }
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x08, Some(&Value(v0)),  None,             None) => EventAst::DisableActionStatusID (v0),
-            (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableActionStatusID (v0),
-            (0x02, 0x09, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::InvertInterruptOrActionStatusID { interrupt_id: v0, status_id: v1 },
-            (0x02, 0x0B, Some(&Value(v0)),  None,             None) => EventAst::DisableInterrupt (v0),
-            (0x02, 0x0C, Some(&Value(v0)),  None,             None) => EventAst::DeleteInterrupt (v0),
-            (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupt,
+            (0x02, 0x06, Some(&Value(v0)),  None,             None) => EventAst::EnableInterrupt (v0),
+            (0x02, 0x08, Some(&Value(v0)),  None,             None) => EventAst::DisableInterrupt (v0),
+            (0x02, 0x09, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::ToggleInterrupt { interrupt_type: InterruptType::new(v0), interrupt_id: v1 },
+            (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableInterruptGroup (InterruptType::new(v0)),
+            (0x02, 0x0B, Some(&Value(v0)),  None,             None) => EventAst::DisableInterruptGroup (InterruptType::new(v0)),
+            (0x02, 0x0C, Some(&Value(v0)),  None,             None) => EventAst::ClearInterruptGroup (InterruptType::new(v0)),
+            (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupts,
             (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
 
@@ -867,22 +867,30 @@ pub enum EventAst {
     CallEveryFrame { thread_id: i32, offset: Offset },
     /// Stops the execution of a loop created with CallEveryFrame
     RemoveCallEveryFrame { thread_id: i32 },
-    /// Disables the given Status ID
-    DisableActionStatusID (i32),
-    /// Enables the given Status ID
-    EnableActionStatusID (i32),
-    /// Invert Interrupt or Action Status ID
-    InvertInterruptOrActionStatusID { interrupt_id: i32, status_id: i32 },
-    /// Closes the specific interruption window. Must be set to the same thing as the allow specific interrupt that you wish to cancel.
+    /// Enables the given interrupt ID on any interrupt type.
+    EnableInterrupt (i32),
+    /// Disables the given interrupt ID on any interrupt type.
     DisableInterrupt (i32),
-    /// Unregisters a previously created interrupt.
-    DeleteInterrupt (i32),
-    /// Change the current action upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
-    ChangeAction (ChangeAction),
-    /// Add an additional requirement to the preceeding Change Action statement.
-    ChangeActionAdditionalRequirement { test: Expression },
+    /// Invert the given interrupt ID assosciated with the given interrupt type.
+    ToggleInterrupt { interrupt_type: InterruptType, interrupt_id: i32 },
+    /// Enables all interrupts associated with the given interrupt type.
+    EnableInterruptGroup (InterruptType),
+    /// Disables all interrupts associated with the given interrupt type.
+    DisableInterruptGroup (InterruptType),
+    /// Remove all actions currently assosciated with an interrupt type.
+    ClearInterruptGroup (InterruptType),
+    /// An interrupt with the given interrupt ID is assosciated with the interrupt type of that action.
+    /// The interrupt type used, seems to be hardcoded to the action somehow.
+    /// The current action will change upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
+    CreateInterrupt (Interrupt),
+    /// Add an additional requirement to the preceeding CreateInterrupt statement.
+    /// All requirements on the interrupt must be true for the interrupt to occur.
+    PreviousInterruptAddRequirement { test: Expression },
+    /// Add an additonal requirement to the specified interrupt type and interrupt id.
+    /// All requirements on the interrupt must be true for the interrupt to occur.
+    InterruptAddRequirement { interrupt_type: InterruptType, interrupt_id: i32, test: Expression },
     /// Allow the current action to be interrupted by another action.
-    AllowInterrupt,
+    AllowInterrupts,
     /// Change the current subaction.
     ChangeSubaction (i32),
     /// Change the current subaction, restarting the frame count.
@@ -1798,10 +1806,64 @@ pub struct AestheticWindEffect {
 }
 
 #[derive(Serialize, Clone, Debug)]
-pub struct ChangeAction {
-    pub status_id: Option<i32>,
-    pub action:    i32,
-    pub test:      Expression
+pub struct Interrupt {
+    pub interrupt_id: Option<i32>,
+    pub action:       i32,
+    pub test:         Expression
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum InterruptType {
+    Main,
+    GroundSpecial,
+    GroundItem,
+    GroundCatch,
+    GroundAttack,
+    GroundEscape,
+    GroundGuard,
+    GroundJump,
+    GroundOther,
+    AirLanding,
+    CliffCatch,
+    AirSpecial,
+    AirItemThrow,
+    AirLasso,
+    AirDodge,
+    AirAttack,
+    AirTreadjump,
+    AirWalljump,
+    AirJump,
+    /// Only works in squat
+    PassThroughPlat,
+    Unknown (i32),
+}
+
+impl InterruptType {
+    pub fn new(value: i32) -> Self {
+        match value {
+            0x00 => InterruptType::Main,
+            0x01 => InterruptType::GroundSpecial,
+            0x02 => InterruptType::GroundItem,
+            0x03 => InterruptType::GroundCatch,
+            0x04 => InterruptType::GroundAttack,
+            0x05 => InterruptType::GroundEscape,
+            0x06 => InterruptType::GroundGuard,
+            0x07 => InterruptType::GroundJump,
+            0x08 => InterruptType::GroundOther,
+            0x09 => InterruptType::AirLanding,
+            0x0A => InterruptType::CliffCatch,
+            0x0B => InterruptType::AirSpecial,
+            0x0C => InterruptType::AirItemThrow,
+            0x0D => InterruptType::AirLasso,
+            0x0E => InterruptType::AirDodge,
+            0x0F => InterruptType::AirAttack,
+            0x10 => InterruptType::AirTreadjump,
+            0x11 => InterruptType::AirWalljump,
+            0x12 => InterruptType::AirJump,
+            0x13 => InterruptType::PassThroughPlat,
+            _ => InterruptType::Unknown (value)
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
