@@ -508,6 +508,7 @@ impl<'a> ScriptRunner<'a> {
         self.visited_gotos.clear();
         self.x_vel_modify = VelModify::None;
         self.y_vel_modify = VelModify::None;
+        self.reverse_direction = false;
 
         // The hitbox existed last frame so should be interpolated.
         // (Unless it gets overwritten, but that will be handled when that happens)

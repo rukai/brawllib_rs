@@ -249,7 +249,7 @@ pub fn action_name(index: usize) -> String {
       //0x0f7 => String::from(""),
       //0x0f8 => String::from(""),
       //0x0f9 => String::from(""),
-        0x0fa => String::from("CaptureMaserHand"),
+        0x0fa => String::from("CaptureMasterHand"),
       //0x0fb => String::from(""),
       //0x0fc => String::from(""),
       //0x0fd => String::from(""),
