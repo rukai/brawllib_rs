@@ -140,9 +140,9 @@ fn process_block(data: &[u8], is_nested: bool) -> ProcessedBlock {
                 let address = address & 0xFFFFFFFE;
 
                 if insert_endif {
-                    // TODO: Handle this case, will be very tricky will need to do something like
-                    // this instead of codes.push(WiiRDCode::IfStatement { .. }
-                    //return ProcessedBlock::EndIfIf { .. }
+                    // TODO: Handle this case, it will be very tricky, will need to do something like
+                    // return ProcessedBlock::EndIfIf { .. }
+                    //instead of codes.push(WiiRDCode::IfStatement { .. }
                 }
 
                 let test = match code {
@@ -361,9 +361,21 @@ fn process_block(data: &[u8], is_nested: bool) -> ProcessedBlock {
                         return ProcessedBlock::Finished (WiiRDBlock { codes });
                     }
                 };
+
                 let offset_lines = (&data[offset + 2..]).read_i16::<BigEndian>().unwrap();
-                codes.push(WiiRDCode::Goto { flag, offset_lines });
+
                 offset += 8;
+
+                // Skip over these instructions as its probably a data section.
+                // TODO: If I want to use the AST for converting to/from a higher level language
+                // this will need to properly handle data sections
+                // TODO: Doesnt handle a goto going backwards into the skipped lines later on.
+                if let JumpFlag::Always = flag {
+                    offset += 8 * offset_lines as usize;
+                }
+                else {
+                    codes.push(WiiRDCode::Goto { flag, offset_lines });
+                }
             }
             0x68 => {
                 let flag = match data[offset + 1] {
@@ -495,15 +507,20 @@ fn process_block(data: &[u8], is_nested: bool) -> ProcessedBlock {
                 }
             }
             0xE2 => {
-                let _else_branch = data[offset + 1] & 0x10 != 0;
+                let else_branch = data[offset + 1] & 0x10 != 0;
                 let count = data[offset + 3];
                 let reset_base_address_high = (&data[offset + 4..]).read_u16::<BigEndian>().unwrap();
                 let reset_pointer_address_high = (&data[offset + 6..]).read_u16::<BigEndian>().unwrap();
 
+                if else_branch {
+                    codes.push(WiiRDCode::Else { endif_count: count, reset_base_address_high, reset_pointer_address_high });
+                }
+
                 offset += 8;
                 if is_nested {
-                    return ProcessedBlock::EndIf { count: EndIfCount::Finite(count), then_branch: WiiRDBlock { codes }, bytes_processed: offset, reset_base_address_high, reset_pointer_address_high };
-
+                    if count != 0 {
+                        return ProcessedBlock::EndIf { count: EndIfCount::Finite(count), then_branch: WiiRDBlock { codes }, bytes_processed: offset, reset_base_address_high, reset_pointer_address_high };
+                    }
                 }
                 else {
                     codes.push(WiiRDCode::ResetAddressHigh { reset_base_address_high, reset_pointer_address_high });
@@ -529,7 +546,7 @@ enum ProcessedBlock {
     EndIf        { count: EndIfCount, then_branch: WiiRDBlock, bytes_processed: usize, reset_base_address_high: u16, reset_pointer_address_high: u16 },
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum EndIfCount {
     Infinite,
     Finite (u8),
@@ -613,6 +630,11 @@ pub enum WiiRDCode {
     InsertPPC { use_base_address: bool, address: u32, instruction_data: Vec<u8> },
     /// E0 or E2
     ResetAddressHigh { reset_base_address_high: u16, reset_pointer_address_high: u16 },
+    /// E21
+    /// Inverts the code execution status.
+    /// TODO: Properly explain how code execution works, its like a hacky way to do if statements,
+    /// but first I want to fix my if statement implementation to match.
+    Else { endif_count: u8, reset_base_address_high: u16, reset_pointer_address_high: u16 },
 }
 
 #[derive(Serialize, Clone, Debug)]
