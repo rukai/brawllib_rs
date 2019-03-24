@@ -88,8 +88,18 @@ impl BrawlMod {
     }
 
     pub fn load_wiird_codeset(&self) -> Result<WiiRDBlock, Error> {
+        // RSBE01.gct is usually located in the codes folder but can also be in the main sub folder e.g. LXP 2.1
+        // So, just check every subdirectory of the root.
         if let Some(mod_path) = &self.mod_path {
-            wiird::wiird_load_gct(&mod_path.join("codes/RSBE01.gct"))
+            for dir in fs::read_dir(mod_path).unwrap() {
+                if let Ok(dir) = dir {
+                    let codeset_path = dir.path().join("RSBE01.gct");
+                    if codeset_path.exists() {
+                        return wiird::wiird_load_gct(&codeset_path)
+                    }
+                }
+            }
+            bail!("Cannot find the WiiRD codeset (RSBE01.gct)");
         } else {
             bail!("Not a mod, vanilla brawl does not have a WiiRD codeset.");
         }
