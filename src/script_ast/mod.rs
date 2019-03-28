@@ -1272,7 +1272,7 @@ pub enum HitBoxEffect {
     //Unk1,
     Bury,
     Stun,
-    Unk2,
+    //Unk2,
     Flower,
     //Unk3,
     //Unk4,
