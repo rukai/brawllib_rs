@@ -44,6 +44,7 @@ pub mod math;
 pub mod wii_memory;
 pub mod wiird;
 pub mod wiird_runner;
+pub mod renderer;
 mod util;
 mod action_names;
 mod fighter_names;
