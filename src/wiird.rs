@@ -680,7 +680,7 @@ pub enum GeckoOperation {
 }
 
 impl GeckoOperation {
-    fn new(value: u8) -> Self {
+    pub(crate) fn new(value: u8) -> Self {
         match value {
             0  => GeckoOperation::Add,
             1  => GeckoOperation::Mul,

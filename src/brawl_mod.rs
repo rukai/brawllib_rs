@@ -69,7 +69,7 @@ impl BrawlMod {
             }
 
             let wii_memory = if self.mod_path.is_some() {
-                let codeset = self.load_wiird_codeset()?;
+                let codeset = self.load_wiird_codeset_raw()?;
                 let sakurai_ram_offset = 0x80F9FC20;
                 let sakurai_fighter_pac_offset = 0x80;
                 let fighter_pac_offset = sakurai_ram_offset - sakurai_fighter_pac_offset;
@@ -85,6 +85,38 @@ impl BrawlMod {
         };
 
         Ok(Fighter::load(brawl_fighter_dir, mod_fighter_dir, &common_fighter, &wii_memory, single_model))
+    }
+
+    pub fn load_wiird_codeset_raw(&self) -> Result<Vec<u8>, Error> {
+        // RSBE01.gct is usually located in the codes folder but can also be in the main sub folder e.g. LXP 2.1
+        // So, just check every subdirectory of the root.
+        if let Some(mod_path) = &self.mod_path {
+            for dir in fs::read_dir(mod_path).unwrap() {
+                if let Ok(dir) = dir {
+                    let codeset_path = dir.path().join("RSBE01.gct");
+                    if codeset_path.exists() {
+                        let mut data: Vec<u8> = vec!();
+                        match File::open(&codeset_path) {
+                            Ok(mut file) => {
+                                if let Err(err) = file.read_to_end(&mut data) {
+                                    bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err);
+                                }
+                            }
+                            Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
+                        }
+
+                        if data.len() < 8 {
+                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+                        }
+
+                        return Ok(data[8..].to_vec()) // Skip the header
+                    }
+                }
+            }
+            bail!("Cannot find the WiiRD codeset (RSBE01.gct)");
+        } else {
+            bail!("Not a mod, vanilla brawl does not have a WiiRD codeset.");
+        }
     }
 
     pub fn load_wiird_codeset(&self) -> Result<WiiRDBlock, Error> {
