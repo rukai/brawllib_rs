@@ -22,6 +22,7 @@ use crate::script_ast::{
     SpecifyThrow,
     ThrowUse,
 };
+use crate::fighter::WiiRDFrameSpeedModifier;
 use crate::script_ast::variable_ast::{
     VariableAst,
     InternalConstantInt,
@@ -32,20 +33,21 @@ use crate::script_ast::variable_ast::{
 use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
-    pub call_stacks:          Vec<CallStack<'a>>,
-    pub fighter_scripts:      &'a [&'a ScriptAst],
-    pub common_scripts:       &'a [&'a ScriptAst],
-    pub section_scripts:      &'a [SectionScriptAst],
-    pub call_every_frame:     HashMap<i32, CallEveryFrame<'a>>,
-    pub visited_gotos:        Vec<i32>,
-    pub frame_index:          f32,
-    pub interruptible:        bool,
-    pub hitboxes:             [Option<ScriptCollisionBox>; 7],
-    pub hurtbox_state_all:    HurtBoxState,
-    pub hurtbox_states:       HashMap<i32, HurtBoxState>,
-    pub ledge_grab_enable:    LedgeGrabEnable,
-    pub frame_speed_modifier: f32,
-    pub tag_display:          bool,
+    pub wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier],
+    pub call_stacks:                 Vec<CallStack<'a>>,
+    pub fighter_scripts:             &'a [&'a ScriptAst],
+    pub common_scripts:              &'a [&'a ScriptAst],
+    pub section_scripts:             &'a [SectionScriptAst],
+    pub call_every_frame:            HashMap<i32, CallEveryFrame<'a>>,
+    pub visited_gotos:               Vec<i32>,
+    pub frame_index:                 f32,
+    pub interruptible:               bool,
+    pub hitboxes:                    [Option<ScriptCollisionBox>; 7],
+    pub hurtbox_state_all:           HurtBoxState,
+    pub hurtbox_states:              HashMap<i32, HurtBoxState>,
+    pub ledge_grab_enable:           LedgeGrabEnable,
+    pub frame_speed_modifier:        f32,
+    pub tag_display:                 bool,
     /// State is maintained across frames
     pub x: f32,
     /// State is maintained across frames
@@ -248,7 +250,7 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
+    pub fn new(wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
@@ -375,6 +377,7 @@ impl<'a> ScriptRunner<'a> {
         //}
 
         let mut runner = ScriptRunner {
+            wiird_frame_speed_modifiers,
             call_stacks,
             fighter_scripts,
             common_scripts,
@@ -488,6 +491,11 @@ impl<'a> ScriptRunner<'a> {
         // Need to run the script until the first wait, so that the script is in the valid state
         // for the first frame.
         runner.step_script("ScriptRunner init");
+
+        println!("fighter");
+        for a in wiird_frame_speed_modifiers.iter() {
+            println!("{:?}", a);
+        }
 
         runner
     }
@@ -1124,6 +1132,7 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::SwordGlow (_) => { }
             &EventAst::DeleteSwordGlow { .. } => { }
             &EventAst::AestheticWindEffect (_) => { }
+            &EventAst::EndAestheticWindEffect { .. } => { }
             &EventAst::ScreenShake { .. } => { }
             //&EventAst::ModelChanger { reference, switch_index, bone_group_index } => {
             &EventAst::ModelChanger { .. } => {

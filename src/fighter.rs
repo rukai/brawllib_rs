@@ -17,6 +17,14 @@ use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
 use crate::wii_memory::WiiMemory;
 
 #[derive(Debug)]
+pub struct WiiRDFrameSpeedModifier {
+    pub action: bool,
+    pub action_subaction_id: u16,
+    pub frame: u8,
+    pub frame_speed: f32,
+}
+
+#[derive(Debug)]
 pub struct Fighter {
     pub cased_name: String,
     pub moveset_common: Arc,
@@ -26,6 +34,7 @@ pub struct Fighter {
     // TODO: Is there any reason to keep this now I can `mod_type`, any mods are going to be done by psa anyway...
     pub modded_by_psa: bool,
     pub mod_type: ModType,
+    pub wiird_frame_speed_modifiers: Vec<WiiRDFrameSpeedModifier>,
 }
 
 impl Fighter {
@@ -103,6 +112,20 @@ impl Fighter {
             (false, false) => unreachable!("The data has to have been read from somewhere"),
         };
 
+        let mut wiird_frame_speed_modifiers = vec!();
+        let mut fighter_byte = 1;
+        let mut offset = 0x90581000;
+        while fighter_byte != 0 {
+            fighter_byte = wii_memory.read_u8(offset);
+            wiird_frame_speed_modifiers.push(WiiRDFrameSpeedModifier {
+                action:              wii_memory.read_u8(offset + 2) & 0xF0 == 0,
+                action_subaction_id: wii_memory.read_u16(offset + 2) & 0x0FFF,
+                frame:               wii_memory.read_u8(offset + 1),
+                frame_speed:         1.0,
+            });
+            offset += 8;
+        }
+
         Some(Fighter {
             cased_name: fighter_data.cased_name,
             moveset_common,
@@ -111,6 +134,7 @@ impl Fighter {
             models,
             modded_by_psa,
             mod_type,
+            wiird_frame_speed_modifiers,
         })
     }
 

@@ -146,7 +146,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(&action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
+                let mut script_runner = ScriptRunner::new(&fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 

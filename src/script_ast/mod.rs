@@ -692,6 +692,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x14, 0x04, Some(&Value(v0)), None, None) => EventAst::EndAestheticWindEffect { unk: v0 },
             (0x1A, 0x00, Some(&Value(v0)), None, None) => EventAst::ScreenShake { magnitude: v0 },
             (0x1A, 0x04, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
                 if let (Some(&Scalar(v3)), Some(&Scalar(v4))) = (args.get(3), args.get(4)) {
@@ -1054,7 +1055,7 @@ pub enum EventAst {
     LimitedScreenTint (LimitedScreenTint),
     /// Tint the screen to the specified color until terminated by `EndUnlimitedScreenTint`.
     UnlimitedScreenTint (UnlimitedScreenTint),
-    /// Terminates an unlimited screen tint with the specified ID.
+    /// Ends an unlimited screen tint with the specified ID.
     EndUnlimitedScreenTint { tint_id: i32, transition_out_time: i32 },
     /// Creates glow of sword. Only usable when the proper effects are loaded by their respective characters.
     SwordGlow (SwordGlow),
@@ -1062,6 +1063,8 @@ pub enum EventAst {
     DeleteSwordGlow { fade_time: i32 },
     /// Moves nearby movable model parts (capes, hair, etc) with a wind specified by the parameters.
     AestheticWindEffect (AestheticWindEffect),
+    /// Ends the wind effect spawned by the "Aesthetic Wind Effect" event
+    EndAestheticWindEffect { unk: i32 },
     /// Shakes the screen.
     ScreenShake { magnitude: i32 },
     /// Zoom the camera on the character.
