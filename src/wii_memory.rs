@@ -82,6 +82,17 @@ impl WiiMemory {
         }
     }
 
+    pub fn read_f32(&self, address: usize) -> f32 {
+        if address >= 0x8000_0000 && address < 0x8180_0000 {
+            BigEndian::read_f32(&self.mem1[address - 0x8000_0000 ..])
+        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+             BigEndian::read_f32(&self.mem2[address - 0x9000_0000 ..])
+        } else {
+            error!("Failed to read value: Cannot map address 0x{:x} to wii memory", address);
+            0.0
+        }
+    }
+
     pub fn buffer_from(&self, address: usize) -> &[u8] {
         if address >= 0x8000_0000 && address < 0x8180_0000 {
             &self.mem1[address - 0x8000_0000..]

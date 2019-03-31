@@ -47,4 +47,4 @@ pub mod wiird_runner;
 pub mod renderer;
 mod util;
 mod action_names;
-mod fighter_names;
+mod fighter_maps;

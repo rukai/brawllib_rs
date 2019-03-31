@@ -40,7 +40,9 @@ pub struct ScriptRunner<'a> {
     pub section_scripts:             &'a [SectionScriptAst],
     pub call_every_frame:            HashMap<i32, CallEveryFrame<'a>>,
     pub visited_gotos:               Vec<i32>,
-    pub frame_index:                 f32,
+    pub subaction_index:             usize,
+    pub frame_index:                 f32, // affected by frame speed modifiers
+    pub frame_count:                 usize, // goes up by exactly 1 every frame, only used for external statistics like iasa
     pub interruptible:               bool,
     pub hitboxes:                    [Option<ScriptCollisionBox>; 7],
     pub hurtbox_state_all:           HurtBoxState,
@@ -250,7 +252,7 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
+    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
@@ -382,9 +384,11 @@ impl<'a> ScriptRunner<'a> {
             fighter_scripts,
             common_scripts,
             section_scripts,
+            subaction_index,
             call_every_frame:      HashMap::new(),
             visited_gotos:         vec!(),
             frame_index:           0.0,
+            frame_count:           0,
             interruptible:         false,
             hitboxes:              [None, None, None, None, None, None, None],
             hurtbox_state_all:     HurtBoxState::Normal,
@@ -492,18 +496,26 @@ impl<'a> ScriptRunner<'a> {
         // for the first frame.
         runner.step_script("ScriptRunner init");
 
-        println!("fighter");
-        for a in wiird_frame_speed_modifiers.iter() {
-            println!("{:?}", a);
-        }
-
         runner
     }
 
     /// Steps the main, gfx, sfx and other scripts by 1 game frame.
     /// `action_name` can be anything, it is just used for debugging.
     pub fn step(&mut self, action_name: &str) {
+        let mut fsms = vec!();
+        for fsm in self.wiird_frame_speed_modifiers {
+            // TODO: Because we currently only operate at the subaction level, this is the best we can do.
+            if !fsm.action && fsm.action_subaction_id as usize == self.subaction_index && (self.frame_index as u16) >= fsm.frame as u16 {
+                fsms.push(fsm);
+            }
+        }
+
+        fsms.sort_by_key(|x| x.frame);
+        if let Some(fsm) = fsms.last() {
+            self.frame_speed_modifier = fsm.frame_speed;
+        }
         self.frame_index += self.frame_speed_modifier;
+        self.frame_count += 1;
         self.step_script(action_name);
     }
 

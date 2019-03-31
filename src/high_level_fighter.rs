@@ -146,7 +146,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(&fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
+                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -294,7 +294,7 @@ impl HighLevelFighter {
                         });
 
                         if iasa.is_none() && script_runner.interruptible {
-                            iasa = Some(script_runner.frame_index)
+                            iasa = Some(script_runner.frame_count)
                         }
 
                         script_runner.step(actual_name.as_ref());
@@ -312,10 +312,10 @@ impl HighLevelFighter {
                         "LandingAirB"  | "LandingAirHi" |
                         "LandingAirLw" | "LandingLight" |
                         "LandingHeavy" | "LandingFallSpecial"
-                          => script_runner.frame_index,
-                        _ => 0.0
+                          => script_runner.frame_count,
+                        _ => 0
                     }
-                } as usize;
+                };
 
                 let landing_lag = match actual_name.as_ref() {
                     "AttackAirN"  => Some(attributes.nair_landing_lag),
@@ -334,7 +334,7 @@ impl HighLevelFighter {
 
         HighLevelFighter {
             internal_name:            fighter.cased_name.clone(),
-            name:                     crate::fighter_names::fighter_name(&fighter.cased_name),
+            name:                     crate::fighter_maps::fighter_name(&fighter.cased_name),
             ledge_grabs:              fighter_data.misc.ledge_grabs.clone(),
             scripts_fragment_fighter: fragment_scripts_fighter,
             scripts_fragment_common:  fragment_scripts_common,

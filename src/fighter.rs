@@ -114,15 +114,19 @@ impl Fighter {
 
         let mut wiird_frame_speed_modifiers = vec!();
         let mut fighter_byte = 1;
-        let mut offset = 0x90581000;
+        let mut offset = 0x80581000;
+        let required_fighter_id = crate::fighter_maps::fighter_id(&fighter_data.cased_name);
         while fighter_byte != 0 {
             fighter_byte = wii_memory.read_u8(offset);
-            wiird_frame_speed_modifiers.push(WiiRDFrameSpeedModifier {
-                action:              wii_memory.read_u8(offset + 2) & 0xF0 == 0,
-                action_subaction_id: wii_memory.read_u16(offset + 2) & 0x0FFF,
-                frame:               wii_memory.read_u8(offset + 1),
-                frame_speed:         1.0,
-            });
+            if fighter_byte == required_fighter_id {
+                wiird_frame_speed_modifiers.push(WiiRDFrameSpeedModifier {
+                    action:              wii_memory.read_u8(offset + 2) & 0xF0 == 0,
+                    action_subaction_id: wii_memory.read_u16(offset + 2) & 0x0FFF,
+                    frame:               wii_memory.read_u8(offset + 1),
+                    frame_speed:         wii_memory.read_f32(offset + 4),
+                });
+            }
+
             offset += 8;
         }
 

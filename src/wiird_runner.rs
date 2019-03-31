@@ -196,7 +196,7 @@ pub fn process(codeset: &[u8], buffer: &mut [u8], buffer_ram_location: u32) -> W
                 }
                 else {
                     // TODO: Probably need this!?!?!
-                    execution_stack.push(*execution_stack.last().unwrap()); // for execution to be false there must be a value
+                    execution_stack.push(execution_stack.last().cloned().unwrap_or(true));
                 }
 
                 offset += 8;
