@@ -1318,6 +1318,8 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::InternalConstantInt (InternalConstantInt::CurrentFrameSpeed) => self.frame_speed_modifier as i32,
             VariableAst::InternalConstantInt (InternalConstantInt::CurrentSubaction) => 0, // TODO: Get this passed as an argument to ScriptRunner::new
             VariableAst::InternalConstantInt (InternalConstantInt::CurrentAction) => 0, // TODO: Get this passed as an argument to ScriptRunner::new
+            VariableAst::InternalConstantInt (InternalConstantInt::CrawlControlStickXOffsetMax) => 20, // TODO: probably character dependent?
+            VariableAst::InternalConstantInt (InternalConstantInt::CrawlControlStickXOffsetMin) => -20, // TODO: probably character dependent?
             VariableAst::InternalConstantInt (_) => 0, // Best we can do for everything else is 0
             VariableAst::LongtermAccessInt   (LongtermAccessInt::JumpsUsed) => self.jumps_used,
             VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpCount) => self.wall_jump_count,

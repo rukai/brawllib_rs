@@ -99,6 +99,8 @@ pub enum InternalConstantInt {
     PreviousControlStickYAxisAbsolute,
     PreviousControlStickYAxisReverse,
     PreviousControlStickYAxis2,
+    CrawlControlStickXOffsetMax,
+    CrawlControlStickXOffsetMin,
 
     CurrentSubaction,
     CurrentAction,
@@ -158,6 +160,8 @@ impl InternalConstantInt {
            01026 => InternalConstantInt::PreviousControlStickYAxis,
            01027 => InternalConstantInt::PreviousControlStickYAxisAbsolute,
            01028 => InternalConstantInt::PreviousControlStickYAxisReverse,
+           03134 => InternalConstantInt::CrawlControlStickXOffsetMax,
+           03136 => InternalConstantInt::CrawlControlStickXOffsetMin,
            20000 => InternalConstantInt::CurrentSubaction,
            20001 => InternalConstantInt::CurrentAction,
            20003 => InternalConstantInt::PreviousAction,
