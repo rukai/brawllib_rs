@@ -1,3 +1,5 @@
+use byteorder::{BigEndian, ByteOrder};
+
 use crate::high_level_fighter::HighLevelFighter;
 
 /// Blocks until user closes window
@@ -31,6 +33,10 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
     // layout
     let bind_group_layout =
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { bindings: &[] });
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout,
+        bindings: &[],
+    });
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         bind_group_layouts: &[&bind_group_layout],
     });
@@ -83,15 +89,27 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
                 array_size: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Rgba8Unorm,
-                usage: wgpu::TextureUsageFlags::OUTPUT_ATTACHMENT,
+                usage: wgpu::TextureUsageFlags::all(),
             };
             let framebuffer = device.create_texture(framebuffer_descriptor);
+            let framebuffer_copy_view = wgpu::TextureCopyView {
+                texture: &framebuffer,
+                level: 0,
+                slice: 0,
+                origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
+            };
 
             let framebuffer_out_usage = &wgpu::BufferDescriptor {
-                size: width as u32 * height as u32,
+                size: width as u32 * height as u32 * 4,
                 usage: wgpu::BufferUsageFlags::all(),
             };
             let framebuffer_out = device.create_buffer(framebuffer_out_usage);
+            let framebuffer_out_copy_view = wgpu::BufferCopyView {
+                buffer: &framebuffer_out,
+                offset: 0,
+                row_pitch: 0,
+                image_height: height as u32,
+            };
 
             // create the CommandEncoder
             println!("command_encoder");
@@ -107,22 +125,10 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
                     depth_stencil_attachment: None,
                 });
                 rpass.set_pipeline(&render_pipeline);
+                rpass.set_bind_group(0, &bind_group);
                 rpass.draw(0..3, 0..1);
             }
 
-            println!("framebuffer_copy_view");
-            let framebuffer_copy_view = wgpu::TextureCopyView {
-                texture: &framebuffer,
-                level: 0, // TODO: wtf are these!?!??! check vulkan docs
-                slice: 0,
-                origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
-            };
-            let framebuffer_out_copy_view = wgpu::BufferCopyView {
-                buffer: &framebuffer_out,
-                offset: 0,
-                row_pitch: 0,
-                image_height: height as u32,
-            };
             println!("copy texture to buffer");
             command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
 
@@ -131,22 +137,23 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
 
             println!("read");
             framebuffer_out.map_read_async(0, width as u32 * height as u32 * 4, |result: wgpu::BufferMapAsyncResult<&[u32]>| {
-                if let wgpu::BufferMapAsyncResult::Success(_data_u32) = result {
+                if let wgpu::BufferMapAsyncResult::Success(data_u32) = result {
                     println!("Success");
                     let mut data_u8 = vec!(0; width as usize * height as usize * 4);
                     // uncommenting causes segfault
-                    //for (i, value) in data_u32.iter().enumerate() {
-                    //    // TODO: Might need to just retain the current endianness?!?
-                    //    BigEndian::write_u32(&mut data_u8[i * 4 ..], *value);
-                    //}
-                    let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut data_u8);
-                    encoder.write_frame(&gif_frame).unwrap();
+                    for (i, value) in data_u32.iter().enumerate() {
+                        // TODO: Might need to just retain the current endianness?!?
+                        BigEndian::write_u32(&mut data_u8[i * 4 ..], *value);
+                        println!("{:x}", value);
+                    }
+                    //let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut data_u8);
+                    //encoder.write_frame(&gif_frame).unwrap();
                 }
                 else {
                     println!("ERROR");
                 }
             });
-            device.get_queue().submit(&[]);
+            std::thread::sleep_ms(1000);
         }
     }
 
