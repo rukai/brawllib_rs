@@ -32,12 +32,24 @@ pub fn misc_section(data: &[u8], parent_data: &[u8]) -> MiscSection {
     let ecb_offset = unk0_offset as usize + 0x20;
     let mut ecb_bones = vec!();
     if hurt_box_list.start_offset != 0 {
-        let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4;
-        if ecb_total < 100 {
-            for i in 0..ecb_total {
-                ecb_bones.push((&parent_data[ecb_offset + i * 4 ..]).read_i32::<BigEndian>().unwrap());
+        // TODO: leaving these prints here cause I plan on fixing this next
+        //println!("{}", crate::util::hex_dump(&parent_data[unk0_offset as usize ..unk0_offset as usize + 0x20]));
+        //println!("{}", crate::util::hex_dump(&parent_data[ecb_offset as usize ..ecb_offset as usize + 0x20]));
+        //println!("hurtbox: {:x}", hurt_box_list.start_offset);
+        //println!("ecb: {:x}", ecb_offset);
+        if hurt_box_list.start_offset as usize > ecb_offset {
+            let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4; // TODO: this underflows
+            //println!("ecb_total: {}", ecb_total);
+            if ecb_total < 100 {
+                for i in 0..ecb_total {
+                    ecb_bones.push((&parent_data[ecb_offset + i * 4 ..]).read_i32::<BigEndian>().unwrap());
+                }
             }
         }
+        else {
+            error!("There should always be hurtbox data, hitting this is demonstrating this hack does not always work")
+        }
+        //println!("ecb_bones: {:?}", ecb_bones);
     }
 
     let mut final_smash_auras = vec!();
