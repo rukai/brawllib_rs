@@ -5,13 +5,12 @@ pub mod vertices;
 pub mod objects;
 pub mod definitions;
 
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 
 use crate::resources::Resource;
 use crate::resources;
 use crate::mbox::MBox;
 use crate::mbox;
-use crate::util;
 use palettes::Palette;
 use textures::Texture;
 use vertices::Vertices;
@@ -19,18 +18,18 @@ use bones::Bone;
 use objects::Object;
 use definitions::Definition;
 
-pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
-    let _size        = (&data[0x4..]).read_i32::<BigEndian>().unwrap();
-    let version      = (&data[0x8..]).read_i32::<BigEndian>().unwrap();
-    let _bres_offset = (&data[0xc..]).read_i32::<BigEndian>().unwrap();
+pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
+    let _size        = data.i32_be(0x4);
+    let version      = data.i32_be(0x8);
+    let _bres_offset = data.i32_be(0xc);
 
     let string_offset_offset = match version {
         0xA => 0x44,
         0xB => 0x48,
         _   => 0x3C
     };
-    let string_offset = (&data[string_offset_offset..]).read_i32::<BigEndian>().unwrap();
-    let name = util::parse_str(&data[string_offset as usize .. ]).unwrap().to_string();
+    let string_offset = data.i32_be(string_offset_offset);
+    let name = data.str(string_offset as usize).unwrap().to_string();
 
     //let data_offset = match version {
     //    0xA => 0x40,
@@ -50,20 +49,20 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
         None
     } else {
         Some(Mdl0Props {
-            header_len:         (&data[props_offset + 0x00 ..]).read_u32::<BigEndian>().unwrap(),
-            mdl0offset:         (&data[props_offset + 0x04 ..]).read_i32::<BigEndian>().unwrap(),
-            scaling_rule:       (&data[props_offset + 0x08 ..]).read_i32::<BigEndian>().unwrap(),
-            tex_matrix_mode:    (&data[props_offset + 0x0c ..]).read_i32::<BigEndian>().unwrap(),
-            num_vertices:       (&data[props_offset + 0x10 ..]).read_i32::<BigEndian>().unwrap(),
-            num_triangles:      (&data[props_offset + 0x14 ..]).read_i32::<BigEndian>().unwrap(),
-            orig_path_offset:   (&data[props_offset + 0x18 ..]).read_i32::<BigEndian>().unwrap(),
-            num_nodes:          (&data[props_offset + 0x1c ..]).read_i32::<BigEndian>().unwrap(),
-            need_nrm_mtx_array: (&data[props_offset + 0x20 ..]).read_u8().unwrap(),
-            need_tex_mtx_array: (&data[props_offset + 0x21 ..]).read_u8().unwrap(),
-            enable_extents:     (&data[props_offset + 0x22 ..]).read_u8().unwrap(),
-            env_mtx_mode:       (&data[props_offset + 0x23 ..]).read_u8().unwrap(),
-            data_offset:        (&data[props_offset + 0x24 ..]).read_i32::<BigEndian>().unwrap(),
-            extents:  mbox::mbox(&data[props_offset + 0x28 ..]),
+            header_len:         data.u32_be(props_offset + 0x00),
+            mdl0offset:         data.i32_be(props_offset + 0x04),
+            scaling_rule:       data.i32_be(props_offset + 0x08),
+            tex_matrix_mode:    data.i32_be(props_offset + 0x0c),
+            num_vertices:       data.i32_be(props_offset + 0x10),
+            num_triangles:      data.i32_be(props_offset + 0x14),
+            orig_path_offset:   data.i32_be(props_offset + 0x18),
+            num_nodes:          data.i32_be(props_offset + 0x1c),
+            need_nrm_mtx_array: data.u8    (props_offset + 0x20),
+            need_tex_mtx_array: data.u8    (props_offset + 0x21),
+            enable_extents:     data.u8    (props_offset + 0x22),
+            env_mtx_mode:       data.u8    (props_offset + 0x23),
+            data_offset:        data.i32_be(props_offset + 0x24),
+            extents:  mbox::mbox(data.relative_fancy_slice(props_offset + 0x28..)),
         })
     };
 
@@ -86,28 +85,28 @@ pub(crate) fn mdl0(data: &[u8]) -> Mdl0 {
     for i in 0..num_children {
         let offset = 0x10 + i * 0x4;
 
-        let resources_offset = (&data[offset..]).read_i32::<BigEndian>().unwrap();
+        let resources_offset = data.i32_be(offset);
         if resources_offset != 0 {
-            let resources = resources::resources(&data[resources_offset as usize .. ]);
+            let resources = resources::resources(data.relative_fancy_slice(resources_offset as usize .. ));
             match i {
                 6  if fur_version => { fur_vectors = Some(resources) }
                 7  if fur_version => { fur_layer_coords = Some(resources) }
                 8  if fur_version => { materials = Some(resources) }
                 9  if fur_version => { shaders = Some(resources) }
-                10 if fur_version => { objects = Some(objects::objects(&data[resources_offset as usize ..], resources)) }
-                11 if fur_version => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
-                12 if fur_version => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
-                0 => { definitions = Some(definitions::definitions(&data[resources_offset as usize..], resources)) }
-                1 => { bones = Some(bones::bones(&data[resources_offset as usize ..], resources)) }
-                2 => { vertices = Some(vertices::vertices(&data[resources_offset as usize ..], resources)) }
+                10 if fur_version => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                11 if fur_version => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                12 if fur_version => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0 => { definitions = Some(definitions::definitions(data.relative_fancy_slice(resources_offset as usize..), resources)) }
+                1 => { bones = Some(bones::bones(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                2 => { vertices = Some(vertices::vertices(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 3 => { normals = Some(resources) }
                 4 => { colors = Some(resources) }
                 5 => { uv = Some(resources) }
                 6 => { materials = Some(resources) }
                 7 => { shaders = Some(resources) }
-                8 => { objects = Some(objects::objects(&data[resources_offset as usize ..], resources)) }
-                9 => { texture_refs = Some(textures::textures(&data[resources_offset as usize ..], resources)) }
-                10 => { palette_refs = Some(palettes::palettes(&data[resources_offset as usize ..], resources)) }
+                8 => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                9 => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                10 => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 _ => { unreachable!() }
             }
         }

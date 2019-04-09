@@ -1,80 +1,79 @@
-use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::{Vector3, Matrix4};
+use fancy_slice::FancySlice;
 
 use crate::mbox::MBox;
 use crate::mbox;
 use crate::resources::Resource;
-use crate::util;
 use crate::math;
 
-pub(crate) fn bones(data: &[u8], resources: Vec<Resource>) -> Bone {
-    bone_siblings(&data[resources[0].data_offset as usize ..], 0).pop().unwrap()
+pub(crate) fn bones(data: FancySlice, resources: Vec<Resource>) -> Bone {
+    bone_siblings(data.relative_fancy_slice(resources[0].data_offset as usize ..), 0).pop().unwrap()
 }
 
-fn bone_siblings(data_root: &[u8], offset: i32) -> Vec<Bone> {
-    let data = &data_root[offset as usize..];
+fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
+    let data = data_root.relative_fancy_slice(offset as usize..);
 
-    let header_len    = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
-    let mdl0_offset   = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
-    let string_offset = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
-    let index         = (&data[0x0c..]).read_i32::<BigEndian>().unwrap();
-    let node_id       = (&data[0x10..]).read_i32::<BigEndian>().unwrap();
-    let flags_int     = (&data[0x14..]).read_u32::<BigEndian>().unwrap();
-    let billboard_int = (&data[0x18..]).read_u32::<BigEndian>().unwrap();
-    let bb_index      = (&data[0x1c..]).read_u32::<BigEndian>().unwrap();
+    let header_len    = data.i32_be(0x00);
+    let mdl0_offset   = data.i32_be(0x04);
+    let string_offset = data.i32_be(0x08);
+    let index         = data.i32_be(0x0c);
+    let node_id       = data.i32_be(0x10);
+    let flags_int     = data.u32_be(0x14);
+    let billboard_int = data.u32_be(0x18);
+    let bb_index      = data.u32_be(0x1c);
 
     let scale = Vector3::<f32>::new(
-        (&data[0x20..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x24..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x28..]).read_f32::<BigEndian>().unwrap(),
+        data.f32_be(0x20),
+        data.f32_be(0x24),
+        data.f32_be(0x28),
     );
     let rot = Vector3::<f32>::new(
-        (&data[0x2c..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x30..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x34..]).read_f32::<BigEndian>().unwrap(),
+        data.f32_be(0x2c),
+        data.f32_be(0x30),
+        data.f32_be(0x34),
     );
     let translate = Vector3::<f32>::new(
-        (&data[0x38..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x3c..]).read_f32::<BigEndian>().unwrap(),
-        (&data[0x40..]).read_f32::<BigEndian>().unwrap(),
+        data.f32_be(0x38),
+        data.f32_be(0x3c),
+        data.f32_be(0x40),
     );
 
-    let extents  = mbox::mbox(&data[0x44..]);
-    let _parent_offset     = (&data[0x5c..]).read_i32::<BigEndian>().unwrap();
-    let first_child_offset = (&data[0x60..]).read_i32::<BigEndian>().unwrap();
-    let next_offset        = (&data[0x64..]).read_i32::<BigEndian>().unwrap();
-    let _prev_offset       = (&data[0x68..]).read_i32::<BigEndian>().unwrap();
-    let user_data_offset   = (&data[0x6c..]).read_i32::<BigEndian>().unwrap();
+    let extents  = mbox::mbox(data.relative_fancy_slice(0x44..));
+    let _parent_offset     = data.i32_be(0x5c);
+    let first_child_offset = data.i32_be(0x60);
+    let next_offset        = data.i32_be(0x64);
+    let _prev_offset       = data.i32_be(0x68);
+    let user_data_offset   = data.i32_be(0x6c);
 
-    let transform0         = (&data[0x70..]).read_f32::<BigEndian>().unwrap();
-    let transform1         = (&data[0x74..]).read_f32::<BigEndian>().unwrap();
-    let transform2         = (&data[0x78..]).read_f32::<BigEndian>().unwrap();
-    let transform3         = (&data[0x7c..]).read_f32::<BigEndian>().unwrap();
+    let transform0         = data.f32_be(0x70);
+    let transform1         = data.f32_be(0x74);
+    let transform2         = data.f32_be(0x78);
+    let transform3         = data.f32_be(0x7c);
 
-    let transform4         = (&data[0x80..]).read_f32::<BigEndian>().unwrap();
-    let transform5         = (&data[0x84..]).read_f32::<BigEndian>().unwrap();
-    let transform6         = (&data[0x88..]).read_f32::<BigEndian>().unwrap();
-    let transform7         = (&data[0x8c..]).read_f32::<BigEndian>().unwrap();
+    let transform4         = data.f32_be(0x80);
+    let transform5         = data.f32_be(0x84);
+    let transform6         = data.f32_be(0x88);
+    let transform7         = data.f32_be(0x8c);
 
-    let transform8         = (&data[0x90..]).read_f32::<BigEndian>().unwrap();
-    let transform9         = (&data[0x94..]).read_f32::<BigEndian>().unwrap();
-    let transform10        = (&data[0x98..]).read_f32::<BigEndian>().unwrap();
-    let transform11        = (&data[0x9c..]).read_f32::<BigEndian>().unwrap();
+    let transform8         = data.f32_be(0x90);
+    let transform9         = data.f32_be(0x94);
+    let transform10        = data.f32_be(0x98);
+    let transform11        = data.f32_be(0x9c);
 
-    let transform_inv0     = (&data[0xa0..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv1     = (&data[0xa4..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv2     = (&data[0xa8..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv3     = (&data[0xac..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv0     = data.f32_be(0xa0);
+    let transform_inv1     = data.f32_be(0xa4);
+    let transform_inv2     = data.f32_be(0xa8);
+    let transform_inv3     = data.f32_be(0xac);
 
-    let transform_inv4     = (&data[0xb0..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv5     = (&data[0xb4..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv6     = (&data[0xb8..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv7     = (&data[0xbc..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv4     = data.f32_be(0xb0);
+    let transform_inv5     = data.f32_be(0xb4);
+    let transform_inv6     = data.f32_be(0xb8);
+    let transform_inv7     = data.f32_be(0xbc);
 
-    let transform_inv8     = (&data[0xc0..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv9     = (&data[0xc4..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv10    = (&data[0xc8..]).read_f32::<BigEndian>().unwrap();
-    let transform_inv11    = (&data[0xcc..]).read_f32::<BigEndian>().unwrap();
+    let transform_inv8     = data.f32_be(0xc0);
+    let transform_inv9     = data.f32_be(0xc4);
+    let transform_inv10    = data.f32_be(0xc8);
+    let transform_inv11    = data.f32_be(0xcc);
 
     // BrawlBox uses a Matrix43, this means there are 4 columns and 3 rows we need to read.
     // We only have 4x4 matrices available, so use [0.0, 0.0, 0.0, 1.0] as the last row,
@@ -122,7 +121,7 @@ fn bone_siblings(data_root: &[u8], offset: i32) -> Vec<Bone> {
          1.0,
     );
 
-    let name = String::from(util::parse_str(&data[string_offset as usize..]).unwrap());
+    let name = data.str(string_offset as usize).unwrap().to_string();
 
     let flags = BoneFlags::from_bits(flags_int).unwrap();
     let billboard = match billboard_int {
@@ -139,13 +138,13 @@ fn bone_siblings(data_root: &[u8], offset: i32) -> Vec<Bone> {
     let children = if first_child_offset == 0 {
         vec!()
     } else {
-        bone_siblings(&data_root, offset + first_child_offset)
+        bone_siblings(data_root, offset + first_child_offset)
     };
 
     let mut siblings = if next_offset == 0 {
         vec!()
     } else {
-        bone_siblings(&data_root, offset + next_offset)
+        bone_siblings(data_root, offset + next_offset)
     };
 
     siblings.push(Bone {

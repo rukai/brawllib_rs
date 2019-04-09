@@ -1,56 +1,56 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 
 use crate::script::Script;
 use crate::script;
 use crate::util;
 use crate::wii_memory::WiiMemory;
 
-pub(crate) fn arc_fighter_data_common(parent_data: &[u8], data: &[u8], wii_memory: &WiiMemory) -> ArcFighterDataCommon {
-    let global_ics           = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
-    let global_ics_sse       = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
-    let ics                  = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
-    let ics_sse              = (&data[0x0c..]).read_i32::<BigEndian>().unwrap();
-    let entry_actions_start  = (&data[0x10..]).read_i32::<BigEndian>().unwrap();
-    let exit_actions_start   = (&data[0x14..]).read_i32::<BigEndian>().unwrap();
-    let flash_overlay_array  = (&data[0x18..]).read_i32::<BigEndian>().unwrap();
-    let unk1                 = (&data[0x1c..]).read_i32::<BigEndian>().unwrap();
-    let unk2                 = (&data[0x20..]).read_i32::<BigEndian>().unwrap();
-    let unk3                 = (&data[0x24..]).read_i32::<BigEndian>().unwrap();
-    let unk4                 = (&data[0x28..]).read_i32::<BigEndian>().unwrap();
-    let unk5                 = (&data[0x2c..]).read_i32::<BigEndian>().unwrap();
-    let unk6                 = (&data[0x30..]).read_i32::<BigEndian>().unwrap();
-    let unk7                 = (&data[0x34..]).read_i32::<BigEndian>().unwrap();
-    let unk8                 = (&data[0x38..]).read_i32::<BigEndian>().unwrap();
-    let unk9                 = (&data[0x3c..]).read_i32::<BigEndian>().unwrap();
-    let unk10                = (&data[0x40..]).read_i32::<BigEndian>().unwrap();
-    let unk11                = (&data[0x44..]).read_i32::<BigEndian>().unwrap();
-    let unk12                = (&data[0x48..]).read_i32::<BigEndian>().unwrap();
-    let flash_overlay_offset = (&data[0x4c..]).read_i32::<BigEndian>().unwrap();
-    let screen_tints         = (&data[0x50..]).read_i32::<BigEndian>().unwrap();
-    let leg_bones            = (&data[0x54..]).read_i32::<BigEndian>().unwrap();
-    let unk13                = (&data[0x58..]).read_i32::<BigEndian>().unwrap();
-    let unk14                = (&data[0x5c..]).read_i32::<BigEndian>().unwrap();
-    let unk15                = (&data[0x60..]).read_i32::<BigEndian>().unwrap();
-    let unk16                = (&data[0x64..]).read_i32::<BigEndian>().unwrap();
+pub(crate) fn arc_fighter_data_common(parent_data: FancySlice, data: FancySlice, wii_memory: &WiiMemory) -> ArcFighterDataCommon {
+    let global_ics           = data.i32_be(0x00);
+    let global_ics_sse       = data.i32_be(0x04);
+    let ics                  = data.i32_be(0x08);
+    let ics_sse              = data.i32_be(0x0c);
+    let entry_actions_start  = data.i32_be(0x10);
+    let exit_actions_start   = data.i32_be(0x14);
+    let flash_overlay_array  = data.i32_be(0x18);
+    let unk1                 = data.i32_be(0x1c);
+    let unk2                 = data.i32_be(0x20);
+    let unk3                 = data.i32_be(0x24);
+    let unk4                 = data.i32_be(0x28);
+    let unk5                 = data.i32_be(0x2c);
+    let unk6                 = data.i32_be(0x30);
+    let unk7                 = data.i32_be(0x34);
+    let unk8                 = data.i32_be(0x38);
+    let unk9                 = data.i32_be(0x3c);
+    let unk10                = data.i32_be(0x40);
+    let unk11                = data.i32_be(0x44);
+    let unk12                = data.i32_be(0x48);
+    let flash_overlay_offset = data.i32_be(0x4c);
+    let screen_tints         = data.i32_be(0x50);
+    let leg_bones            = data.i32_be(0x54);
+    let unk13                = data.i32_be(0x58);
+    let unk14                = data.i32_be(0x5c);
+    let unk15                = data.i32_be(0x60);
+    let unk16                = data.i32_be(0x64);
 
     let sizes = get_sizes(data);
 
     let entry_actions_num = sizes.iter().find(|x| x.offset == entry_actions_start as usize).unwrap().size / 4; // divide by integer size
-    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num, wii_memory);
-    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num, wii_memory);
+    let entry_actions = script::scripts(parent_data, parent_data.relative_fancy_slice(entry_actions_start as usize ..), entry_actions_num, wii_memory);
+    let exit_actions = script::scripts(parent_data, parent_data.relative_fancy_slice(exit_actions_start as usize ..), entry_actions_num, wii_memory);
 
-    let leg_bones_left_list = util::list_offset(&parent_data[leg_bones as usize..]);
+    let leg_bones_left_list = util::list_offset(parent_data.relative_fancy_slice(leg_bones as usize..));
     let mut leg_bones_left = vec!();
     for i in 0..leg_bones_left_list.count as usize {
-        let string_offset = (&parent_data[leg_bones_left_list.start_offset as usize + i * 4 ..]).read_i32::<BigEndian>().unwrap();
-        leg_bones_left.push(util::parse_str(&parent_data[string_offset as usize..]).unwrap().to_string());
+        let string_offset = parent_data.i32_be(leg_bones_left_list.start_offset as usize + i * 4);
+        leg_bones_left.push(parent_data.str(string_offset as usize).unwrap().to_string());
     }
 
-    let leg_bones_right_list = util::list_offset(&parent_data[leg_bones as usize + util::LIST_OFFSET_SIZE ..]);
+    let leg_bones_right_list = util::list_offset(parent_data.relative_fancy_slice(leg_bones as usize + util::LIST_OFFSET_SIZE ..));
     let mut leg_bones_right = vec!();
     for i in 0..leg_bones_right_list.count as usize {
-        let string_offset = (&parent_data[leg_bones_right_list.start_offset as usize + i * 4 ..]).read_i32::<BigEndian>().unwrap();
-        leg_bones_right.push(util::parse_str(&parent_data[string_offset as usize..]).unwrap().to_string());
+        let string_offset = parent_data.i32_be(leg_bones_right_list.start_offset as usize + i * 4);
+        leg_bones_right.push(parent_data.str(string_offset as usize).unwrap().to_string());
     }
 
     ArcFighterDataCommon {
@@ -121,10 +121,10 @@ struct OffsetSizePair {
     size: usize,
 }
 
-fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
+fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
     let mut pairs = vec!();
     for i in 0..26 {
-        let offset = (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize;
+        let offset = data.i32_be(i * 4) as usize;
         if offset != 0 {
             pairs.push(OffsetSizePair { offset, size: 0 });
         }

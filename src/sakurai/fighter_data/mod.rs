@@ -1,67 +1,66 @@
 pub mod misc_section;
 
-use byteorder::{BigEndian, ReadBytesExt};
-
 use crate::script::Script;
 use crate::script;
 use crate::util;
 use crate::wii_memory::WiiMemory;
-
 use misc_section::MiscSection;
 
-pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8], wii_memory: &WiiMemory) -> ArcFighterData {
-    let subaction_flags_start     = (&data[0..]).read_i32::<BigEndian>().unwrap();
-    let model_visibility_start     = (&data[4..]).read_i32::<BigEndian>().unwrap();
-    let attribute_start            = (&data[8..]).read_i32::<BigEndian>().unwrap();
-    let sse_attribute_start        = (&data[12..]).read_i32::<BigEndian>().unwrap();
-    let misc_section_offset        = (&data[16..]).read_i32::<BigEndian>().unwrap();
-    let common_action_flags_start  = (&data[20..]).read_i32::<BigEndian>().unwrap();
-    let action_flags_start         = (&data[24..]).read_i32::<BigEndian>().unwrap();
-    let _unknown0                  = (&data[28..]).read_i32::<BigEndian>().unwrap();
-    let action_interrupts          = (&data[32..]).read_i32::<BigEndian>().unwrap();
-    let entry_actions_start        = (&data[36..]).read_i32::<BigEndian>().unwrap();
-    let exit_actions_start         = (&data[40..]).read_i32::<BigEndian>().unwrap();
-    let action_pre_start           = (&data[44..]).read_i32::<BigEndian>().unwrap();
-    let subaction_main_start      = (&data[48..]).read_i32::<BigEndian>().unwrap();
-    let subaction_gfx_start       = (&data[52..]).read_i32::<BigEndian>().unwrap();
-    let subaction_sfx_start       = (&data[56..]).read_i32::<BigEndian>().unwrap();
-    let subaction_other_start     = (&data[60..]).read_i32::<BigEndian>().unwrap();
-    let anchored_item_positions    = (&data[64..]).read_i32::<BigEndian>().unwrap();
-    let gooey_bomb_positions       = (&data[68..]).read_i32::<BigEndian>().unwrap();
-    let bone_ref1                  = (&data[72..]).read_i32::<BigEndian>().unwrap();
-    let bone_ref2                  = (&data[76..]).read_i32::<BigEndian>().unwrap();
-    let entry_action_overrides     = (&data[80..]).read_i32::<BigEndian>().unwrap();
-    let exit_action_overrides      = (&data[84..]).read_i32::<BigEndian>().unwrap();
-    let _unknown1                  = (&data[88..]).read_i32::<BigEndian>().unwrap();
-    let samus_arm_cannon_positions = (&data[92..]).read_i32::<BigEndian>().unwrap();
-    let _unknown2                  = (&data[96..]).read_i32::<BigEndian>().unwrap();
-    let static_articles_start      = (&data[100..]).read_i32::<BigEndian>().unwrap();
-    let entry_articles_start       = (&data[104..]).read_i32::<BigEndian>().unwrap();
-    let flags1                     = (&data[116..]).read_u32::<BigEndian>().unwrap();
-    let flags2                     = (&data[120..]).read_i32::<BigEndian>().unwrap();
+use fancy_slice::FancySlice;
+
+pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_memory: &WiiMemory) -> ArcFighterData {
+    let subaction_flags_start      = data.i32_be(0);
+    let model_visibility_start     = data.i32_be(4);
+    let attribute_start            = data.i32_be(8);
+    let sse_attribute_start        = data.i32_be(12);
+    let misc_section_offset        = data.i32_be(16);
+    let common_action_flags_start  = data.i32_be(20);
+    let action_flags_start         = data.i32_be(24);
+    let _unknown0                  = data.i32_be(28);
+    let action_interrupts          = data.i32_be(32);
+    let entry_actions_start        = data.i32_be(36);
+    let exit_actions_start         = data.i32_be(40);
+    let action_pre_start           = data.i32_be(44);
+    let subaction_main_start       = data.i32_be(48);
+    let subaction_gfx_start        = data.i32_be(52);
+    let subaction_sfx_start        = data.i32_be(56);
+    let subaction_other_start      = data.i32_be(60);
+    let anchored_item_positions    = data.i32_be(64);
+    let gooey_bomb_positions       = data.i32_be(68);
+    let bone_ref1                  = data.i32_be(72);
+    let bone_ref2                  = data.i32_be(76);
+    let entry_action_overrides     = data.i32_be(80);
+    let exit_action_overrides      = data.i32_be(84);
+    let _unknown1                  = data.i32_be(88);
+    let samus_arm_cannon_positions = data.i32_be(92);
+    let _unknown2                  = data.i32_be(96);
+    let static_articles_start      = data.i32_be(100);
+    let entry_articles_start       = data.i32_be(104);
+    let flags1                     = data.u32_be(116);
+    let flags2                     = data.i32_be(120);
 
     let sizes = get_sizes(data);
 
     let subaction_flags_num = sizes.iter().find(|x| x.offset == subaction_flags_start as usize).unwrap().size / SUB_ACTION_FLAGS_SIZE;
-    let subaction_flags = subaction_flags(parent_data, &parent_data[subaction_flags_start as usize ..], subaction_flags_num);
+    let subaction_flags = subaction_flags(parent_data, parent_data.relative_fancy_slice(subaction_flags_start as usize ..), subaction_flags_num);
 
     let model_visibility = model_visibility(parent_data, model_visibility_start);
 
     let action_flags_num = sizes.iter().find(|x| x.offset == action_flags_start as usize).unwrap().size / ACTION_FLAGS_SIZE;
-    let action_flags = action_flags(&parent_data[action_flags_start as usize ..], action_flags_num);
+    let action_flags = action_flags(parent_data.relative_fancy_slice(action_flags_start as usize ..), action_flags_num);
 
     let entry_actions_num = sizes.iter().find(|x| x.offset == entry_actions_start as usize).unwrap().size / 4; // divide by integer size
-    let entry_actions = script::scripts(parent_data, &parent_data[entry_actions_start as usize ..], entry_actions_num, wii_memory);
-    let exit_actions = script::scripts(parent_data, &parent_data[exit_actions_start as usize ..], entry_actions_num, wii_memory);
+    let entry_actions = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(entry_actions_start as usize ..), entry_actions_num, wii_memory);
+    let exit_actions = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(exit_actions_start as usize ..), entry_actions_num, wii_memory);
 
     let subaction_main_num = sizes.iter().find(|x| x.offset == subaction_main_start as usize).unwrap().size / 4; // divide by integer size
-    let subaction_main = script::scripts(parent_data, &parent_data[subaction_main_start as usize ..], subaction_main_num, wii_memory);
-    let subaction_gfx = script::scripts(parent_data, &parent_data[subaction_gfx_start as usize ..], subaction_main_num, wii_memory);
-    let subaction_sfx = script::scripts(parent_data, &parent_data[subaction_sfx_start as usize ..], subaction_main_num, wii_memory);
-    let subaction_other = script::scripts(parent_data, &parent_data[subaction_other_start as usize ..], subaction_main_num, wii_memory);
+    let subaction_main = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(subaction_main_start as usize ..), subaction_main_num, wii_memory);
+    let subaction_gfx = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(subaction_gfx_start as usize ..), subaction_main_num, wii_memory);
+    let subaction_sfx = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(subaction_sfx_start as usize ..), subaction_main_num, wii_memory);
+    let subaction_other = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(subaction_other_start as usize ..), subaction_main_num, wii_memory);
 
-    let attributes = fighter_attributes(&parent_data[attribute_start as usize ..]);
-    let misc = misc_section::misc_section(&parent_data[misc_section_offset as usize ..], parent_data);
+    let attributes = fighter_attributes(parent_data.relative_fancy_slice(attribute_start as usize ..));
+    let misc = misc_section::misc_section(parent_data.relative_fancy_slice(misc_section_offset as usize ..), parent_data.relative_fancy_slice(..));
 
     ArcFighterData {
         subaction_flags,
@@ -93,81 +92,81 @@ pub(crate) fn arc_fighter_data(parent_data: &[u8], data: &[u8], wii_memory: &Wii
     }
 }
 
-fn fighter_attributes(data: &[u8]) -> FighterAttributes {
+fn fighter_attributes(data: FancySlice) -> FighterAttributes {
     FighterAttributes {
-        walk_init_vel:                     (&data[0x00..]).read_f32::<BigEndian>().unwrap(),
-        walk_acc:                          (&data[0x04..]).read_f32::<BigEndian>().unwrap(),
-        walk_max_vel:                      (&data[0x08..]).read_f32::<BigEndian>().unwrap(),
-        ground_friction:                   (&data[0x0c..]).read_f32::<BigEndian>().unwrap(),
-        dash_init_vel:                     (&data[0x10..]).read_f32::<BigEndian>().unwrap(),
-        dash_run_acc_a:                    (&data[0x14..]).read_f32::<BigEndian>().unwrap(),
-        dash_run_acc_b:                    (&data[0x18..]).read_f32::<BigEndian>().unwrap(),
-        dash_run_term_vel:                 (&data[0x1c..]).read_f32::<BigEndian>().unwrap(),
-        grounded_max_x_vel:                (&data[0x24..]).read_f32::<BigEndian>().unwrap(),
-        dash_cancel_frame_window:          (&data[0x28..]).read_i32::<BigEndian>().unwrap(),
-        guard_on_max_momentum:             (&data[0x2c..]).read_f32::<BigEndian>().unwrap(),
-        jump_squat_frames:                 (&data[0x30..]).read_i32::<BigEndian>().unwrap(),
-        jump_x_init_vel:                   (&data[0x34..]).read_f32::<BigEndian>().unwrap(),
-        jump_y_init_vel:                   (&data[0x38..]).read_f32::<BigEndian>().unwrap(),
-        jump_x_vel_ground_mult:            (&data[0x3c..]).read_f32::<BigEndian>().unwrap(),
-        jump_x_init_term_vel:              (&data[0x40..]).read_f32::<BigEndian>().unwrap(),
-        jump_y_init_vel_short:             (&data[0x44..]).read_f32::<BigEndian>().unwrap(),
-        air_jump_x_mult:                   (&data[0x48..]).read_f32::<BigEndian>().unwrap(),
-        air_jump_y_mult:                   (&data[0x4c..]).read_f32::<BigEndian>().unwrap(),
-        footstool_init_vel:                (&data[0x50..]).read_f32::<BigEndian>().unwrap(),
-        footstool_init_vel_short:          (&data[0x54..]).read_f32::<BigEndian>().unwrap(),
-        meteor_cancel_delay:               (&data[0x5c..]).read_f32::<BigEndian>().unwrap(),
-        num_jumps:                         (&data[0x60..]).read_u32::<BigEndian>().unwrap(),
-        gravity:                           (&data[0x64..]).read_f32::<BigEndian>().unwrap(),
-        term_vel:                          (&data[0x68..]).read_f32::<BigEndian>().unwrap(),
-        air_friction_y:                    (&data[0x6c..]).read_f32::<BigEndian>().unwrap(),
-        air_y_term_vel:                    (&data[0x70..]).read_f32::<BigEndian>().unwrap(),
-        air_mobility_a:                    (&data[0x74..]).read_f32::<BigEndian>().unwrap(),
-        air_mobility_b:                    (&data[0x78..]).read_f32::<BigEndian>().unwrap(),
-        air_x_term_vel:                    (&data[0x7c..]).read_f32::<BigEndian>().unwrap(),
-        air_friction_x:                    (&data[0x80..]).read_f32::<BigEndian>().unwrap(),
-        fastfall_velocity:                 (&data[0x84..]).read_f32::<BigEndian>().unwrap(),
-        air_x_term_vel_hard:               (&data[0x88..]).read_f32::<BigEndian>().unwrap(),
-        glide_frame_window:                (&data[0x8c..]).read_u32::<BigEndian>().unwrap(),
-        jab2_window:                       (&data[0x94..]).read_f32::<BigEndian>().unwrap(),
-        jab3_window:                       (&data[0x98..]).read_f32::<BigEndian>().unwrap(),
-        ftilt2_window:                     (&data[0x9c..]).read_f32::<BigEndian>().unwrap(),
-        ftilt3_window:                     (&data[0xa0..]).read_f32::<BigEndian>().unwrap(),
-        fsmash2_window:                    (&data[0xa4..]).read_f32::<BigEndian>().unwrap(),
-        flip_dir_frame:                    (&data[0xa8..]).read_f32::<BigEndian>().unwrap(),
-        weight:                            (&data[0xb0..]).read_f32::<BigEndian>().unwrap(),
-        size:                              (&data[0xb4..]).read_f32::<BigEndian>().unwrap(),
-        results_screen_size:               (&data[0xb8..]).read_f32::<BigEndian>().unwrap(),
-        shield_size:                       (&data[0xc4..]).read_f32::<BigEndian>().unwrap(),
-        shield_break_vel:                  (&data[0xc8..]).read_f32::<BigEndian>().unwrap(),
-        shield_strength:                   (&data[0xcc..]).read_f32::<BigEndian>().unwrap(),
-        respawn_platform_size:             (&data[0xd4..]).read_f32::<BigEndian>().unwrap(),
-        edge_jump_x_vel:                   (&data[0xf4..]).read_f32::<BigEndian>().unwrap(),
-        edge_jump_y_vel:                   (&data[0xfc..]).read_f32::<BigEndian>().unwrap(),
-        item_throw_strength:               (&data[0x118..]).read_f32::<BigEndian>().unwrap(),
-        projectile_item_move_speed:        (&data[0x128..]).read_f32::<BigEndian>().unwrap(),
-        projectile_item_move_speed_dash_f: (&data[0x12c..]).read_f32::<BigEndian>().unwrap(),
-        projectile_item_move_speed_dash_b: (&data[0x130..]).read_f32::<BigEndian>().unwrap(),
-        light_landing_lag:                 (&data[0x138..]).read_f32::<BigEndian>().unwrap(),
-        normal_landing_lag:                (&data[0x13c..]).read_f32::<BigEndian>().unwrap(),
-        nair_landing_lag:                  (&data[0x140..]).read_f32::<BigEndian>().unwrap(),
-        fair_landing_lag:                  (&data[0x144..]).read_f32::<BigEndian>().unwrap(),
-        bair_landing_lag:                  (&data[0x148..]).read_f32::<BigEndian>().unwrap(),
-        uair_landing_lag:                  (&data[0x14c..]).read_f32::<BigEndian>().unwrap(),
-        dair_landing_lag:                  (&data[0x150..]).read_f32::<BigEndian>().unwrap(),
-        term_vel_hard_frames:              (&data[0x154..]).read_u32::<BigEndian>().unwrap(),
-        hip_n_bone:                        (&data[0x158..]).read_u32::<BigEndian>().unwrap(),
-        tag_height_value:                  (&data[0x15c..]).read_f32::<BigEndian>().unwrap(),
-        walljump_x_vel:                    (&data[0x164..]).read_f32::<BigEndian>().unwrap(),
-        walljump_y_vel:                    (&data[0x168..]).read_f32::<BigEndian>().unwrap(),
-        lhand_n_bone:                      (&data[0x180..]).read_u32::<BigEndian>().unwrap(),
-        rhand_n_bone:                      (&data[0x184..]).read_u32::<BigEndian>().unwrap(),
-        water_y_acc:                       (&data[0x18c..]).read_f32::<BigEndian>().unwrap(),
-        spit_star_size:                    (&data[0x1a4..]).read_f32::<BigEndian>().unwrap(),
-        spit_star_damage:                  (&data[0x1a8..]).read_u32::<BigEndian>().unwrap(),
-        egg_size:                          (&data[0x1ac..]).read_f32::<BigEndian>().unwrap(),
-        hip_n_bone2:                       (&data[0x1cc..]).read_u32::<BigEndian>().unwrap(),
-        x_rot_n_bone:                      (&data[0x1e0..]).read_u32::<BigEndian>().unwrap(),
+        walk_init_vel:                     data.f32_be(0x00),
+        walk_acc:                          data.f32_be(0x04),
+        walk_max_vel:                      data.f32_be(0x08),
+        ground_friction:                   data.f32_be(0x0c),
+        dash_init_vel:                     data.f32_be(0x10),
+        dash_run_acc_a:                    data.f32_be(0x14),
+        dash_run_acc_b:                    data.f32_be(0x18),
+        dash_run_term_vel:                 data.f32_be(0x1c),
+        grounded_max_x_vel:                data.f32_be(0x24),
+        dash_cancel_frame_window:          data.i32_be(0x28),
+        guard_on_max_momentum:             data.f32_be(0x2c),
+        jump_squat_frames:                 data.i32_be(0x30),
+        jump_x_init_vel:                   data.f32_be(0x34),
+        jump_y_init_vel:                   data.f32_be(0x38),
+        jump_x_vel_ground_mult:            data.f32_be(0x3c),
+        jump_x_init_term_vel:              data.f32_be(0x40),
+        jump_y_init_vel_short:             data.f32_be(0x44),
+        air_jump_x_mult:                   data.f32_be(0x48),
+        air_jump_y_mult:                   data.f32_be(0x4c),
+        footstool_init_vel:                data.f32_be(0x50),
+        footstool_init_vel_short:          data.f32_be(0x54),
+        meteor_cancel_delay:               data.f32_be(0x5c),
+        num_jumps:                         data.u32_be(0x60),
+        gravity:                           data.f32_be(0x64),
+        term_vel:                          data.f32_be(0x68),
+        air_friction_y:                    data.f32_be(0x6c),
+        air_y_term_vel:                    data.f32_be(0x70),
+        air_mobility_a:                    data.f32_be(0x74),
+        air_mobility_b:                    data.f32_be(0x78),
+        air_x_term_vel:                    data.f32_be(0x7c),
+        air_friction_x:                    data.f32_be(0x80),
+        fastfall_velocity:                 data.f32_be(0x84),
+        air_x_term_vel_hard:               data.f32_be(0x88),
+        glide_frame_window:                data.u32_be(0x8c),
+        jab2_window:                       data.f32_be(0x94),
+        jab3_window:                       data.f32_be(0x98),
+        ftilt2_window:                     data.f32_be(0x9c),
+        ftilt3_window:                     data.f32_be(0xa0),
+        fsmash2_window:                    data.f32_be(0xa4),
+        flip_dir_frame:                    data.f32_be(0xa8),
+        weight:                            data.f32_be(0xb0),
+        size:                              data.f32_be(0xb4),
+        results_screen_size:               data.f32_be(0xb8),
+        shield_size:                       data.f32_be(0xc4),
+        shield_break_vel:                  data.f32_be(0xc8),
+        shield_strength:                   data.f32_be(0xcc),
+        respawn_platform_size:             data.f32_be(0xd4),
+        edge_jump_x_vel:                   data.f32_be(0xf4),
+        edge_jump_y_vel:                   data.f32_be(0xfc),
+        item_throw_strength:               data.f32_be(0x118),
+        projectile_item_move_speed:        data.f32_be(0x128),
+        projectile_item_move_speed_dash_f: data.f32_be(0x12c),
+        projectile_item_move_speed_dash_b: data.f32_be(0x130),
+        light_landing_lag:                 data.f32_be(0x138),
+        normal_landing_lag:                data.f32_be(0x13c),
+        nair_landing_lag:                  data.f32_be(0x140),
+        fair_landing_lag:                  data.f32_be(0x144),
+        bair_landing_lag:                  data.f32_be(0x148),
+        uair_landing_lag:                  data.f32_be(0x14c),
+        dair_landing_lag:                  data.f32_be(0x150),
+        term_vel_hard_frames:              data.u32_be(0x154),
+        hip_n_bone:                        data.u32_be(0x158),
+        tag_height_value:                  data.f32_be(0x15c),
+        walljump_x_vel:                    data.f32_be(0x164),
+        walljump_y_vel:                    data.f32_be(0x168),
+        lhand_n_bone:                      data.u32_be(0x180),
+        rhand_n_bone:                      data.u32_be(0x184),
+        water_y_acc:                       data.f32_be(0x18c),
+        spit_star_size:                    data.f32_be(0x1a4),
+        spit_star_damage:                  data.u32_be(0x1a8),
+        egg_size:                          data.f32_be(0x1ac),
+        hip_n_bone2:                       data.u32_be(0x1cc),
+        x_rot_n_bone:                      data.u32_be(0x1e0),
     }
 }
 
@@ -294,20 +293,20 @@ bitflags! {
     }
 }
 
-fn subaction_flags(parent_data: &[u8], data: &[u8], num: usize) -> Vec<SubactionFlags> {
+fn subaction_flags(parent_data: FancySlice, data: FancySlice, num: usize) -> Vec<SubactionFlags> {
     let mut result = vec!();
     let num = num + 1;
     for i in 0..num {
-        let in_translation_time =   data[i * SUB_ACTION_FLAGS_SIZE + 0];
-        let animation_flags_int =   data[i * SUB_ACTION_FLAGS_SIZE + 1];
-        //  padding               (&data[i * SUB_ACTION_FLAGS_SIZE + 2..]).read_u16
-        let string_offset       = (&data[i * SUB_ACTION_FLAGS_SIZE + 4..]).read_i32::<BigEndian>().unwrap();
+        let in_translation_time = data.u8(i * SUB_ACTION_FLAGS_SIZE + 0);
+        let animation_flags_int = data.u8(i * SUB_ACTION_FLAGS_SIZE + 1);
+        //  padding               data.u16_be(i * SUB_ACTION_FLAGS_SIZE + 2..);
+        let string_offset       = data.i32_be(i * SUB_ACTION_FLAGS_SIZE + 4);
 
         let animation_flags = AnimationFlags::from_bits(animation_flags_int).unwrap();
         let name = if string_offset == 0 {
             String::new()
         } else {
-            util::parse_str(&parent_data[string_offset as usize ..]).unwrap().to_string()
+            parent_data.str(string_offset as usize).unwrap().to_string()
         };
 
         result.push(SubactionFlags {
@@ -327,11 +326,11 @@ pub struct SubactionFlags {
     pub name:                String,
 }
 
-fn model_visibility(parent_data: &[u8], model_visibility_start: i32) -> ModelVisibility {
-    let reference_offset  = (&parent_data[model_visibility_start as usize + 0x00..]).read_i32::<BigEndian>().unwrap();
-    let bone_switch_count = (&parent_data[model_visibility_start as usize + 0x04..]).read_i32::<BigEndian>().unwrap();
-    let defaults_offset   = (&parent_data[model_visibility_start as usize + 0x08..]).read_i32::<BigEndian>().unwrap();
-    let defaults_count    = (&parent_data[model_visibility_start as usize + 0x0c..]).read_i32::<BigEndian>().unwrap();
+fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> ModelVisibility {
+    let reference_offset  = parent_data.i32_be(model_visibility_start as usize + 0x00);
+    let bone_switch_count = parent_data.i32_be(model_visibility_start as usize + 0x04);
+    let defaults_offset   = parent_data.i32_be(model_visibility_start as usize + 0x08);
+    let defaults_count    = parent_data.i32_be(model_visibility_start as usize + 0x0c);
 
     let mut references = vec!();
     if reference_offset != 0 {
@@ -350,20 +349,20 @@ fn model_visibility(parent_data: &[u8], model_visibility_start: i32) -> ModelVis
         }
 
         for reference_i in 0..reference_count as usize {
-            let bone_switch_offset = (&parent_data[reference_offset as usize + VISIBILITY_REFERENCE_SIZE * reference_i ..]).read_i32::<BigEndian>().unwrap() as usize;
+            let bone_switch_offset = parent_data.i32_be(reference_offset as usize + VISIBILITY_REFERENCE_SIZE * reference_i) as usize;
             let mut bone_switches = vec!();
             if bone_switch_offset != 0 {
 
                 for bone_switch_i in 0..bone_switch_count as usize {
-                    let visibility_group_list = util::list_offset(&parent_data[bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i ..]);
+                    let visibility_group_list = util::list_offset(parent_data.relative_fancy_slice(bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i ..));
                     let mut groups = vec!();
 
                     for visibility_group_i in 0..visibility_group_list.count as usize {
-                        let bone_list = util::list_offset(&parent_data[visibility_group_list.start_offset as usize + util::LIST_OFFSET_SIZE * visibility_group_i ..]);
+                        let bone_list = util::list_offset(parent_data.relative_fancy_slice(visibility_group_list.start_offset as usize + util::LIST_OFFSET_SIZE * visibility_group_i ..));
                         let mut bones = vec!();
 
                         for bone_i in 0..bone_list.count as usize {
-                            let bone = (&parent_data[bone_list.start_offset as usize + 4 * bone_i ..]).read_i32::<BigEndian>().unwrap();
+                            let bone = parent_data.i32_be(bone_list.start_offset as usize + 4 * bone_i);
                             bones.push(bone);
                         }
 
@@ -379,8 +378,8 @@ fn model_visibility(parent_data: &[u8], model_visibility_start: i32) -> ModelVis
 
     let mut defaults = vec!();
     for i in 0..defaults_count as usize {
-        let switch_index = (&parent_data[defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i     ..]).read_i32::<BigEndian>().unwrap();
-        let group_index  = (&parent_data[defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i + 4 ..]).read_i32::<BigEndian>().unwrap();
+        let switch_index = parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i    );
+        let group_index  = parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i + 4);
 
         defaults.push(VisibilityDefault { switch_index, group_index });
     }
@@ -423,14 +422,14 @@ pub struct VisibilityDefault {
     pub group_index: i32,
 }
 
-fn action_flags(data: &[u8], num: usize) -> Vec<ActionFlags> {
+fn action_flags(data: FancySlice, num: usize) -> Vec<ActionFlags> {
     let mut result = vec!();
     for i in 0..num {
         result.push(ActionFlags {
-            flag1: (&data[i * ACTION_FLAGS_SIZE + 0x0..]).read_u32::<BigEndian>().unwrap(),
-            flag2: (&data[i * ACTION_FLAGS_SIZE + 0x4..]).read_u32::<BigEndian>().unwrap(),
-            flag3: (&data[i * ACTION_FLAGS_SIZE + 0x8..]).read_u32::<BigEndian>().unwrap(),
-            flag4: (&data[i * ACTION_FLAGS_SIZE + 0xc..]).read_u32::<BigEndian>().unwrap(),
+            flag1: data.u32_be(i * ACTION_FLAGS_SIZE + 0x0),
+            flag2: data.u32_be(i * ACTION_FLAGS_SIZE + 0x4),
+            flag3: data.u32_be(i * ACTION_FLAGS_SIZE + 0x8),
+            flag4: data.u32_be(i * ACTION_FLAGS_SIZE + 0xc),
         });
     }
     result
@@ -450,10 +449,10 @@ struct OffsetSizePair {
     size: usize,
 }
 
-fn get_sizes(data: &[u8]) -> Vec<OffsetSizePair> {
+fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
     let mut pairs = vec!();
     for i in 0..27 {
-        let offset = (&data[i * 4 ..]).read_i32::<BigEndian>().unwrap() as usize;
+        let offset = data.i32_be(i * 4) as usize;
         if offset != 0 {
             pairs.push(OffsetSizePair { offset, size: 0 });
         }

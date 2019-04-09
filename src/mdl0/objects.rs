@@ -1,40 +1,39 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 
 use crate::resources::Resource;
-use crate::util;
 
-pub(crate) fn objects(data: &[u8], resources: Vec<Resource>) -> Vec<Object> {
+pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object> {
     let mut objects = vec!();
     for resource in resources {
-        let data = &data[resource.data_offset as usize ..];
-        let _total_length           = (&data[0x00..]).read_i32::<BigEndian>().unwrap();
-        let _mdl0_offset            = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
-        let single_bind_node_id     = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
-        let vertex_format1          = (&data[0x0c..]).read_u32::<BigEndian>().unwrap();
-        let vertex_format2          = (&data[0x10..]).read_u32::<BigEndian>().unwrap();
-        let vertex_specs            = (&data[0x14..]).read_u32::<BigEndian>().unwrap();
-        let definitions_buffer_size = (&data[0x18..]).read_i32::<BigEndian>().unwrap();
-        let definitions_size        = (&data[0x1c..]).read_i32::<BigEndian>().unwrap(); // amount of the buffer_size that is actually used
-        let definitions_offset      = (&data[0x20..]).read_i32::<BigEndian>().unwrap(); // relative to this struct
-        let primitives_buffer_size  = (&data[0x24..]).read_i32::<BigEndian>().unwrap();
-        let primitives_size         = (&data[0x28..]).read_i32::<BigEndian>().unwrap(); // amount of the buffer_size that is actually used
-        let primitives_offset       = (&data[0x2c..]).read_i32::<BigEndian>().unwrap(); // relative to this struct
-        let array_flags             = (&data[0x30..]).read_u32::<BigEndian>().unwrap();
-        let modifier                = (&data[0x34..]).read_u32::<BigEndian>().unwrap();
-        let string_offset           = (&data[0x38..]).read_u32::<BigEndian>().unwrap();
-        let index                   = (&data[0x3c..]).read_u32::<BigEndian>().unwrap();
-        let num_vertices            = (&data[0x40..]).read_u32::<BigEndian>().unwrap();
-        let num_faces               = (&data[0x44..]).read_u32::<BigEndian>().unwrap();
-        let vertex_id               = (&data[0x48..]).read_i16::<BigEndian>().unwrap();
-        let normal_id               = (&data[0x4A..]).read_i16::<BigEndian>().unwrap();
+        let data = data.relative_fancy_slice(resource.data_offset as usize ..);
+        let _total_length           = data.i32_be(0x00);
+        let _mdl0_offset            = data.i32_be(0x04);
+        let single_bind_node_id     = data.i32_be(0x08);
+        let vertex_format1          = data.u32_be(0x0c);
+        let vertex_format2          = data.u32_be(0x10);
+        let vertex_specs            = data.u32_be(0x14);
+        let definitions_buffer_size = data.i32_be(0x18);
+        let definitions_size        = data.i32_be(0x1c); // amount of the buffer_size that is actually used
+        let definitions_offset      = data.i32_be(0x20); // relative to this struct
+        let primitives_buffer_size  = data.i32_be(0x24);
+        let primitives_size         = data.i32_be(0x28); // amount of the buffer_size that is actually used
+        let primitives_offset       = data.i32_be(0x2c); // relative to this struct
+        let array_flags             = data.u32_be(0x30);
+        let modifier                = data.u32_be(0x34);
+        let string_offset           = data.u32_be(0x38);
+        let index                   = data.u32_be(0x3c);
+        let num_vertices            = data.u32_be(0x40);
+        let num_faces               = data.u32_be(0x44);
+        let vertex_id               = data.i16_be(0x48);
+        let normal_id               = data.i16_be(0x4A);
 
         let mut color_ids = [0; 2];
-        color_ids[0] = (&data[0x4C..]).read_i16::<BigEndian>().unwrap();
-        color_ids[1] = (&data[0x4E..]).read_i16::<BigEndian>().unwrap();
+        color_ids[0] = data.i16_be(0x4C);
+        color_ids[1] = data.i16_be(0x4E);
 
         let mut uv_ids = [0; 8];
         for i in 0..uv_ids.len() {
-            uv_ids[i] = (&data[0x50 + i * 2 ..]).read_i16::<BigEndian>().unwrap();
+            uv_ids[i] = data.i16_be(0x50 + i * 2);
         }
 
         let single_bind_node_id = if single_bind_node_id < 0 {
@@ -48,7 +47,7 @@ pub(crate) fn objects(data: &[u8], resources: Vec<Resource>) -> Vec<Object> {
         let name = if string_offset == 0 {
             None
         } else {
-            Some(String::from(util::parse_str(&data[string_offset as usize..]).unwrap()))
+            Some(data.str(string_offset as usize).unwrap().to_string())
         };
 
         objects.push(Object {

@@ -1,17 +1,17 @@
-use byteorder::{BigEndian, ReadBytesExt};
 use cgmath::Vector3;
+use fancy_slice::FancySlice;
 
-pub fn mbox(data: &[u8]) -> MBox {
+pub fn mbox(data: FancySlice) -> MBox {
     MBox {
         min: Vector3::<f32>::new(
-            (&data[0x00..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x04..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x08..]).read_f32::<BigEndian>().unwrap(),
+            data.f32_be(0x00),
+            data.f32_be(0x04),
+            data.f32_be(0x08),
         ),
         max: Vector3::<f32>::new(
-            (&data[0x0c..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x10..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x14..]).read_f32::<BigEndian>().unwrap(),
+            data.f32_be(0x0c),
+            data.f32_be(0x10),
+            data.f32_be(0x14),
         )
     }
 }

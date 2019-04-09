@@ -1,4 +1,5 @@
 use byteorder::{BigEndian, ByteOrder};
+use fancy_slice::FancySlice;
 
 pub struct WiiMemory {
     mem1: Vec<u8>,
@@ -102,5 +103,16 @@ impl WiiMemory {
             error!("Failed to get buffer: Cannot map address 0x{:x} to wii memory", address);
             &[]
         }
+    }
+    pub fn fancy_slice_from(&self, address: usize) -> FancySlice {
+        let slice = if address >= 0x8000_0000 && address < 0x8180_0000 {
+            &self.mem1[address - 0x8000_0000..]
+        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+            &self.mem2[address - 0x9000_0000..]
+        } else {
+            error!("Failed to get buffer: Cannot map address 0x{:x} to wii memory", address);
+            &[]
+        };
+        FancySlice::new(slice)
     }
 }

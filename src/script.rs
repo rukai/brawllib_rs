@@ -1,18 +1,18 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 
 use crate::wii_memory::WiiMemory;
 
-pub(crate) fn scripts(parent_data: &[u8], offset_data: &[u8], num: usize, wii_memory: &WiiMemory) -> Vec<Script> {
+pub(crate) fn scripts(parent_data: FancySlice, offset_data: FancySlice, num: usize, wii_memory: &WiiMemory) -> Vec<Script> {
     let mut result = vec!();
     for i in 0..num {
-        let offset = (&offset_data[i * 4..]).read_u32::<BigEndian>().unwrap();
+        let offset = offset_data.u32_be(i * 4);
         result.push(new_script(parent_data, offset, wii_memory));
     }
     result
 }
 
 /// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
-pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], ignore_origins: &[i32], wii_memory: &WiiMemory) -> Vec<Script> {
+pub(crate) fn fragment_scripts(parent_data: FancySlice, known_scripts: &[&[Script]], ignore_origins: &[i32], wii_memory: &WiiMemory) -> Vec<Script> {
     let mut fragments: Vec<Script> = vec!();
     for scripts in known_scripts.iter() {
         for script in scripts.iter() {
@@ -65,25 +65,25 @@ pub(crate) fn fragment_scripts(parent_data: &[u8], known_scripts: &[&[Script]], 
     fragments
 }
 
-pub fn new_script(parent_data: &[u8], offset: u32, wii_memory: &WiiMemory) -> Script {
+pub fn new_script(parent_data: FancySlice, offset: u32, wii_memory: &WiiMemory) -> Script {
     let buffer = if offset == 0 || offset as i32 == -1 {
         return Script { events: vec!(), offset: offset as i32 }
     } else if offset > 0 && offset < (parent_data.len() as u32) {
-        &parent_data[offset as usize ..]
+        parent_data.relative_fancy_slice(offset as usize ..)
     } else if offset < 8000_0000 {
         return Script { events: vec!(), offset: offset as i32 }
     } else {
-        wii_memory.buffer_from(offset as usize)
+        wii_memory.fancy_slice_from(offset as usize)
     };
 
     let mut events = vec!();
     let mut event_offset = 0;
     loop {
-        let namespace     =   buffer[event_offset as usize];
-        let code          =   buffer[event_offset as usize + 1];
-        let num_arguments =   buffer[event_offset as usize + 2];
-        let unk1          =   buffer[event_offset as usize + 3];
-        let raw_id        = (&buffer[event_offset as usize ..]).read_u32::<BigEndian>().unwrap();
+        let namespace     = buffer.u8    (event_offset as usize);
+        let code          = buffer.u8    (event_offset as usize + 1);
+        let num_arguments = buffer.u8    (event_offset as usize + 2);
+        let unk1          = buffer.u8    (event_offset as usize + 3);
+        let raw_id        = buffer.u32_be(event_offset as usize);
 
         if code == 0 && namespace == 0 { // end of script
             break
@@ -93,12 +93,12 @@ pub fn new_script(parent_data: &[u8], offset: u32, wii_memory: &WiiMemory) -> Sc
         // const long FADEDATA = 0xFADE0D8A; // Constant for the tag FADE0D8A representing the end of useable space.
         // const long FADEFOOD = 0xFADEF00D; // Constant for the tag FADEF00D representing empty, useable space.
         if raw_id != 0xFADEF00D && raw_id != 0xFADE0D8A {
-            let argument_offset = (&buffer[event_offset as usize + 4 ..]).read_u32::<BigEndian>().unwrap();
+            let argument_offset = buffer.u32_be(event_offset as usize + 4);
 
             let argument_buffer = if argument_offset as usize >= parent_data.len() {
-                wii_memory.buffer_from(argument_offset as usize)
+                wii_memory.fancy_slice_from(argument_offset as usize)
             } else {
-                &parent_data[argument_offset as usize..]
+                parent_data.relative_fancy_slice(argument_offset as usize..)
             };
 
             let arguments = arguments(argument_buffer, argument_offset, num_arguments as usize);
@@ -115,38 +115,38 @@ pub fn new_script(parent_data: &[u8], offset: u32, wii_memory: &WiiMemory) -> Sc
     Script { events, offset: offset as i32 }
 }
 
-fn arguments(buffer: &[u8], origin: u32, num_arguments: usize) -> Vec<Argument> {
+fn arguments(data: FancySlice, origin: u32, num_arguments: usize) -> Vec<Argument> {
     let mut arguments = vec!();
     for i in 0..num_arguments as i32 {
         let argument_offset = i * ARGUMENT_SIZE as i32;
 
-        if argument_offset + 8 > buffer.len() as i32 {
-            error!("Script argument parsing tried to read out of bounds via offset {} into buffer of size {}", argument_offset, buffer.len());
+        if argument_offset + 8 > data.len() as i32 {
+            error!("Script argument parsing tried to read out of bounds via offset {} into data of size {}", argument_offset, data.len());
             break;
         }
 
-        let ty   = (&buffer[argument_offset as usize     ..]).read_i32::<BigEndian>().unwrap();
-        let data = (&buffer[argument_offset as usize + 4 ..]).read_i32::<BigEndian>().unwrap();
+        let ty    = data.i32_be(argument_offset as usize    );
+        let value = data.i32_be(argument_offset as usize + 4);
 
         let argument = match ty {
-            0 => Argument::Value (data),
-            1 => Argument::Scalar (data as f32 / 60000.0),
-            2 => Argument::Offset (Offset { offset: data, origin: origin as i32 + argument_offset + 4}),
-            3 => Argument::Bool (data == 1),
-            4 => Argument::File (data),
+            0 => Argument::Value (value),
+            1 => Argument::Scalar (value as f32 / 60000.0),
+            2 => Argument::Offset (Offset { offset: value, origin: origin as i32 + argument_offset + 4}),
+            3 => Argument::Bool (value == 1),
+            4 => Argument::File (value),
             5 => {
-                let data = data as u32;
-                let memory_type = ((data & 0xF0000000) >> 28) as u8;
-                let data_type   = ((data & 0x0F000000) >> 24) as u8;
-                let address     =  (data & 0x00FFFFFF)        as u32;
+                let value = value as u32;
+                let memory_type = ((value & 0xF0000000) >> 28) as u8;
+                let data_type   = ((value & 0x0F000000) >> 24) as u8;
+                let address     =  (value & 0x00FFFFFF)        as u32;
 
                 let memory_type = VariableMemoryType::new(memory_type);
                 let data_type = VariableDataType::new(data_type);
 
                 Argument::Variable (Variable { memory_type, data_type, address })
             }
-            6 => Requirement::new(data as u32),
-            _ => Argument::Unknown (ty, data),
+            6 => Requirement::new(value as u32),
+            _ => Argument::Unknown (ty, value),
         };
         arguments.push(argument);
     }

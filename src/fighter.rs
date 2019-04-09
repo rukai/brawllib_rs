@@ -11,10 +11,12 @@ use crate::arc;
 use crate::bres::BresChildData;
 use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
-use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
+use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
 use crate::wii_memory::WiiMemory;
+
+use fancy_slice::FancySlice;
 
 #[derive(Debug)]
 pub struct WiiRDFrameSpeedModifier {
@@ -61,6 +63,7 @@ impl Fighter {
         info!("Parsing fighter: {}", fighter_data.cased_name);
         let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
         let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
+            let data = FancySlice::new(data);
             arc::arc(data, wii_memory)
         } else {
             error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
@@ -77,12 +80,14 @@ impl Fighter {
         let motion_etc_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
         let motion_file_name = format!("Fit{}Motion.pac", fighter_data.cased_name);
         let motion = if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
+            let data = FancySlice::new(data);
             arc::arc(data, wii_memory)
         } else {
             if let Some(data) = fighter_data.data.get(&motion_file_name) {
                 // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
                 // Currently I dont need that file at all (What does it even contain?)
                 // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
+                let data = FancySlice::new(data);
                 arc::arc(data, wii_memory)
             } else {
                 // TODO: This is being hit because some fighters just use another fighters motion file
@@ -95,7 +100,8 @@ impl Fighter {
         let mut models = vec!();
         for i in 0..100 {
             if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
-                models.push(arc::arc(&model_data, wii_memory));
+                let data = FancySlice::new(model_data);
+                models.push(arc::arc(data, wii_memory));
                 if single_model {
                     break;
                 }

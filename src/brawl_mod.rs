@@ -13,6 +13,8 @@ use crate::arc;
 use failure::Error;
 use failure::bail;
 
+use fancy_slice::FancySlice;
+
 /// This is very cheap to create, it just contains the passed paths.
 /// All the actual work is done in the `load_*` methods.
 pub struct BrawlMod {
@@ -79,7 +81,9 @@ impl BrawlMod {
                 WiiMemory::new()
             };
 
-            (arc::arc(&file_data, &wii_memory), wii_memory)
+            let data = FancySlice::new(&file_data);
+
+            (arc::arc(data, &wii_memory), wii_memory)
         } else {
             bail!("Missing Fighter.pac");
         };

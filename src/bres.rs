@@ -1,30 +1,29 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 
 use crate::util;
 use crate::resources;
 use crate::chr0::*;
 use crate::mdl0::*;
 
-pub(crate) fn bres(data: &[u8]) -> Bres {
-    let root_offset = (&data[0xc..0xe]).read_u16::<BigEndian>().unwrap();
-    bres_group(&data[root_offset as usize ..])
+pub(crate) fn bres(data: FancySlice) -> Bres {
+    let root_offset = data.u16_be(0xc);
+    bres_group(data.relative_fancy_slice(root_offset as usize ..))
 }
 
-fn bres_group(data: &[u8]) -> Bres {
+fn bres_group(data: FancySlice) -> Bres {
     let mut children = vec!();
-    for resource in resources::resources(&data[ROOT_SIZE..]) {
-        let child_data = &data[ROOT_SIZE + resource.data_offset as usize .. ];
+    for resource in resources::resources(data.relative_fancy_slice(ROOT_SIZE..)) {
+        let child_data = data.relative_fancy_slice(ROOT_SIZE + resource.data_offset as usize ..);
 
-        let tag = util::parse_tag(child_data);
+        let tag = util::parse_tag(child_data.relative_slice(..));
         let child_data = match tag.as_ref() {
             "CHR0" => BresChildData::Chr0 (chr0(child_data)),
             "MDL0" => BresChildData::Mdl0 (mdl0(child_data)),
-            "" => BresChildData::Bres (Box::new(bres_group(&data[resource.data_offset as usize ..]))),
+            "" => BresChildData::Bres (Box::new(bres_group(data.relative_fancy_slice(resource.data_offset as usize ..)))),
             _  => BresChildData::Unknown (tag),
         };
 
         children.push(BresChild {
-            string_offset: resource.string_offset,
             data_offset:   resource.data_offset,
             name:          resource.string,
             data:          child_data,
@@ -47,7 +46,6 @@ pub struct Bres {
 const ROOT_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct BresChild {
-    string_offset: i32,
     data_offset: i32,
     pub name: String,
     pub data: BresChildData

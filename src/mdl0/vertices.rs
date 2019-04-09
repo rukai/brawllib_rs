@@ -1,36 +1,37 @@
-use byteorder::{BigEndian, ReadBytesExt};
+use fancy_slice::FancySlice;
 use cgmath::Vector3;
 
 use crate::resources::Resource;
 
-pub(crate) fn vertices(data: &[u8], resources: Vec<Resource>) -> Vec<Vertices> {
+pub(crate) fn vertices(data: FancySlice, resources: Vec<Resource>) -> Vec<Vertices> {
     let mut vertices = vec!();
     for resource in resources {
-        let data = &data[resource.data_offset as usize..];
+        let data = data.relative_fancy_slice(resource.data_offset as usize..);
 
-        let size           = (&data[0x00..]).read_i32::<BigEndian>().unwrap(); // including header
-        let _mdl0_offset   = (&data[0x04..]).read_i32::<BigEndian>().unwrap();
-        let data_offset    = (&data[0x08..]).read_i32::<BigEndian>().unwrap();
-        let string_offset  = (&data[0x0c..]).read_i32::<BigEndian>().unwrap(); // 0x40
-        let index          = (&data[0x10..]).read_i32::<BigEndian>().unwrap();
-        let is_xyz         = (&data[0x14..]).read_i32::<BigEndian>().unwrap();
-        let component_type = (&data[0x18..]).read_i32::<BigEndian>().unwrap();
-        let divisor        = (&data[0x1c..]).read_u8().unwrap();
-        let entry_stride   = (&data[0x1d..]).read_u8().unwrap();
-        let num_vertices   = (&data[0x1e..]).read_u16::<BigEndian>().unwrap();
+        let size           = data.i32_be(0x00); // including header
+        let _mdl0_offset   = data.i32_be(0x04);
+        let data_offset    = data.i32_be(0x08);
+        let string_offset  = data.i32_be(0x0c); // 0x40
+        let index          = data.i32_be(0x10);
+        let is_xyz         = data.i32_be(0x14);
+        let component_type = data.i32_be(0x18);
+        let divisor        = data.u8    (0x1c);
+        let entry_stride   = data.u8    (0x1d);
+        let num_vertices   = data.u16_be(0x1e);
         let e_min = Vector3::<f32>::new(
-            (&data[0x20..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x24..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x28..]).read_f32::<BigEndian>().unwrap(),
+            data.f32_be(0x20),
+            data.f32_be(0x24),
+            data.f32_be(0x28),
         );
         let e_max = Vector3::<f32>::new(
-            (&data[0x2c..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x30..]).read_f32::<BigEndian>().unwrap(),
-            (&data[0x34..]).read_f32::<BigEndian>().unwrap(),
+            data.f32_be(0x2c),
+            data.f32_be(0x30),
+            data.f32_be(0x34),
         );
+
         // 16 bytes of padding before data starts
 
-        let data = (&data[data_offset as usize.. size as usize]).to_vec();
+        let data = data.relative_slice(data_offset as usize .. size as usize).to_vec();
 
         vertices.push(Vertices {
             name: resource.string,

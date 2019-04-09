@@ -73,7 +73,7 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
 
     // DRAW!
     {
-        let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
+        let mut _encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
 
         for _ in &subaction.frames {
             // Create buffers
@@ -153,7 +153,6 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction: usize) -> Ve
                     println!("ERROR");
                 }
             });
-            std::thread::sleep_ms(1000);
         }
     }
 

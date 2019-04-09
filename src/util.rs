@@ -1,11 +1,9 @@
-use std::str;
+use fancy_slice::FancySlice;
 
-use byteorder::{BigEndian, ReadBytesExt};
-
-pub(crate) fn list_offset(data: &[u8]) -> ListOffset {
+pub(crate) fn list_offset(data: FancySlice) -> ListOffset {
     ListOffset {
-        start_offset: (&data[0x0..]).read_i32::<BigEndian>().unwrap(),
-        count:        (&data[0x4..]).read_i32::<BigEndian>().unwrap(),
+        start_offset: data.i32_be(0x0),
+        count:        data.i32_be(0x4),
     }
 }
 
@@ -14,15 +12,6 @@ pub(crate) const LIST_OFFSET_SIZE: usize = 0x8;
 pub(crate) struct ListOffset {
     pub start_offset: i32,
     pub count: i32,
-}
-
-pub fn parse_str(data: &[u8]) -> Result<&str, String> {
-    if let Some(length) = data.iter().position(|x| *x == 0) {
-        str::from_utf8(&data[..length]).map_err(|x| format!("{}", x))
-    }
-    else {
-        Err(String::from("String was not terminated"))
-    }
 }
 
 pub fn parse_tag(data: &[u8]) -> String {
