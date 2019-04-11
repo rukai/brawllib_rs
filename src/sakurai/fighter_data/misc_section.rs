@@ -4,59 +4,28 @@ use fancy_slice::FancySlice;
 use crate::util;
 
 pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
-    let unk0_offset           = data.i32_be(0);
+    let _unk0_offset          = data.i32_be(0);
     let final_smash_aura_list = util::list_offset(data.relative_fancy_slice(0x04..));
     let hurt_box_list         = util::list_offset(data.relative_fancy_slice(0x0c..));
     let ledge_grab_list       = util::list_offset(data.relative_fancy_slice(0x14..));
     let unk7_list             = util::list_offset(data.relative_fancy_slice(0x1c..));
     let bone_refs_offset      = data.i32_be(0x24);
-    let unk10_offset          = data.i32_be(0x28);
+    let item_bones            = data.i32_be(0x28);
     let sound_data_offset     = data.i32_be(0x2c);
     let unk12_offset          = data.i32_be(0x30);
     let multi_jump_offset     = data.i32_be(0x34);
     let glide_offset          = data.i32_be(0x38);
     let crawl_offset          = data.i32_be(0x3c);
-    let collision_data_offset = data.i32_be(0x40);
+    let ecbs_offset           = data.i32_be(0x40);
     let tether_offset         = data.i32_be(0x44);
     let unk18_offset          = data.i32_be(0x48);
-
-    // TODO
-    // Located at 0x1E50c in brawl FitPokeZeniGame.pac, there is supposed to be a struct something like this:
-    // struct ECBData {
-    //    bone_count: i32 // 0x00000006
-    //    min_width:  f32 // 0x40800000
-    //    min_height: f32 // 0x40800000
-    //}
-    // However I have no idea how to find that so I'm just going to calculate the length and hardcode the min_width + min_height
-
-    let ecb_offset = unk0_offset as usize + 0x20;
-    let mut ecb_bones = vec!();
-    if hurt_box_list.start_offset != 0 {
-        // TODO: leaving these prints here cause I plan on fixing this next
-        //println!("{}", crate::util::hex_dump(&parent_data[unk0_offset as usize ..unk0_offset as usize + 0x20]));
-        //println!("{}", crate::util::hex_dump(&parent_data[ecb_offset as usize ..ecb_offset as usize + 0x20]));
-        //println!("hurtbox: {:x}", hurt_box_list.start_offset);
-        //println!("ecb: {:x}", ecb_offset);
-        if hurt_box_list.start_offset as usize > ecb_offset {
-            let ecb_total = (hurt_box_list.start_offset as usize - ecb_offset) / 4; // TODO: this underflows
-            //println!("ecb_total: {}", ecb_total);
-            if ecb_total < 100 {
-                for i in 0..ecb_total {
-                    ecb_bones.push(parent_data.i32_be(ecb_offset + i * 4));
-                }
-            }
-        }
-        else {
-            error!("There should always be hurtbox data, hitting this is demonstrating this hack does not always work")
-        }
-        //println!("ecb_bones: {:?}", ecb_bones);
-    }
 
     let mut final_smash_auras = vec!();
     for i in 0..final_smash_aura_list.count {
         let offset = final_smash_aura_list.start_offset as usize + i as usize * FINAL_SMASH_AURA_SIZE;
         final_smash_auras.push(final_smash_aura(parent_data.relative_fancy_slice(offset..)));
     }
+
     let mut hurt_boxes = vec!();
     for i in 0..hurt_box_list.count {
         let offset = hurt_box_list.start_offset as usize + i as usize * HURTBOX_SIZE;
@@ -90,6 +59,35 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
         })
     };
 
+    let ecbs_list = util::list_offset(parent_data.relative_fancy_slice(ecbs_offset as usize..));
+
+    // it looks like this same structure is used elsewhere as well. Check the DataSection.cs and ExtraDataOffsets.cs files in brawlbox.
+    let mut ecbs = vec!();
+    for i in 0..ecbs_list.count {
+        let pointer = parent_data.i32_be(ecbs_list.start_offset as usize + i as usize * ECB_SIZE); // TODO: Is this indirection for anything? Maybe the list is supposed to occur here instead?
+        println!("pointer: 0x{:x}", pointer);
+
+        let ecb_type         = parent_data.i32_be(pointer as usize + 0x00);
+        if ecb_type == 0 {
+            let ecb_bones_offset = parent_data.i32_be(pointer as usize + 0x04);
+            let ecb_bones_count  = parent_data.i32_be(pointer as usize + 0x08);
+            let length           = parent_data.f32_be(pointer as usize + 0x0C);
+            let width            = parent_data.f32_be(pointer as usize + 0x10);
+            let height           = parent_data.f32_be(pointer as usize + 0x14);
+
+            let mut bones = vec!();
+            for i in 0..ecb_bones_count {
+                bones.push(parent_data.i32_be(ecb_bones_offset as usize + i as usize * 4));
+            }
+
+            ecbs.push(ECB { bones, length, width, height });
+        } else {
+            error!("ECB type unimplemented")
+        }
+    }
+    println!("{:#?}", ecbs);
+
+
     let tether = if tether_offset == 0 {
         None
     } else {
@@ -100,19 +98,18 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     };
 
     MiscSection {
-        ecb_bones,
         final_smash_auras,
         hurt_boxes,
         ledge_grabs,
         unk7s,
         bone_refs,
-        unk10_offset,
+        item_bones,
         sound_data_offset,
         unk12_offset,
         multi_jump_offset,
         glide_offset,
         crawl,
-        collision_data_offset,
+        ecbs,
         tether,
         unk18_offset,
     }
@@ -195,19 +192,18 @@ fn unk7(data: FancySlice) -> Unk7 {
 
 #[derive(Clone, Debug)]
 pub struct MiscSection {
-    pub ecb_bones: Vec<i32>,
     pub final_smash_auras: Vec<FinalSmashAura>,
     pub hurt_boxes: Vec<HurtBox>,
     pub ledge_grabs: Vec<LedgeGrab>,
     pub unk7s: Vec<Unk7>,
     pub bone_refs: Vec<i32>,
-    unk10_offset: i32,
+    item_bones: i32,
     sound_data_offset: i32,
     unk12_offset: i32,
     multi_jump_offset: i32,
     glide_offset: i32,
     pub crawl: Option<Crawl>,
-    collision_data_offset: i32,
+    pub ecbs: Vec<ECB>,
     pub tether: Option<Tether>,
     unk18_offset: i32,
 }
@@ -276,6 +272,16 @@ pub struct Unk7 {
 pub struct Crawl {
     pub forward: f32,
     pub backward: f32,
+}
+
+pub const ECB_SIZE: usize = 0x4; // TODO
+#[derive(Clone, Debug)]
+/// TODO: Currently just ECB type 0, maybe change to enum or maybe change the fields to Options
+pub struct ECB {
+    bones:  Vec<i32>,
+    length: f32,
+    width:  f32,
+    height: f32,
 }
 
 #[derive(Clone, Debug)]

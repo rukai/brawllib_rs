@@ -5,7 +5,7 @@ use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionScript, ExternalSubroutine};
-use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox};
+use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox, ECB as MiscECB};
 use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
     ScriptAst,
@@ -251,7 +251,7 @@ impl HighLevelFighter {
                             top:    min_height,
                             bottom: if script_runner.airbourne { min_height } else { 0.0 }
                         };
-                        let ecb = gen_ecb(&frame_bones, &fighter_data.misc.ecb_bones, min_ecb);
+                        let ecb = gen_ecb(&frame_bones, &fighter_data.misc.ecbs, min_ecb);
 
                         let mut throw = None;
                         if let Some(ref specify_throw) = script_runner.throw {
@@ -960,30 +960,30 @@ pub struct ECB {
     pub bottom: f32,
 }
 
-fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], mut ecb: ECB) -> ECB {
-    for ecb_bone in ecb_bones {
-        if bone.index == *ecb_bone {
-            let x = bone.transform_normal.w.z;
-            let y = bone.transform_normal.w.y;
+fn gen_ecb(bone: &BoneTransforms, ecbs: &[MiscECB], mut ecb: ECB) -> ECB {
+    //for ecb_bone in ecb_bones {
+    //    if bone.index == *ecb_bone {
+    //        let x = bone.transform_normal.w.z;
+    //        let y = bone.transform_normal.w.y;
 
-            if x < ecb.left {
-                ecb.left = x;
-            }
-            if x > ecb.right {
-                ecb.right = x;
-            }
-            if y < ecb.bottom {
-                ecb.bottom = y;
-            }
-            if y > ecb.top {
-                ecb.top = y;
-            }
-        }
-    }
+    //        if x < ecb.left {
+    //            ecb.left = x;
+    //        }
+    //        if x > ecb.right {
+    //            ecb.right = x;
+    //        }
+    //        if y < ecb.bottom {
+    //            ecb.bottom = y;
+    //        }
+    //        if y > ecb.top {
+    //            ecb.top = y;
+    //        }
+    //    }
+    //}
 
-    for child in bone.children.iter() {
-        ecb = gen_ecb(child, ecb_bones, ecb);
-    }
+    //for child in bone.children.iter() {
+    //    ecb = gen_ecb(child, ecb_bones, ecb);
+    //}
     ecb
 }
 

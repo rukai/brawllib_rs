@@ -27,30 +27,3 @@ pub fn parse_tag(data: &[u8]) -> String {
     }
     tag
 }
-
-#[allow(unused)]
-pub fn hex_dump(data: &[u8]) -> String {
-    let mut string = String::new();
-    for (i, byte) in data.iter().enumerate() {
-        if i != 0 && i % 2 == 0 {
-            string.push_str(" ");
-        }
-        string.push_str(&format!("{:02x}", byte));
-    }
-    string
-}
-
-#[allow(unused)]
-pub fn ascii_dump(data: &[u8]) -> String {
-    let mut string = String::new();
-    for byte in data {
-        let ascii = *byte as char;
-        if ascii.is_ascii_graphic() {
-            string.push(ascii);
-        }
-        else {
-            string.push('.');
-        }
-    }
-    string
-}
