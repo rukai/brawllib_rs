@@ -5,7 +5,7 @@ use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionScript, ExternalSubroutine};
-use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox, ECB as MiscECB};
+use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox, BoneRefs};
 use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
     ScriptAst,
@@ -172,6 +172,7 @@ impl HighLevelFighter {
                         let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                         let (animation_xyz_offset, frame_bones) = HighLevelFighter::transform_bones(
                             &first_bone,
+                            &fighter_data.misc.bone_refs,
                             Matrix4::<f32>::identity(),
                             Matrix4::<f32>::identity(),
                             chr0,
@@ -240,18 +241,43 @@ impl HighLevelFighter {
                         }
                         hl_hit_boxes.sort_by_key(|x| x.hitbox_id);
 
-                        // TODO: get these from the fighter data
-                        let min_width = 2.0;
-                        let min_height = 2.0;
+                        let mut option_ecb = None;
+                        for misc_ecb in &fighter_data.misc.ecbs {
+                            let min_ecb = ECB {
+                                // This implementation is just a guess from my observations that:
+                                // *    The higher the min_width the higher the right ecb point.
+                                // *    The higher the min_width the lower the left ecb point.
+                                // *    When further than all bones, both points move equally far apart.
+                                // *    When further than all bones, actions that affect the ecb horizontally no longer affect the ecb e.g. marth jab
+                                left:     -misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
+                                right:    misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
+                                top:      -10000.0,
+                                bottom:   10000.0,
+                                transn_x: 0.0,
+                                transn_y: 0.0,
+                            };
+                            let mut ecb = gen_ecb(&frame_bones, &misc_ecb.bones, &fighter_data.misc.bone_refs, min_ecb);
 
-                        // TODO: figure out how exactly these min values are supposed to work.
-                        let min_ecb = ECB {
-                            left:   -min_width / 2.0,
-                            right:  min_width / 2.0,
-                            top:    min_height,
-                            bottom: if script_runner.airbourne { min_height } else { 0.0 }
-                        };
-                        let ecb = gen_ecb(&frame_bones, &fighter_data.misc.ecbs, min_ecb);
+                            // This implementation is just a guess from my observations that:
+                            // *    The higher the min_height the higher the top ecb point.
+                            // *    The higher the min_height the lower the bottom ecb point, capping out at transN.
+                            // *    Actions such as crouching, lower the height of the top ecb point.
+                            let middle_y = (ecb.top + ecb.bottom) / 2.0;
+                            let new_top    = middle_y + misc_ecb.min_height / 2.0;
+                            let new_bottom = middle_y - misc_ecb.min_height / 2.0;
+                            if new_top > ecb.top {
+                                ecb.top = new_top;
+                            }
+                            if new_bottom < ecb.bottom {
+                                ecb.bottom = new_bottom;
+                            }
+                            if ecb.bottom < ecb.transn_y {
+                                ecb.bottom = ecb.transn_y
+                            }
+
+                            option_ecb = Some(ecb);
+                        }
+                        let ecb = option_ecb.unwrap();
 
                         let mut throw = None;
                         if let Some(ref specify_throw) = script_runner.throw {
@@ -350,7 +376,7 @@ impl HighLevelFighter {
     /// Returns a tuple containing:
     ///     0.  The MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
     ///     1.  The BoneTransforms tree.
-    fn transform_bones(bone: &Bone, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> (Option<Vector3<f32>>, BoneTransforms) {
+    fn transform_bones(bone: &Bone, bone_refs: &BoneRefs, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> (Option<Vector3<f32>>, BoneTransforms) {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
         // by default the bones tpose transformation is used.
@@ -362,7 +388,7 @@ impl HighLevelFighter {
         for chr0_child in &chr0.children {
             if chr0_child.name == bone.name {
                 let transform = parent_transform * chr0_child.get_transform(chr0.loop_value, frame);
-                if moves_character && bone.name == "TransN" {
+                if moves_character && bone.index == bone_refs.trans_n {
                     // in this case TransN is not part of the animation but instead used to move the character in game.
                     assert!(offset.is_none());
                     offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
@@ -385,7 +411,7 @@ impl HighLevelFighter {
         // do the same for all children bones
         let mut children = vec!();
         for child in bone.children.iter() {
-            let (moves, processed_child) = HighLevelFighter::transform_bones(child, transform_normal, transform_hitbox, chr0, frame, animation_flags);
+            let (moves, processed_child) = HighLevelFighter::transform_bones(child, bone_refs, transform_normal, transform_hitbox, chr0, frame, animation_flags);
             children.push(processed_child);
             if let Some(moves) = moves {
                 assert!(offset.is_none());
@@ -954,36 +980,42 @@ pub struct HighLevelHitBox {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct ECB {
-    pub left:   f32,
-    pub right:  f32,
-    pub top:    f32,
-    pub bottom: f32,
+    pub left:     f32,
+    pub right:    f32,
+    pub top:      f32,
+    pub bottom:   f32,
+    pub transn_x: f32,
+    pub transn_y: f32,
 }
 
-fn gen_ecb(bone: &BoneTransforms, ecbs: &[MiscECB], mut ecb: ECB) -> ECB {
-    //for ecb_bone in ecb_bones {
-    //    if bone.index == *ecb_bone {
-    //        let x = bone.transform_normal.w.z;
-    //        let y = bone.transform_normal.w.y;
+fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], bone_refs: &BoneRefs, mut ecb: ECB) -> ECB {
+    for ecb_bone in ecb_bones {
+        if bone.index == *ecb_bone {
+            let x = bone.transform_normal.w.z;
+            let y = bone.transform_normal.w.y;
 
-    //        if x < ecb.left {
-    //            ecb.left = x;
-    //        }
-    //        if x > ecb.right {
-    //            ecb.right = x;
-    //        }
-    //        if y < ecb.bottom {
-    //            ecb.bottom = y;
-    //        }
-    //        if y > ecb.top {
-    //            ecb.top = y;
-    //        }
-    //    }
-    //}
+            if x < ecb.left {
+                ecb.left = x;
+            }
+            if x > ecb.right {
+                ecb.right = x;
+            }
+            if y < ecb.bottom {
+                ecb.bottom = y;
+            }
+            if y > ecb.top {
+                ecb.top = y;
+            }
+        }
+    }
+    if bone.index == bone_refs.trans_n {
+        ecb.transn_x = bone.transform_normal.w.z;
+        ecb.transn_y = bone.transform_normal.w.y;
+    }
 
-    //for child in bone.children.iter() {
-    //    ecb = gen_ecb(child, ecb_bones, ecb);
-    //}
+    for child in bone.children.iter() {
+        ecb = gen_ecb(child, ecb_bones, bone_refs, ecb);
+    }
     ecb
 }
 

@@ -44,11 +44,18 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
         unk7s.push(unk7(parent_data.relative_fancy_slice(offset ..)));
     }
 
-    let mut bone_refs = vec!();
-    for i in 0..10 {
-        let offset = bone_refs_offset as usize + i as usize * 4;
-        bone_refs.push(parent_data.i32_be(offset));
-    }
+    let bone_refs = BoneRefs {
+        unk0:    parent_data.i32_be(bone_refs_offset as usize + 0x00),
+        unk1:    parent_data.i32_be(bone_refs_offset as usize + 0x04),
+        unk2:    parent_data.i32_be(bone_refs_offset as usize + 0x08),
+        unk3:    parent_data.i32_be(bone_refs_offset as usize + 0x0c),
+        trans_n: parent_data.i32_be(bone_refs_offset as usize + 0x10),
+        unk5:    parent_data.i32_be(bone_refs_offset as usize + 0x14),
+        unk6:    parent_data.i32_be(bone_refs_offset as usize + 0x18),
+        unk7:    parent_data.i32_be(bone_refs_offset as usize + 0x1c),
+        unk8:    parent_data.i32_be(bone_refs_offset as usize + 0x20),
+        unk9:    parent_data.i32_be(bone_refs_offset as usize + 0x24),
+    };
 
     let crawl = if crawl_offset == 0 {
         None
@@ -64,29 +71,25 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     // it looks like this same structure is used elsewhere as well. Check the DataSection.cs and ExtraDataOffsets.cs files in brawlbox.
     let mut ecbs = vec!();
     for i in 0..ecbs_list.count {
-        let pointer = parent_data.i32_be(ecbs_list.start_offset as usize + i as usize * ECB_SIZE); // TODO: Is this indirection for anything? Maybe the list is supposed to occur here instead?
-        println!("pointer: 0x{:x}", pointer);
-
-        let ecb_type         = parent_data.i32_be(pointer as usize + 0x00);
+        let pointer  = parent_data.i32_be(ecbs_list.start_offset as usize + i as usize * ECB_SIZE); // TODO: Is this indirection for anything? Maybe the list is supposed to occur here instead?
+        let ecb_type = parent_data.i32_be(pointer as usize + 0x00);
         if ecb_type == 0 {
             let ecb_bones_offset = parent_data.i32_be(pointer as usize + 0x04);
             let ecb_bones_count  = parent_data.i32_be(pointer as usize + 0x08);
-            let length           = parent_data.f32_be(pointer as usize + 0x0C);
-            let width            = parent_data.f32_be(pointer as usize + 0x10);
-            let height           = parent_data.f32_be(pointer as usize + 0x14);
+            let min_height       = parent_data.f32_be(pointer as usize + 0x0C);
+            let min_width        = parent_data.f32_be(pointer as usize + 0x10);
+            let unk              = parent_data.f32_be(pointer as usize + 0x14);
 
             let mut bones = vec!();
             for i in 0..ecb_bones_count {
                 bones.push(parent_data.i32_be(ecb_bones_offset as usize + i as usize * 4));
             }
 
-            ecbs.push(ECB { bones, length, width, height });
+            ecbs.push(ECB { bones, min_height, min_width, unk });
         } else {
             error!("ECB type unimplemented")
         }
     }
-    println!("{:#?}", ecbs);
-
 
     let tether = if tether_offset == 0 {
         None
@@ -196,7 +199,7 @@ pub struct MiscSection {
     pub hurt_boxes: Vec<HurtBox>,
     pub ledge_grabs: Vec<LedgeGrab>,
     pub unk7s: Vec<Unk7>,
-    pub bone_refs: Vec<i32>,
+    pub bone_refs: BoneRefs,
     item_bones: i32,
     sound_data_offset: i32,
     unk12_offset: i32,
@@ -269,6 +272,21 @@ pub struct Unk7 {
 }
 
 #[derive(Clone, Debug)]
+pub struct BoneRefs {
+    pub unk0:    i32,
+    pub unk1:    i32,
+    pub unk2:    i32,
+    pub unk3:    i32,
+    pub trans_n: i32,
+    pub unk5:    i32,
+    pub unk6:    i32,
+    pub unk7:    i32,
+    pub unk8:    i32,
+    pub unk9:    i32,
+}
+
+
+#[derive(Clone, Debug)]
 pub struct Crawl {
     pub forward: f32,
     pub backward: f32,
@@ -278,10 +296,10 @@ pub const ECB_SIZE: usize = 0x4; // TODO
 #[derive(Clone, Debug)]
 /// TODO: Currently just ECB type 0, maybe change to enum or maybe change the fields to Options
 pub struct ECB {
-    bones:  Vec<i32>,
-    length: f32,
-    width:  f32,
-    height: f32,
+    pub bones:      Vec<i32>,
+    pub min_height: f32,
+    pub min_width:  f32,
+    pub unk:        f32, // Is this even part of the ecb, might just be padding...? always 0 and changing doesnt seem to do anything
 }
 
 #[derive(Clone, Debug)]
