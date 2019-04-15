@@ -70,7 +70,7 @@ pub fn new_script(parent_data: FancySlice, offset: u32, wii_memory: &WiiMemory) 
         return Script { events: vec!(), offset: offset as i32 }
     } else if offset > 0 && offset < (parent_data.len() as u32) {
         parent_data.relative_fancy_slice(offset as usize ..)
-    } else if offset < 8000_0000 {
+    } else if offset < 0x8000_0000 {
         return Script { events: vec!(), offset: offset as i32 }
     } else {
         wii_memory.fancy_slice_from(offset as usize)

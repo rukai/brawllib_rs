@@ -6,7 +6,7 @@ use crate::wii_memory::WiiMemory;
 
 use fancy_slice::FancySlice;
 
-pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory) -> Arc {
+pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
     //read the main header
     let num_sub_headers = data.u16_be(6);
     let name = data.str(0x10).unwrap().to_string();
@@ -20,7 +20,7 @@ pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory) -> Arc {
             let tag = util::parse_tag(&data.relative_slice(header_index + ARC_CHILD_HEADER_SIZE ..));
             let child_data = data.relative_fancy_slice(header_index + ARC_CHILD_HEADER_SIZE ..);
             arc_child.data = match tag.as_ref() {
-                "ARC"  => ArcChildData::Arc(arc(child_data, wii_memory)),
+                "ARC"  => ArcChildData::Arc(arc(child_data, wii_memory, item)),
                 "EFLS" => ArcChildData::Efls,
                 "bres" => ArcChildData::Bres(bres(child_data)),
                 "ATKD" => ArcChildData::Atkd,
@@ -28,7 +28,7 @@ pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory) -> Arc {
                 "REFT" => ArcChildData::Reft,
                 "AIPD" => ArcChildData::Aipd,
                 "W"    => ArcChildData::W,
-                "" if i == 0 => ArcChildData::Sakurai(sakurai::arc_sakurai(data.relative_fancy_slice(header_index + ARC_CHILD_HEADER_SIZE ..), wii_memory)),
+                "" if i == 0 => ArcChildData::Sakurai(sakurai::arc_sakurai(data.relative_fancy_slice(header_index + ARC_CHILD_HEADER_SIZE ..), wii_memory, item)),
                 _ => ArcChildData::Unknown
             };
 

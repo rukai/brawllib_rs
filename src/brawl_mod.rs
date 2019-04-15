@@ -83,7 +83,7 @@ impl BrawlMod {
 
             let data = FancySlice::new(&file_data);
 
-            (arc::arc(data, &wii_memory), wii_memory)
+            (arc::arc(data, &wii_memory, false), wii_memory)
         } else {
             bail!("Missing Fighter.pac");
         };

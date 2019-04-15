@@ -1,5 +1,6 @@
 pub mod fighter_data;
 pub mod fighter_data_common;
+pub mod item_data;
 
 use crate::script::Script;
 use crate::script;
@@ -7,10 +8,11 @@ use crate::wii_memory::WiiMemory;
 
 use fighter_data::ArcFighterData;
 use fighter_data_common::ArcFighterDataCommon;
+use item_data::ArcItemData;
 
 use fancy_slice::FancySlice;
 
-pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory) -> ArcSakurai {
+pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> ArcSakurai {
     let size                      = data.i32_be(0x00);
     let lookup_entry_offset       = data.i32_be(0x04);
     let lookup_entry_count        = data.i32_be(0x08);
@@ -59,8 +61,9 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory) -> ArcSakura
 
         let data = data.relative_fancy_slice(ARC_SAKURAI_HEADER_SIZE + data_offset as usize..);
         let mut section_data = match name.as_str() {
-            "data"       => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data, wii_memory)),
-            "dataCommon" => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data, wii_memory)),
+            "data" if item => SectionData::ItemData(item_data::arc_item_data(parent_data, data, wii_memory)),
+            "data"         => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data, wii_memory)),
+            "dataCommon"   => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data, wii_memory)),
             _            => SectionData::None
         };
 
@@ -93,6 +96,9 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory) -> ArcSakura
             SectionData::Script(script) => {
                 all_scripts_sub.push(script.script.clone());
             }
+            SectionData::ItemData(_item_data) => {
+                // TODO
+            }
             _ => { }
         }
     }
@@ -124,6 +130,7 @@ pub struct ArcSakuraiSection {
 
 #[derive(Clone, Debug)]
 pub enum SectionData {
+    ItemData (ArcItemData),
     FighterData (ArcFighterData),
     FighterDataCommon (ArcFighterDataCommon),
     Script (SectionScript),

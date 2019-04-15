@@ -33,10 +33,17 @@ pub struct Fighter {
     pub moveset: Arc,
     pub motion: Arc,
     pub models: Vec<Arc>,
+    pub kirby_hats: Vec<KirbyHat>,
     // TODO: Is there any reason to keep this now I can `mod_type`, any mods are going to be done by psa anyway...
     pub modded_by_psa: bool,
     pub mod_type: ModType,
     pub wiird_frame_speed_modifiers: Vec<WiiRDFrameSpeedModifier>,
+}
+
+#[derive(Debug)]
+pub struct KirbyHat {
+    pub moveset: Arc,
+    pub models: Vec<Arc>,
 }
 
 impl Fighter {
@@ -53,18 +60,18 @@ impl Fighter {
         // However it might actually slow things down because all the threads are reading from disk at once.
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
-        fighter_datas(brawl_fighter_dir, mod_fighter_dir)
-            .into_par_iter()
-            .filter_map(|x| Fighter::load_single(x, common_fighter, single_model, wii_memory))
-            .collect()
+        let fighter_datas = fighter_datas(brawl_fighter_dir, mod_fighter_dir);
+            fighter_datas.par_iter()
+                .filter_map(|x| Fighter::load_single(x, &fighter_datas, common_fighter, single_model, wii_memory))
+                .collect()
     }
 
-    fn load_single(fighter_data: FighterData, common_fighter: &Arc, single_model: bool, wii_memory: &WiiMemory) -> Option<Fighter> {
+    fn load_single(fighter_data: &FighterData, other_fighters: &[FighterData], common_fighter: &Arc, single_model: bool, wii_memory: &WiiMemory) -> Option<Fighter> {
         info!("Parsing fighter: {}", fighter_data.cased_name);
         let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
         let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
             let data = FancySlice::new(data);
-            arc::arc(data, wii_memory)
+            arc::arc(data, wii_memory, false)
         } else {
             error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
             return None;
@@ -81,17 +88,15 @@ impl Fighter {
         let motion_file_name = format!("Fit{}Motion.pac", fighter_data.cased_name);
         let motion = if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
             let data = FancySlice::new(data);
-            arc::arc(data, wii_memory)
+            arc::arc(data, wii_memory, false)
         } else {
             if let Some(data) = fighter_data.data.get(&motion_file_name) {
                 // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
                 // Currently I dont need that file at all (What does it even contain?)
                 // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
                 let data = FancySlice::new(data);
-                arc::arc(data, wii_memory)
+                arc::arc(data, wii_memory, false)
             } else {
-                // TODO: This is being hit because some fighters just use another fighters motion file
-                //       Handle this in the FighterFolder by duplicating the file in each special case.
                 error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_etc_file_name);
                 return None;
             }
@@ -101,13 +106,38 @@ impl Fighter {
         for i in 0..100 {
             if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
                 let data = FancySlice::new(model_data);
-                models.push(arc::arc(data, wii_memory));
+                models.push(arc::arc(data, wii_memory, false));
                 if single_model {
                     break;
                 }
             }
             else {
                 break;
+            }
+        }
+
+        let mut kirby_hats = vec!();
+        for other_fighter in other_fighters {
+            info!("Parsing kirby hat: {}", other_fighter.cased_name);
+            if let Some(moveset_data) = fighter_data.data.get(&format!("FitKirby{}.pac", other_fighter.cased_name)) {
+                let moveset_data = FancySlice::new(moveset_data);
+                let moveset = arc::arc(moveset_data, wii_memory, true);
+
+                let mut models = vec!();
+                for i in 0..100 {
+                    if let Some(model_data) = fighter_data.data.get(&format!("FitKirby{}{:02}.pac", other_fighter.cased_name, i)) {
+                        let data = FancySlice::new(model_data);
+                        models.push(arc::arc(data, wii_memory, true));
+                        if single_model {
+                            break;
+                        }
+                    }
+                    else {
+                        break;
+                    }
+                }
+
+                kirby_hats.push(KirbyHat { moveset, models });
             }
         }
 
@@ -137,11 +167,12 @@ impl Fighter {
         }
 
         Some(Fighter {
-            cased_name: fighter_data.cased_name,
+            cased_name: fighter_data.cased_name.clone(),
             moveset_common,
             moveset,
             motion,
             models,
+            kirby_hats,
             modded_by_psa,
             mod_type,
             wiird_frame_speed_modifiers,

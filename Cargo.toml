@@ -20,7 +20,7 @@ rayon = "1"
 failure = "0.1"
 gif = "0.10"
 wgpu = { version = "0.2", features = ["vulkan"] }
-fancy_slice = "0.1"
+fancy_slice = { version = "0.1", features = [] }
 
 [dev-dependencies]
 getopts = "0.2"

@@ -60,7 +60,7 @@ pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_me
     let subaction_other = script::scripts(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(subaction_other_start as usize ..), subaction_main_num, wii_memory);
 
     let attributes = fighter_attributes(parent_data.relative_fancy_slice(attribute_start as usize ..));
-    let misc = misc_section::misc_section(parent_data.relative_fancy_slice(misc_section_offset as usize ..), parent_data.relative_fancy_slice(..));
+    let misc = misc_section::misc_section(parent_data.relative_fancy_slice(misc_section_offset as usize ..), parent_data);
 
     ArcFighterData {
         subaction_flags,
