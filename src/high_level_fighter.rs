@@ -1082,7 +1082,7 @@ fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox]) -> Vec
 // This is a basic (incorrect) implementation to handle wario and kirby's weird bone indices.
 // Refer to https://github.com/libertyernie/brawltools/blob/83b79a571d84efc1884950204852a14eab58060e/Ikarus/Moveset%20Entries/MovesetNode.cs#L261
 pub fn get_bone_index(index: i32) -> i32 {
-    if index > 400 {
+    if index >= 400 {
         index - 400
     } else {
         index
