@@ -118,8 +118,8 @@ impl Fighter {
 
         let mut kirby_hats = vec!();
         for other_fighter in other_fighters {
-            info!("Parsing kirby hat: {}", other_fighter.cased_name);
             if let Some(moveset_data) = fighter_data.data.get(&format!("FitKirby{}.pac", other_fighter.cased_name)) {
+                info!("Parsing kirby hat: {}", other_fighter.cased_name);
                 let moveset_data = FancySlice::new(moveset_data);
                 let moveset = arc::arc(moveset_data, wii_memory, true);
 

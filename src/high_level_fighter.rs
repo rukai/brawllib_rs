@@ -177,7 +177,8 @@ impl HighLevelFighter {
                             Matrix4::<f32>::identity(),
                             chr0,
                             chr0_frame_index as i32,
-                            animation_flags
+                            animation_flags,
+                            fighter_data.attributes.size
                         );
                         let animation_xyz_offset = animation_xyz_offset.unwrap_or(Vector3::new(0.0, 0.0, 0.0));
                         // TODO: should DisableMovement affect xyz_offset from transform_bones?????
@@ -376,7 +377,7 @@ impl HighLevelFighter {
     /// Returns a tuple containing:
     ///     0.  The MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
     ///     1.  The BoneTransforms tree.
-    fn transform_bones(bone: &Bone, bone_refs: &BoneRefs, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags) -> (Option<Vector3<f32>>, BoneTransforms) {
+    fn transform_bones(bone: &Bone, bone_refs: &BoneRefs, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags, size: f32) -> (Option<Vector3<f32>>, BoneTransforms) {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
         // by default the bones tpose transformation is used.
@@ -402,16 +403,17 @@ impl HighLevelFighter {
             }
         }
 
-        // Ignore any transformations from the models tpose TopN bone or the animations TopN bone
+        // Ignore any transformations from the models tpose TopN bone or the animations TopN bone.
+        // Furthermore we make use of this bone to apply a scale to the entire model.
         if bone.name == "TopN" {
-            transform_normal = Matrix4::identity();
+            transform_normal = Matrix4::from_scale(size);
             transform_hitbox = Matrix4::identity();
         }
 
         // do the same for all children bones
         let mut children = vec!();
         for child in bone.children.iter() {
-            let (moves, processed_child) = HighLevelFighter::transform_bones(child, bone_refs, transform_normal, transform_hitbox, chr0, frame, animation_flags);
+            let (moves, processed_child) = HighLevelFighter::transform_bones(child, bone_refs, transform_normal, transform_hitbox, chr0, frame, animation_flags, size);
             children.push(processed_child);
             if let Some(moves) = moves {
                 assert!(offset.is_none());
