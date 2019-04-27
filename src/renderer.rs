@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::mpsc;
 use std::f32::consts;
 
-use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad};
+use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
 use wgpu::winit::{
     ElementState,
     Event,
@@ -277,169 +277,8 @@ fn create_state() -> WgpuState {
 }
 
 fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize) -> wgpu::CommandEncoder {
-    let subaction = &high_level_fighter.subactions[subaction_index];
-    let frame = &subaction.frames[frame_index];
-
-    let subaction_extent = subaction.hurt_box_extent();
-    let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
-    let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
-    let extent_height = subaction_extent.up    - subaction_extent.down;
-    let extent_width  = subaction_extent.right - subaction_extent.left;
-    let extent_aspect = extent_width / extent_height;
-    let aspect = width as f32 / height as f32 ;
-    let fov = 40.0;
-
-    let radius = subaction_extent.up - extent_middle_y.max(subaction_extent.right - extent_middle_z);
-    let fov_rad = fov * consts::PI / 180.0;
-    let mut camera_distance = radius / (fov_rad / 2.0).tan();
-
-    // This logic probably only works because this.pixel_width >= this.pixel_height is always true
-    if extent_aspect > aspect {
-        camera_distance /= aspect;
-    }
-    else if extent_width > extent_height {
-        camera_distance /= extent_aspect;
-    }
-
-    let camera_target   = Point3::new(0.0,             extent_middle_y, extent_middle_z);
-    let camera_location = Point3::new(camera_distance, extent_middle_y, extent_middle_z);
-    let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, 1.0, 0.0));
-
-    let projection = cgmath::perspective(
-        Rad(fov_rad),
-        aspect,
-        1.0,
-        1000.0,
-    );
-    //let projection = cgmath::ortho(
-    //    -extent_width  / 2.0, // 18.** / 2.0
-    //    extent_width   / 2.0,
-    //    -extent_height / 2.0, // 20.** / 2.0
-    //    extent_height  / 2.0,
-    //    1.0,
-    //    1000.0,
-    //);
-
-    let mut vertices_vec = vec!();
-    let mut indices_vec: Vec<u16> = vec!();
-    let mut index_count = 0;
-
-    vertices_vec.push(Vertex {
-        _pos:   [0.0, 0.5, 0.0, 1.0],
-        _color: [1.0, 1.0, 0.0, 1.0],
-    });
-    vertices_vec.push(Vertex {
-        _pos:   [0.0, -0.5, -0.5, 1.0],
-        _color: [1.0, 1.0, 0.0, 1.0],
-    });
-    vertices_vec.push(Vertex {
-        _pos:   [0.0, -0.5, 0.5, 1.0],
-        _color: [1.0, 1.0, 0.0, 1.0],
-    });
-
-    indices_vec.push(index_count + 0);
-    indices_vec.push(index_count + 1);
-    indices_vec.push(index_count + 2);
-    index_count += 3;
-
-    for hitbox in frame.hit_boxes.iter() {
-        // only display hitboxes that are used in regular matches
-        if let CollisionBoxValues::Hit(hit_values) = &hitbox.next_values {
-            if !hit_values.enabled {
-                continue;
-            }
-        }
-
-        let _color = match hitbox.hitbox_id {
-            0 => [0.93725, 0.39216, 0.00000, 1.0], // orange
-            1 => [1.00000, 0.00000, 0.00000, 1.0], // red
-            2 => [1.00000, 0.00000, 1.00000, 1.0], // purple
-            3 => [0.09412, 0.83922, 0.78823, 1.0], // turqoise
-            4 => [0.14118, 0.83992, 0.09412, 1.0], // green
-            _ => [1.00000, 1.00000, 1.00000, 1.0], // white
-        };
-
-        let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y + frame.y_pos, prev.z + frame.x_pos));
-        let next = Vector3::new(hitbox.next_pos.x, hitbox.next_pos.y + frame.y_pos, hitbox.next_pos.z + frame.x_pos);
-        let prev_distance = prev.map(|prev| prev.distance(next)).unwrap_or(0.0);
-
-        let width_segments = 23;
-        let height_segments = 17;
-
-        let mut grid = vec!();
-        for iy in 0..height_segments+1 {
-            let mut vertices_row = vec!();
-            let v = iy as f32 / height_segments as f32;
-
-            for ix in 0..width_segments+1 {
-                let u = ix as f32 / width_segments as f32;
-                let mut y_offset = 0.0;
-                if v >= 0.0 && v <= 0.5 {
-                    y_offset += prev_distance;
-                }
-
-                let sin_v_pi = (v * consts::PI).sin();
-                let _pos = [
-                    hitbox.next_size * (u * consts::PI * 2.0).cos() * sin_v_pi,
-                    hitbox.next_size * (v * consts::PI      ).cos() + y_offset,
-                    hitbox.next_size * (u * consts::PI * 2.0).sin() * sin_v_pi,
-                    1.0
-                ];
-                vertices_vec.push(Vertex {
-                    _pos,
-                    _color,
-                });
-
-                index_count += 1; // TODO: before or after push?!?!?
-                vertices_row.push(index_count);
-            }
-            grid.push(vertices_row);
-        }
-
-        for iy in 0..height_segments {
-            for ix in 0..width_segments {
-                let a = grid[iy][ix + 1];
-                let b = grid[iy][ix];
-                let c = grid[iy + 1][ix];
-                let d = grid[iy + 1][ix + 1];
-
-                indices_vec.extend(&[a, b, c]);
-                indices_vec.extend(&[b, c, d]);
-            }
-        }
-    }
-
-    let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
-        .fill_from_slice(&vertices_vec);
-
-    let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
-        .fill_from_slice(&indices_vec);
-
-    let model = Matrix4::from_scale(1.0);
-    let transform = projection.clone() * view.clone() * model;
-    let transform: &[f32; 16] = transform.as_ref();
-    let uniform_buf = state.device
-        .create_buffer_mapped(
-            16,
-            wgpu::BufferUsageFlags::UNIFORM | wgpu::BufferUsageFlags::TRANSFER_DST,
-        )
-        .fill_from_slice(transform);
-
-    let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &state.bind_group_layout,
-        bindings: &[
-            wgpu::Binding {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &uniform_buf,
-                    range: 0..64,
-                },
-            },
-        ],
-    });
-
-    // create the CommandEncoder
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
     {
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -456,10 +295,162 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             depth_stencil_attachment: None,
         });
         rpass.set_pipeline(&state.render_pipeline);
-        rpass.set_bind_group(0, &bind_group, &[]);
-        rpass.set_index_buffer(&indices, 0);
-        rpass.set_vertex_buffers(&[(&vertices, 0)]);
-        rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+
+        let subaction = &high_level_fighter.subactions[subaction_index];
+        let frame = &subaction.frames[frame_index];
+
+        let subaction_extent = subaction.hurt_box_extent();
+        let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
+        let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
+        let extent_height = subaction_extent.up    - subaction_extent.down;
+        let extent_width  = subaction_extent.right - subaction_extent.left;
+        let extent_aspect = extent_width / extent_height;
+        let aspect = width as f32 / height as f32 ;
+        let fov = 40.0;
+
+        let radius = subaction_extent.up - extent_middle_y.max(subaction_extent.right - extent_middle_z);
+        let fov_rad = fov * consts::PI / 180.0;
+        let mut camera_distance = radius / (fov_rad / 2.0).tan();
+
+        // This logic probably only works because this.pixel_width >= this.pixel_height is always true
+        if extent_aspect > aspect {
+            camera_distance /= aspect;
+        }
+        else if extent_width > extent_height {
+            camera_distance /= extent_aspect;
+        }
+
+        let camera_target   = Point3::new(0.0,             extent_middle_y, extent_middle_z);
+        let camera_location = Point3::new(camera_distance, extent_middle_y, extent_middle_z);
+        let camera_location = Point3::new(100.0, extent_middle_y, extent_middle_z);
+        let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, 1.0, 0.0));
+
+        let projection = cgmath::perspective(
+            Rad(fov_rad),
+            aspect,
+            1.0,
+            1000.0,
+        );
+        //let projection = cgmath::ortho(
+        //    -extent_width  / 2.0, // 18.** / 2.0
+        //    extent_width   / 2.0,
+        //    -extent_height / 2.0, // 20.** / 2.0
+        //    extent_height  / 2.0,
+        //    1.0,
+        //    1000.0,
+        //);
+
+        for hitbox in frame.hit_boxes.iter() {
+            // only display hitboxes that are used in regular matches
+            if let CollisionBoxValues::Hit(hit_values) = &hitbox.next_values {
+                if !hit_values.enabled {
+                    continue;
+                }
+            }
+
+            let _color = match hitbox.hitbox_id {
+                0 => [0.93725, 0.39216, 0.00000, 1.0], // orange
+                1 => [1.00000, 0.00000, 0.00000, 1.0], // red
+                2 => [1.00000, 0.00000, 1.00000, 1.0], // purple
+                3 => [0.09412, 0.83922, 0.78823, 1.0], // turqoise
+                4 => [0.14118, 0.83992, 0.09412, 1.0], // green
+                _ => [1.00000, 1.00000, 1.00000, 1.0], // white
+            };
+
+            let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y + frame.y_pos, prev.z + frame.x_pos));
+            let next = Vector3::new(hitbox.next_pos.x, hitbox.next_pos.y + frame.y_pos, hitbox.next_pos.z + frame.x_pos);
+            let prev_distance = prev.map(|prev| prev.distance(next)).unwrap_or(0.0);
+
+            let width_segments = 23;
+            let height_segments = 17;
+
+            let mut vertices_vec = vec!();
+            let mut indices_vec: Vec<u16> = vec!();
+            let mut index_count = 0;
+
+            let mut grid = vec!();
+            for iy in 0..height_segments+1 {
+                let mut vertices_row = vec!();
+                let v = iy as f32 / height_segments as f32;
+
+                for ix in 0..width_segments+1 {
+                    let u = ix as f32 / width_segments as f32;
+                    let mut y_offset = 0.0;
+                    if v >= 0.0 && v <= 0.5 {
+                        y_offset += prev_distance;
+                    }
+
+                    let sin_v_pi = (v * consts::PI).sin();
+                    let _pos = [
+                        hitbox.next_size * (u * consts::PI * 2.0).cos() * sin_v_pi,
+                        hitbox.next_size * (v * consts::PI      ).cos() + y_offset,
+                        hitbox.next_size * (u * consts::PI * 2.0).sin() * sin_v_pi,
+                        1.0
+                    ];
+                    vertices_vec.push(Vertex {
+                        _pos,
+                        _color,
+                    });
+
+                    index_count += 1; // TODO: before or after push?!?!?
+                    vertices_row.push(index_count);
+                }
+                grid.push(vertices_row);
+            }
+
+            for iy in 0..height_segments {
+                for ix in 0..width_segments {
+                    let a = grid[iy][ix + 1];
+                    let b = grid[iy][ix];
+                    let c = grid[iy + 1][ix];
+                    let d = grid[iy + 1][ix + 1];
+
+                    indices_vec.extend(&[a, b, c]);
+                    indices_vec.extend(&[b, c, d]);
+                }
+            }
+
+            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
+                .fill_from_slice(&vertices_vec);
+
+            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
+                .fill_from_slice(&indices_vec);
+
+            let rotation = if let Some(prev) = prev {
+                let diff = (prev - next).normalize();
+                let source_angle = Vector3::new(0.0, 1.0, 0.0);
+                Quaternion::from_arc(source_angle, diff, None).into()
+            } else {
+                Matrix4::identity()
+            };
+            let model = rotation * Matrix4::from_translation(next);
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device
+                .create_buffer_mapped(
+                    16,
+                    wgpu::BufferUsageFlags::UNIFORM | wgpu::BufferUsageFlags::TRANSFER_DST,
+                )
+                .fill_from_slice(transform);
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..64,
+                        },
+                    },
+                ],
+            });
+
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_index_buffer(&indices, 0);
+            rpass.set_vertex_buffers(&[(&vertices, 0)]);
+            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+        }
     }
 
     command_encoder
