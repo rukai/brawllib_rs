@@ -23,10 +23,10 @@ gif = "0.10"
 wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu" }
 #wgpu = { path = "/home/rubic/Projects/Crates/wgpu/wgpu-rs", features = ["vulkan"] }
 fancy_slice = { version = "0.1", features = [] }
+winit_input_helper = "0.2"
 
 [dev-dependencies]
 getopts = "0.2"
-three = "0.4"
 mint = "0.5"
 
 [profile.release]

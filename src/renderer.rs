@@ -3,15 +3,8 @@ use std::sync::mpsc;
 use std::f32::consts;
 
 use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
-use wgpu::winit::{
-    ElementState,
-    Event,
-    EventsLoop,
-    KeyboardInput,
-    VirtualKeyCode,
-    Window,
-    WindowEvent,
-};
+use wgpu::winit::{EventsLoop, VirtualKeyCode, Window};
+use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::{HighLevelFighter, CollisionBoxValues};
 
@@ -24,8 +17,8 @@ struct Vertex {
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
 pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
-    let mut running = true;
     let mut events_loop = EventsLoop::new();
+    let mut input = WinitInputHelper::new();
 
     let mut state = create_state();
 
@@ -48,11 +41,48 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     let subaction = &high_level_fighter.subactions[subaction_index];
 
     let mut frame_index = 0;
+    let mut wireframe = false;
+    let mut app_state = State::Play;
 
-    while running {
-        frame_index += 1;
-        if frame_index >= subaction.frames.len() {
-            frame_index = 0;
+    while !input.quit() {
+        if input.key_pressed(VirtualKeyCode::Key1) {
+            wireframe = !wireframe;
+        }
+
+        if input.key_pressed(VirtualKeyCode::Back) {
+            // TODO: Reset camera
+            frame_index = 0; // TODO: Probably delete this later, resetting frame_index is kind of only useful for debugging.
+        }
+        if input.key_pressed(VirtualKeyCode::Space) || input.key_pressed(VirtualKeyCode::Right) {
+            app_state = State::StepForward;
+        }
+        if input.key_pressed(VirtualKeyCode::Left) {
+            app_state = State::StepBackward;
+        }
+        if input.key_pressed(VirtualKeyCode::Return) {
+            app_state = State::Play;
+        }
+
+        // advance frame
+        match app_state {
+            State::StepForward | State::Play => {
+                frame_index += 1;
+                if frame_index >= subaction.frames.len() {
+                    frame_index = 0;
+                }
+            }
+            State::StepBackward => {
+                if frame_index == 0 {
+                    frame_index = subaction.frames.len() - 1;
+                } else {
+                    frame_index -= 1
+                }
+            }
+            State::Pause => { }
+        }
+
+        if let State::StepForward | State::StepBackward = app_state {
+            app_state = State::Pause;
         }
 
         {
@@ -61,31 +91,13 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
             state.device.get_queue().submit(&[command_encoder.finish()]);
         }
 
-        events_loop.poll_events(|event| match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::KeyboardInput {
-                    input:
-                        KeyboardInput {
-                            virtual_keycode: Some(code),
-                            state: ElementState::Pressed,
-                            ..
-                        },
-                    ..
-                } => match code {
-                    VirtualKeyCode::Escape => running = false,
-                    _ => {}
-                },
-                WindowEvent::CloseRequested => running = false,
-                WindowEvent::Resized(size) => {
-                    let physical = size.to_physical(window.get_hidpi_factor());
-                    swap_chain_descriptor.width = physical.width.round() as u32;
-                    swap_chain_descriptor.height = physical.height.round() as u32;
-                    swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
-                }
-                _ => {}
-            },
-            _ => {}
-        });
+        input.update(&mut events_loop);
+        if let Some(size) = input.window_resized() {
+            let physical = size.to_physical(window.get_hidpi_factor());
+            swap_chain_descriptor.width = physical.width.round() as u32;
+            swap_chain_descriptor.height = physical.height.round() as u32;
+            swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
+        }
     }
 }
 
@@ -417,8 +429,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                 .fill_from_slice(&indices_vec);
 
             let rotation = if let Some(prev) = prev {
-                let diff = (prev - next).normalize();
                 let source_angle = Vector3::new(0.0, 1.0, 0.0);
+                let diff = (prev - next).normalize();
                 Quaternion::from_arc(source_angle, diff, None).into()
             } else {
                 Matrix4::identity()
@@ -454,4 +466,11 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
     }
 
     command_encoder
+}
+
+enum State {
+    Play,
+    StepForward,
+    StepBackward,
+    Pause,
 }
