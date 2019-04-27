@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::mpsc;
 use std::f32::consts;
 
-use cgmath::{Matrix4, Vector3, MetricSpace};
+use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad};
 use wgpu::winit::{
     ElementState,
     Event,
@@ -21,6 +21,7 @@ struct Vertex {
     _color: [f32; 4],
 }
 
+/// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
 pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
     let mut running = true;
@@ -88,7 +89,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     }
 }
 
-/// Returns the bytes of a gif
+/// Returns the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
     let mut result = vec!();
 
@@ -279,19 +280,41 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
     let subaction = &high_level_fighter.subactions[subaction_index];
     let frame = &subaction.frames[frame_index];
 
-    //let subaction_extent = subaction.hurt_box_extent();
-    //let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
-    //let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
-    //let extent_height = subaction_extent.up    - subaction_extent.down;
-    //let extent_width  = subaction_extent.right - subaction_extent.left;
-    //let extent_aspect = extent_width / extent_height;
-    let _aspect = width / height;
-    //let fov = 40.0;
+    let subaction_extent = subaction.hurt_box_extent();
+    let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
+    let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
+    let extent_height = subaction_extent.up    - subaction_extent.down;
+    let extent_width  = subaction_extent.right - subaction_extent.left;
+    let extent_aspect = extent_width / extent_height;
+    let aspect = width as f32 / height as f32 ;
+    let fov = 40.0;
 
+    let radius = subaction_extent.up - extent_middle_y.max(subaction_extent.right - extent_middle_z);
+    let fov_rad = fov * consts::PI / 180.0;
+    let mut camera_distance = radius / (fov_rad / 2.0).tan();
+
+    // This logic probably only works because this.pixel_width >= this.pixel_height is always true
+    if extent_aspect > aspect {
+        camera_distance /= aspect;
+    }
+    else if extent_width > extent_height {
+        camera_distance /= extent_aspect;
+    }
+
+    let camera_target   = Point3::new(0.0,             extent_middle_y, extent_middle_z);
+    let camera_location = Point3::new(camera_distance, extent_middle_y, extent_middle_z);
+    let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, 1.0, 0.0));
+
+    let projection = cgmath::perspective(
+        Rad(fov_rad),
+        aspect,
+        1.0,
+        1000.0,
+    );
     //let projection = cgmath::ortho(
-    //    -extent_width  / 2.0,
+    //    -extent_width  / 2.0, // 18.** / 2.0
     //    extent_width   / 2.0,
-    //    -extent_height / 2.0,
+    //    -extent_height / 2.0, // 20.** / 2.0
     //    extent_height  / 2.0,
     //    1.0,
     //    1000.0,
@@ -306,11 +329,11 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
         _color: [1.0, 1.0, 0.0, 1.0],
     });
     vertices_vec.push(Vertex {
-        _pos:   [-0.5, -0.5, 0.0, 1.0],
+        _pos:   [0.0, -0.5, -0.5, 1.0],
         _color: [1.0, 1.0, 0.0, 1.0],
     });
     vertices_vec.push(Vertex {
-        _pos:   [0.5, -0.5, 0.0, 1.0],
+        _pos:   [0.0, -0.5, 0.5, 1.0],
         _color: [1.0, 1.0, 0.0, 1.0],
     });
 
@@ -392,9 +415,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
     let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
         .fill_from_slice(&indices_vec);
 
-    let transform = Matrix4::from_scale(0.5);
-    //let transform = Matrix4::from_scale(0.05) * Matrix4::from_angle_y(Rad(consts::PI/2.0));
-    //let transform = projection.clone();
+    let model = Matrix4::from_scale(1.0);
+    let transform = projection.clone() * view.clone() * model;
     let transform: &[f32; 16] = transform.as_ref();
     let uniform_buf = state.device
         .create_buffer_mapped(
