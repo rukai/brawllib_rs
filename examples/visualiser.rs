@@ -1,5 +1,6 @@
 use brawllib_rs::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
 use brawllib_rs::brawl_mod::BrawlMod;
+use brawllib_rs::renderer;
 
 use three::{
     Window,
@@ -29,6 +30,8 @@ fn print_usage(program: &str, opts: Options) {
 }
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = env::args().collect();
     let program = &args[0];
 
@@ -84,10 +87,11 @@ fn main() {
     for fighter in fighters {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
             let hl_fighter = HighLevelFighter::new(&fighter);
-            for subaction in hl_fighter.subactions {
+            for (i, subaction) in hl_fighter.subactions.iter().enumerate() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
-                    let window_name = format!("Brawllib_rs visualiser - {} {}", fighter_name, subaction_name);
-                    display_subaction(subaction, window_name);
+                    //let window_name = format!("Brawllib_rs visualiser - {} {}", fighter_name, subaction_name);
+                    //display_subaction(subaction, window_name);
+                    renderer::render_window(&hl_fighter, i);
                     return;
                 }
             }
@@ -98,7 +102,9 @@ fn main() {
     println!("Passed fighter was not found");
 }
 
-fn display_subaction(subaction: HighLevelSubaction, window_name: String) {
+// Old three-rs implementation
+// TODO: Delete
+pub fn display_subaction(subaction: HighLevelSubaction, window_name: String) {
     let mut win = Window::new(window_name);
 
     // setup orbit
