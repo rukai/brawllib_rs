@@ -2,7 +2,7 @@ use std::mem;
 use std::sync::mpsc;
 use std::f32::consts;
 
-use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
+use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
 use wgpu::winit::{EventsLoop, VirtualKeyCode, Window};
 use winit_input_helper::WinitInputHelper;
 
@@ -42,11 +42,15 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
     let mut frame_index = 0;
     let mut wireframe = false;
+    let mut perspective = true;
     let mut app_state = State::Play;
 
     while !input.quit() {
         if input.key_pressed(VirtualKeyCode::Key1) {
             wireframe = !wireframe;
+        }
+        if input.key_pressed(VirtualKeyCode::Key2) {
+            perspective = !perspective;
         }
 
         if input.key_pressed(VirtualKeyCode::Back) {
@@ -87,7 +91,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
         {
             let framebuffer = swap_chain.get_next_texture();
-            let command_encoder = draw_frame(&mut state, &framebuffer.view, size.width.round() as u16, size.height.round() as u16, high_level_fighter, subaction_index, frame_index);
+            let command_encoder = draw_frame(&mut state, &framebuffer.view, swap_chain_descriptor.width as u16, swap_chain_descriptor.height as u16, perspective, wireframe, high_level_fighter, subaction_index, frame_index);
             state.device.get_queue().submit(&[command_encoder.finish()]);
         }
 
@@ -105,8 +109,9 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
     let mut result = vec!();
 
-    let width: u16 = 500;
-    let height: u16 = 500;
+    // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
+    let width: u16 = 400;
+    let height: u16 = 300;
 
     let mut state = create_state();
 
@@ -153,7 +158,7 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize)
                 image_height: height as u32,
             };
 
-            let mut command_encoder = draw_frame(&mut state, &framebuffer.create_default_view(), width, height, high_level_fighter, subaction_index, frame_index);
+            let mut command_encoder = draw_frame(&mut state, &framebuffer.create_default_view(), width, height, true, false, high_level_fighter, subaction_index, frame_index);
             command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
             state.device.get_queue().submit(&[command_encoder.finish()]);
 
@@ -288,7 +293,7 @@ fn create_state() -> WgpuState {
     }
 }
 
-fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize) -> wgpu::CommandEncoder {
+fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
     {
@@ -311,17 +316,19 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
         let subaction = &high_level_fighter.subactions[subaction_index];
         let frame = &subaction.frames[frame_index];
 
-        let subaction_extent = subaction.hurt_box_extent();
+        let mut subaction_extent = subaction.hurt_box_extent();
+        subaction_extent.extend(&subaction.hit_box_extent());
         let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
         let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
         let extent_height = subaction_extent.up    - subaction_extent.down;
         let extent_width  = subaction_extent.right - subaction_extent.left;
         let extent_aspect = extent_width / extent_height;
-        let aspect = width as f32 / height as f32 ;
+        let aspect = width as f32 / height as f32;
         let fov = 40.0;
 
-        let radius = subaction_extent.up - extent_middle_y.max(subaction_extent.right - extent_middle_z);
+        let radius = (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
         let fov_rad = fov * consts::PI / 180.0;
+
         let mut camera_distance = radius / (fov_rad / 2.0).tan();
 
         // This logic probably only works because this.pixel_width >= this.pixel_height is always true
@@ -334,23 +341,189 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
 
         let camera_target   = Point3::new(0.0,             extent_middle_y, extent_middle_z);
         let camera_location = Point3::new(camera_distance, extent_middle_y, extent_middle_z);
-        let camera_location = Point3::new(100.0, extent_middle_y, extent_middle_z);
-        let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, 1.0, 0.0));
+        let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, -1.0, 0.0));
 
-        let projection = cgmath::perspective(
-            Rad(fov_rad),
-            aspect,
-            1.0,
-            1000.0,
-        );
-        //let projection = cgmath::ortho(
-        //    -extent_width  / 2.0, // 18.** / 2.0
-        //    extent_width   / 2.0,
-        //    -extent_height / 2.0, // 20.** / 2.0
-        //    extent_height  / 2.0,
-        //    1.0,
-        //    1000.0,
-        //);
+        let projection = if perspective {
+            cgmath::perspective(
+                Rad(fov_rad),
+                aspect,
+                1.0,
+                1000.0,
+            )
+        } else {
+            let mut height = extent_height;
+            let mut width = extent_width;
+
+            if extent_aspect > aspect {
+                height = width / aspect;
+            }
+            else {
+                width = height * aspect;
+            }
+            cgmath::ortho(
+                -width  / 2.0,
+                width   / 2.0,
+                -height / 2.0,
+                height  / 2.0,
+                1.0,
+                1000.0,
+            )
+        };
+
+        let transform_translation_frame = Matrix4::from_translation(Vector3::new(
+            0.0,
+            frame.y_pos,
+            frame.x_pos,
+        ));
+
+        for hurt_box in &frame.hurt_boxes {
+            let bone_matrix = hurt_box.bone_matrix.clone();
+            let bone_scale = Vector3::new(
+                Vector3::new(bone_matrix.x.x, bone_matrix.x.y, bone_matrix.x.z).magnitude(),
+                Vector3::new(bone_matrix.y.x, bone_matrix.y.y, bone_matrix.y.z).magnitude(),
+                Vector3::new(bone_matrix.z.x, bone_matrix.z.y, bone_matrix.z.z).magnitude(),
+            );
+
+            let radius = hurt_box.hurt_box.radius;
+            let stretch = hurt_box.hurt_box.stretch;
+            let offset = hurt_box.hurt_box.offset;
+
+            let stretch_face = (stretch / radius).div_element_wise(bone_scale);
+
+            let mut vertices_vec = vec!();
+            let mut indices_vec: Vec<u16> = vec!();
+            let mut index_count = 0;
+
+            let mut width_segments = 23; // needs to be odd, so we have a middle segment
+            let mut height_segments = 17; // needs to be odd, so we have a middle segment
+
+            // Make the wireframes less busy in wireframe mode
+            if wireframe {
+                width_segments = 11;
+                height_segments = 7;
+            }
+
+            let _color = if hurt_box.state.is_intangible() {
+                [0.0, 0.0, 1.0, 1.0]
+            } else if hurt_box.state.is_invincible() {
+                [0.0, 1.0, 0.0, 1.0]
+            } else {
+                [1.0, 1.0, 0.0, 1.0]
+            };
+
+            let mut grid = vec!();
+            // modified UV sphere generation from:
+            // https://github.com/mrdoob/THREE.js/blob/4ca3860851d0cd33535afe801a1aa856da277f3a/src/geometries/SphereGeometry.js
+            for iy in 0..height_segments+1 {
+                let mut vertices_row = vec!();
+                let v = iy as f32 / height_segments as f32;
+
+                for ix in 0..width_segments+1 {
+                    let u = ix as f32 / width_segments as f32;
+
+                    // The x, y and z stretch values, split the sphere in half, across its dimension.
+                    // This can result in 8 individual sphere corners.
+                    let mut corner_offset = Vector3::new(0.0, 0.0, 0.0);
+                    if u >= 0.25 && u <= 0.75 { // X
+                        if stretch.x > 0.0 {
+                            corner_offset.x = stretch_face.x;
+                        }
+                    }
+                    else if stretch.x < 0.0 {
+                        corner_offset.x = stretch_face.x;
+                    }
+
+                    if v >= 0.0 && v <= 0.5 { // Y
+                        if stretch.y > 0.0 {
+                            corner_offset.y = stretch_face.y;
+                        }
+                    }
+                    else if stretch.y < 0.0 {
+                        corner_offset.y = stretch_face.y;
+                    }
+
+                    if u >= 0.0 && u <= 0.5 { // Z
+                        if stretch.z > 0.0 {
+                            corner_offset.z = stretch_face.z;
+                        }
+                    }
+                    else if stretch.z < 0.0 {
+                        corner_offset.z = stretch_face.z;
+                    }
+
+                    // vertex generation is supposed have the 8 sphere corners take up exactly 1/8th of the unit sphere.
+                    // However that is difficult because we would need to double up the middle segments.
+                    // So instead we just make it look like this is the case by having large width_segments and height_segments.
+                    let sin_v_pi = (v * consts::PI).sin();
+                    let _pos = [
+                        corner_offset.x - (u * consts::PI * 2.0).cos() * sin_v_pi,
+                        corner_offset.y + (v * consts::PI).cos(),
+                        corner_offset.z + (u * consts::PI * 2.0).sin() * sin_v_pi,
+                        1.0
+                    ];
+                    vertices_vec.push(Vertex { _pos, _color });
+
+                    vertices_row.push(index_count);
+                    index_count += 1;
+                }
+                grid.push(vertices_row);
+            }
+
+            for iy in 0..height_segments {
+                for ix in 0..width_segments {
+                    let a = grid[iy][(ix + 1) % width_segments];
+                    let b = grid[iy][ix];
+                    let c = grid[iy + 1][ix];
+                    let d = grid[iy + 1][(ix + 1) % width_segments];
+
+                    indices_vec.extend(&[a, b, d]);
+                    indices_vec.extend(&[b, c, d]);
+                }
+            }
+
+            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
+                .fill_from_slice(&vertices_vec);
+
+            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
+                .fill_from_slice(&indices_vec);
+
+            let transform_translation = Matrix4::from_translation(Vector3::new(
+                offset.x / (bone_scale.x * radius),
+                offset.y / (bone_scale.y * radius),
+                offset.z / (bone_scale.z * radius)
+            ));
+
+            let transform_scale = Matrix4::from_scale(radius);
+
+            let model = transform_translation_frame * bone_matrix * transform_scale * transform_translation;
+
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device
+                .create_buffer_mapped(
+                    16,
+                    wgpu::BufferUsageFlags::UNIFORM | wgpu::BufferUsageFlags::TRANSFER_DST,
+                )
+                .fill_from_slice(transform);
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..64,
+                        },
+                    },
+                ],
+            });
+
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_index_buffer(&indices, 0);
+            rpass.set_vertex_buffers(&[(&vertices, 0)]);
+            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+        }
 
         for hitbox in frame.hit_boxes.iter() {
             // only display hitboxes that are used in regular matches
@@ -399,13 +572,10 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                         hitbox.next_size * (u * consts::PI * 2.0).sin() * sin_v_pi,
                         1.0
                     ];
-                    vertices_vec.push(Vertex {
-                        _pos,
-                        _color,
-                    });
+                    vertices_vec.push(Vertex { _pos, _color });
 
-                    index_count += 1; // TODO: before or after push?!?!?
                     vertices_row.push(index_count);
+                    index_count += 1;
                 }
                 grid.push(vertices_row);
             }
@@ -417,7 +587,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                     let c = grid[iy + 1][ix];
                     let d = grid[iy + 1][ix + 1];
 
-                    indices_vec.extend(&[a, b, c]);
+                    indices_vec.extend(&[a, b, d]);
                     indices_vec.extend(&[b, c, d]);
                 }
             }
@@ -435,7 +605,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             } else {
                 Matrix4::identity()
             };
-            let model = rotation * Matrix4::from_translation(next);
+            let model = Matrix4::from_translation(next) * rotation;
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
             let uniform_buf = state.device
