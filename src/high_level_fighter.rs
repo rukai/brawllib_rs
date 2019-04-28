@@ -208,7 +208,7 @@ impl HighLevelFighter {
                         x_pos += x_vel + x_vel_temp;
                         y_pos += y_vel + y_vel_temp;
 
-                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner);
+                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner, fighter_data.attributes.size);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
                         let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes);
                         let mut hl_hit_boxes = vec!();
@@ -1021,7 +1021,7 @@ fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], bone_refs: &BoneRefs, mut e
     ecb
 }
 
-fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner, size: f32) -> Vec<HighLevelHurtBox> {
     let hurtbox_state_all = &script_runner.hurtbox_state_all;
     let hurtbox_states    = &script_runner.hurtbox_states;
     let invisible_bones   = &script_runner.invisible_bones;
@@ -1036,9 +1036,14 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: 
             }.clone();
 
             if invisible_bones.iter().all(|x| get_bone_index(*x) != bone.index) {
+                let mut hurt_box = hurt_box.clone();
+                hurt_box.offset *= size;
+                hurt_box.stretch *= size;
+                // dont multiply radius as that will be multiplied by the bone_matrix
+
                 hl_hurt_boxes.push(HighLevelHurtBox {
                     bone_matrix: bone.transform_normal,
-                    hurt_box:    hurt_box.clone(),
+                    hurt_box,
                     state,
                 });
             }
@@ -1046,7 +1051,7 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: 
     }
 
     for child in bone.children.iter() {
-        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner));
+        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner, size));
     }
 
     hl_hurt_boxes

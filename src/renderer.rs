@@ -378,6 +378,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
 
         for hurt_box in &frame.hurt_boxes {
             let bone_matrix = hurt_box.bone_matrix.clone();
+
+            // extract the scale component from the bone_matrix
             let bone_scale = Vector3::new(
                 Vector3::new(bone_matrix.x.x, bone_matrix.x.y, bone_matrix.x.z).magnitude(),
                 Vector3::new(bone_matrix.y.x, bone_matrix.y.y, bone_matrix.y.z).magnitude(),
@@ -462,7 +464,6 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                         1.0
                     ];
                     vertices_vec.push(Vertex { _pos, _color });
-
                     vertices_row.push(index_count);
                     index_count += 1;
                 }
@@ -483,18 +484,11 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
 
             let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
                 .fill_from_slice(&vertices_vec);
-
             let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
                 .fill_from_slice(&indices_vec);
 
-            let transform_translation = Matrix4::from_translation(Vector3::new(
-                offset.x / (bone_scale.x * radius),
-                offset.y / (bone_scale.y * radius),
-                offset.z / (bone_scale.z * radius)
-            ));
-
+            let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
             let transform_scale = Matrix4::from_scale(radius);
-
             let model = transform_translation_frame * bone_matrix * transform_scale * transform_translation;
 
             let transform = projection.clone() * view.clone() * model;
