@@ -21,6 +21,7 @@ use crate::script_ast::{
     Interrupt,
     SpecifyThrow,
     ThrowUse,
+    FloatValue,
 };
 use crate::fighter::WiiRDFrameSpeedModifier;
 use crate::script_ast::variable_ast::{
@@ -109,6 +110,7 @@ pub struct ScriptRunner<'a> {
     pub tether_count: i32,
     pub temp1: i32,
     pub temp2: i32,
+    pub longterm_access_int: Vec<i32>,
 
     // LongtermAccessFloat
     pub special_landing_lag: f32,
@@ -116,6 +118,7 @@ pub struct ScriptRunner<'a> {
     pub shield_charge: f32,
     pub curry_angle1: f32,
     pub curry_randomness: f32,
+    pub longterm_access_float: Vec<f32>,
 
     // LongtermAccessBool
     pub is_dead: bool,
@@ -133,14 +136,17 @@ pub struct ScriptRunner<'a> {
     pub can_not_teeter: bool,
     pub velocity_ignore_hitstun: bool,
     pub deflection: bool,
+    pub longterm_access_bool: Vec<bool>,
 
     // RandomAccessInt
     pub throw_data_param1: i32,
     pub throw_data_param2: i32,
     pub throw_data_param3: i32,
+    pub random_access_int: Vec<i32>,
 
     // RandomAccessFloat
     pub enable_turn_when_below_zero: f32,
+    pub random_access_float: Vec<f32>,
 
     // RandomAccessBool
     pub character_float: bool,
@@ -153,6 +159,7 @@ pub struct ScriptRunner<'a> {
     pub enable_auto_jab: bool,
     pub enable_jab_end: bool,
     pub landing_lag: bool,
+    pub random_access_bool: Vec<bool>,
 }
 
 pub struct CallStack<'a> {
@@ -193,7 +200,7 @@ pub struct ScriptCollisionBox {
 }
 
 impl ScriptCollisionBox {
-    fn from_hitbox(args: &HitBoxArguments, interpolate: bool) -> ScriptCollisionBox {
+    fn from_hitbox(args: &HitBoxArguments, interpolate: bool, damage: f32) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index:  args.bone_index,
             hitbox_id:   args.hitbox_id,
@@ -201,12 +208,12 @@ impl ScriptCollisionBox {
             y_offset:    args.y_offset,
             z_offset:    args.z_offset,
             size:        args.size,
-            values:      CollisionBoxValues::from_hitbox(args),
+            values:      CollisionBoxValues::from_hitbox(args, damage),
             interpolate,
         }
     }
 
-    fn from_special_hitbox(args: &SpecialHitBoxArguments, interpolate: bool) -> ScriptCollisionBox {
+    fn from_special_hitbox(args: &SpecialHitBoxArguments, interpolate: bool, damage: f32) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index: args.hitbox_args.bone_index,
             hitbox_id:  args.hitbox_args.hitbox_id,
@@ -214,7 +221,7 @@ impl ScriptCollisionBox {
             y_offset:   args.hitbox_args.y_offset,
             z_offset:   args.hitbox_args.z_offset,
             size:       args.hitbox_args.size,
-            values:     CollisionBoxValues::from_special_hitbox(args),
+            values:     CollisionBoxValues::from_special_hitbox(args, damage),
             interpolate,
         }
     }
@@ -446,6 +453,7 @@ impl<'a> ScriptRunner<'a> {
             tether_count: 0,
             temp1: 0,
             temp2: 0,
+            longterm_access_int: vec!(0; 0x500), // TODO: How big should this be?
 
             // LongtermAccessFloat
             special_landing_lag: 0.0,
@@ -453,6 +461,7 @@ impl<'a> ScriptRunner<'a> {
             shield_charge: 0.0,
             curry_angle1: 0.0,
             curry_randomness: 0.0,
+            longterm_access_float: vec!(0.0; 0x500), // TODO: How big should this be?
 
             // LongtermAccessBool
             is_dead: false,
@@ -470,14 +479,17 @@ impl<'a> ScriptRunner<'a> {
             can_not_teeter: false,
             velocity_ignore_hitstun: false,
             deflection: false,
+            longterm_access_bool: vec!(false; 0x500), // TODO: How big should this be?
 
             // RandomAccessInt
             throw_data_param1: 0,
             throw_data_param2: 0,
             throw_data_param3: 0,
+            random_access_int: vec!(0; 0x100), // Pika has 72 bytes allocated, so this should be plenty.
 
             // RandomAccessFloat
             enable_turn_when_below_zero: 0.0,
+            random_access_float: vec!(0.0; 0x100), // Pika has 56 bytes allocated, so this should be plenty.
 
             // RandomAccessBool
             character_float: false,
@@ -490,6 +502,7 @@ impl<'a> ScriptRunner<'a> {
             enable_auto_jab: false,
             enable_jab_end: false,
             landing_lag: false,
+            random_access_bool: vec!(false; 0x100), // normally has 8-16 bytes allocated
         };
 
         // Need to run the script until the first wait, so that the script is in the valid state
@@ -843,7 +856,8 @@ impl<'a> ScriptRunner<'a> {
                         }
                     }
 
-                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate));
+                    let damage = self.get_float_value(&args.damage);
+                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate, damage));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
                 }
@@ -878,7 +892,8 @@ impl<'a> ScriptRunner<'a> {
                         }
                     }
 
-                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate));
+                    let damage = self.get_float_value(&args.hitbox_args.damage);
+                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate, damage));
                 } else {
                     error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, action_name);
                 }
@@ -901,7 +916,7 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::ChangeHitBoxDamage { hitbox_id, new_damage } => {
                 if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
                     if let CollisionBoxValues::Hit (ref mut hitbox) = hitbox.values {
-                        hitbox.damage = new_damage;
+                        hitbox.damage = new_damage as f32;
                     }
                 }
             }
@@ -1050,7 +1065,10 @@ impl<'a> ScriptRunner<'a> {
                 self.x_vel_modify = VelModify::Set(x_vel);
                 self.y_vel_modify = VelModify::Set(y_vel);
             }
-            &EventAst::AddVelocity { x_vel, y_vel } => {
+            &EventAst::AddVelocity { ref x_vel, ref y_vel } => {
+                let x_vel = self.get_float_value(x_vel);
+                let y_vel = self.get_float_value(y_vel);
+
                 self.x_vel += x_vel;
                 self.y_vel += y_vel;
 
@@ -1103,22 +1121,27 @@ impl<'a> ScriptRunner<'a> {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value - 1);
             }
-            &EventAst::FloatVariableSet { value, ref variable } => {
+            &EventAst::FloatVariableSet { ref value, ref variable } => {
+                let value = self.get_float_value(value);
                 self.set_variable_float(variable, value);
             }
-            &EventAst::FloatVariableAdd { value, ref variable } => {
+            &EventAst::FloatVariableAdd { ref value, ref variable } => {
+                let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value + value);
             }
-            &EventAst::FloatVariableSubtract { value, ref variable } => {
+            &EventAst::FloatVariableSubtract { ref value, ref variable } => {
+                let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value - value);
             }
-            &EventAst::FloatVariableMultiply { value, ref variable } => {
+            &EventAst::FloatVariableMultiply { ref value, ref variable } => {
+                let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value * value);
             }
-            &EventAst::FloatVariableDivide { value, ref variable } => {
+            &EventAst::FloatVariableDivide { ref value, ref variable } => {
+                let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value / value);
             }
@@ -1278,7 +1301,7 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
-    fn get_variable_int(&mut self, variable: &VariableAst) -> i32 {
+    fn get_variable_int(&self, variable: &VariableAst) -> i32 {
         match variable.data_type() {
             VariableDataType::Int   => self.get_variable_int_inner(variable),
             VariableDataType::Float => self.get_variable_float_inner(variable) as i32,
@@ -1287,12 +1310,19 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
-    fn get_variable_float(&mut self, variable: &VariableAst) -> f32 {
+    fn get_variable_float(&self, variable: &VariableAst) -> f32 {
         match variable.data_type() {
             VariableDataType::Int   => self.get_variable_int_inner(variable) as f32,
             VariableDataType::Float => self.get_variable_float_inner(variable),
             VariableDataType::Bool  => if self.get_variable_bool_inner(variable) { 1.0 } else { 0.0 },
             VariableDataType::Unknown { .. } => 0.0,
+        }
+    }
+
+    fn get_float_value(&self, value: &FloatValue) -> f32 {
+        match value {
+            FloatValue::Constant (value) => *value,
+            FloatValue::Variable (variable) => self.get_variable_float(variable),
         }
     }
 
@@ -1349,11 +1379,11 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::LongtermAccessInt   (LongtermAccessInt::TetherCount) => self.tether_count,
             VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp1) => self.temp1,
             VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp2) => self.temp2,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::Address (_)) => 0,
+            VariableAst::LongtermAccessInt   (LongtermAccessInt::Address (address)) => self.longterm_access_int.get(*address as usize).cloned().unwrap_or(0),
             VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam1) => self.throw_data_param1,
             VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam2) => self.throw_data_param2,
             VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam3) => self.throw_data_param3,
-            VariableAst::RandomAccessInt     (RandomAccessInt::Address (_)) => 0, // TODO
+            VariableAst::RandomAccessInt     (RandomAccessInt::Address (address)) => self.random_access_int.get(*address as usize).cloned().unwrap_or(0),
             VariableAst::Unknown             { .. } => 0, // Likely from garbage data
 
             VariableAst::LongtermAccessFloat (_) | VariableAst::LongtermAccessBool (_) |
@@ -1365,35 +1395,43 @@ impl<'a> ScriptRunner<'a> {
     fn set_variable_int_inner(&mut self, variable: &VariableAst, value: i32) {
         match variable {
             VariableAst::InternalConstantInt (_) => {}, // Cant set a constant
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::JumpsUsed) => self.jumps_used = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpCount) => self.wall_jump_count = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::WallJumpInterval) => self.wall_jump_interval = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::FootstoolCount) => self.footstool_count = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::FallTime) => self.fall_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::SwimTime) => self.swim_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::LipStickRefresh) => self.lip_stick_refresh = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryRemainingTime) => self.curry_remaining_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::CurryAngle2) => self.curry_angle2 = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::StarRemainingTime) => self.star_remaining_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::MushroomRemainingTime) => self.mushroom_remaining_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::LightningRemainingTime) => self.lightning_remaining_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::SizeFlag) => self.size_flag = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::MetalBlockRemainingTime) => self.metal_block_remaining_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::ComboCount) => self.combo_count = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::BubbleTime) => self.bubble_time = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::AttacksPerformed) => self.attacks_performed = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::CostumeID) => self.costume_id = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::HitstunFramesRemaining) => self.hitstun_frames_remaining = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::MeteorCancelWindow) => self.meteor_cancel_window = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::MissedTechs) => self.missed_techs = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::TetherCount) => self.tether_count = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp1) => self.temp1 = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::Temp2) => self.temp2 = value,
-            VariableAst::LongtermAccessInt   (LongtermAccessInt::Address (_)) => { }, // TODO
-            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam1) => self.throw_data_param1 = value,
-            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam2) => self.throw_data_param2 = value,
-            VariableAst::RandomAccessInt     (RandomAccessInt::ThrowDataParam3) => self.throw_data_param3 = value,
-            VariableAst::RandomAccessInt     (RandomAccessInt::Address (_)) => { }, // TODO
+            VariableAst::LongtermAccessInt (LongtermAccessInt::JumpsUsed) => self.jumps_used = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::WallJumpCount) => self.wall_jump_count = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::WallJumpInterval) => self.wall_jump_interval = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::FootstoolCount) => self.footstool_count = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::FallTime) => self.fall_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::SwimTime) => self.swim_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::LipStickRefresh) => self.lip_stick_refresh = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::CurryRemainingTime) => self.curry_remaining_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::CurryAngle2) => self.curry_angle2 = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::StarRemainingTime) => self.star_remaining_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::MushroomRemainingTime) => self.mushroom_remaining_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::LightningRemainingTime) => self.lightning_remaining_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::SizeFlag) => self.size_flag = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::MetalBlockRemainingTime) => self.metal_block_remaining_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::ComboCount) => self.combo_count = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::BubbleTime) => self.bubble_time = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::AttacksPerformed) => self.attacks_performed = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::CostumeID) => self.costume_id = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::HitstunFramesRemaining) => self.hitstun_frames_remaining = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::MeteorCancelWindow) => self.meteor_cancel_window = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::MissedTechs) => self.missed_techs = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::TetherCount) => self.tether_count = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::Temp1) => self.temp1 = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::Temp2) => self.temp2 = value,
+            VariableAst::LongtermAccessInt (LongtermAccessInt::Address (address)) =>
+                if (*address as usize) < self.longterm_access_int.len() {
+                    self.longterm_access_int[*address as usize] = value;
+                }
+
+            VariableAst::RandomAccessInt (RandomAccessInt::ThrowDataParam1) => self.throw_data_param1 = value,
+            VariableAst::RandomAccessInt (RandomAccessInt::ThrowDataParam2) => self.throw_data_param2 = value,
+            VariableAst::RandomAccessInt (RandomAccessInt::ThrowDataParam3) => self.throw_data_param3 = value,
+            VariableAst::RandomAccessInt (RandomAccessInt::Address (address)) =>
+                if (*address as usize) < self.random_access_int.len() {
+                    self.random_access_int[*address as usize] = value;
+                }
+
             VariableAst::Unknown             { .. } => {}, // Likely from garbage data
 
             VariableAst::LongtermAccessFloat (_) | VariableAst::LongtermAccessBool (_) |
@@ -1409,9 +1447,9 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::ShieldCharge) => self.shield_charge,
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryAngle1) => self.curry_angle1,
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryRandomness) => self.curry_randomness,
-            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (_)) => 0.0, // TODO
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (address)) => self.longterm_access_float.get(*address as usize).cloned().unwrap_or(0.0),
             VariableAst::RandomAccessFloat   (RandomAccessFloat::EnableTurnWhenBelowZero) => self.enable_turn_when_below_zero,
-            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (_)) => 0.0, // TODO
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (address)) => self.random_access_float.get(*address as usize).cloned().unwrap_or(0.0),
             VariableAst::Unknown             { .. } => 0.0, // Likely from garbage data
 
             VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessBool (_) |
@@ -1427,9 +1465,15 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::ShieldCharge) => self.shield_charge = value,
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryAngle1) => self.curry_angle1 = value,
             VariableAst::LongtermAccessFloat (LongtermAccessFloat::CurryRandomness) => self.curry_randomness = value,
-            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (_)) => { }, // TODO
+            VariableAst::LongtermAccessFloat (LongtermAccessFloat::Address (address)) =>
+                if (*address as usize) < self.longterm_access_float.len() {
+                    self.longterm_access_float[*address as usize] = value;
+                }
             VariableAst::RandomAccessFloat   (RandomAccessFloat::EnableTurnWhenBelowZero) => self.enable_turn_when_below_zero = value,
-            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (_)) => { } // TODO
+            VariableAst::RandomAccessFloat   (RandomAccessFloat::Address (address)) =>
+                if (*address as usize) < self.random_access_float.len() {
+                    self.random_access_float[*address as usize] = value;
+                }
             VariableAst::Unknown             { .. } => { }, // Likely from garbage data
 
             VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessBool (_) |
@@ -1438,7 +1482,7 @@ impl<'a> ScriptRunner<'a> {
         }
     }
 
-    fn get_variable_bool_inner(&mut self, variable: &VariableAst) -> bool {
+    fn get_variable_bool_inner(&self, variable: &VariableAst) -> bool {
         match variable {
             VariableAst::LongtermAccessBool (LongtermAccessBool::IsDead) => self.is_dead,
             VariableAst::LongtermAccessBool (LongtermAccessBool::CannotDie) => self.cannot_die,
@@ -1455,7 +1499,7 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotTeeter) => self.can_not_teeter,
             VariableAst::LongtermAccessBool (LongtermAccessBool::VelocityIgnoreHitstun) => self.velocity_ignore_hitstun,
             VariableAst::LongtermAccessBool (LongtermAccessBool::Deflection) => self.deflection,
-            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (_)) => false, // TODO
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (address)) => self.longterm_access_bool.get(*address as usize).cloned().unwrap_or(false),
 
             VariableAst::RandomAccessBool (RandomAccessBool::CharacterFloat) => self.character_float,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableFastFall) => self.enable_fast_fall,
@@ -1467,7 +1511,7 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableLandingLag) => self.landing_lag,
-            VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => false, // TODO
+            VariableAst::RandomAccessBool (RandomAccessBool::Address (address)) => self.random_access_bool.get(*address as usize).cloned().unwrap_or(false),
             VariableAst::Unknown          { .. } => false, // Likely from garbage data
 
             VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessFloat (_) |
@@ -1493,7 +1537,10 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::LongtermAccessBool (LongtermAccessBool::CanNotTeeter) => self.can_not_teeter = value,
             VariableAst::LongtermAccessBool (LongtermAccessBool::VelocityIgnoreHitstun) => self.velocity_ignore_hitstun = value,
             VariableAst::LongtermAccessBool (LongtermAccessBool::Deflection) => self.deflection = value,
-            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (_)) => {}
+            VariableAst::LongtermAccessBool (LongtermAccessBool::Address (address)) =>
+                if (*address as usize) < self.longterm_access_bool.len() {
+                    self.longterm_access_bool[*address as usize] = value;
+                }
 
             VariableAst::RandomAccessBool (RandomAccessBool::CharacterFloat) => self.character_float = value,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableFastFall) => self.enable_fast_fall = value,
@@ -1505,7 +1552,10 @@ impl<'a> ScriptRunner<'a> {
             VariableAst::RandomAccessBool (RandomAccessBool::EnableAutoJab) => self.enable_auto_jab = value,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableJabEnd) => self.enable_jab_end = value,
             VariableAst::RandomAccessBool (RandomAccessBool::EnableLandingLag) => self.landing_lag = value,
-            VariableAst::RandomAccessBool (RandomAccessBool::Address (_)) => { }
+            VariableAst::RandomAccessBool (RandomAccessBool::Address (address)) =>
+                if (*address as usize) < self.random_access_bool.len() {
+                    self.random_access_bool[*address as usize] = value;
+                }
             VariableAst::Unknown          { .. } => {}, // Likely from garbage data
 
             VariableAst::LongtermAccessInt (_) | VariableAst::LongtermAccessFloat (_) |

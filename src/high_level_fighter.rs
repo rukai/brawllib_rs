@@ -745,11 +745,11 @@ pub enum CollisionBoxValues {
 }
 
 impl CollisionBoxValues {
-    pub(crate) fn from_hitbox(args: &HitBoxArguments) -> CollisionBoxValues {
+    pub(crate) fn from_hitbox(args: &HitBoxArguments, damage: f32) -> CollisionBoxValues {
         CollisionBoxValues::Hit(HitBoxValues {
             hitbox_id:            args.hitbox_id,
             set_id:               args.set_id,
-            damage:               args.damage,
+            damage:               damage,
             trajectory:           args.trajectory,
             weight_knockback:     args.weight_knockback,
             kbg:                  args.kbg,
@@ -794,12 +794,12 @@ impl CollisionBoxValues {
         })
     }
 
-    pub(crate) fn from_special_hitbox(special_args: &SpecialHitBoxArguments) -> CollisionBoxValues {
+    pub(crate) fn from_special_hitbox(special_args: &SpecialHitBoxArguments, damage: f32) -> CollisionBoxValues {
         let args = &special_args.hitbox_args;
         CollisionBoxValues::Hit(HitBoxValues {
             hitbox_id:            args.hitbox_id,
             set_id:               args.set_id,
-            damage:               args.damage,
+            damage:               damage,
             trajectory:           args.trajectory,
             weight_knockback:     args.weight_knockback,
             kbg:                  args.kbg,
@@ -868,7 +868,7 @@ pub struct GrabBoxValues {
 pub struct HitBoxValues {
     pub hitbox_id:            u8,
     pub set_id:               u8,
-    pub damage:               i32,
+    pub damage:               f32,
     pub trajectory:           i32,
     pub weight_knockback:     i16,
     pub kbg:                  i16,
