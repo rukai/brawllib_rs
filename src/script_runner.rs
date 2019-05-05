@@ -769,7 +769,11 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::DisableInterruptGroup (_) => { } // TODO
             &EventAst::ClearInterruptGroup (_) => { } // TODO
             &EventAst::CreateInterrupt (ref interrupt) => {
-                self.interrupts.push(interrupt.clone());
+                // If the interrupt would succeed on the first frame then ignore it.
+                // This is a super hacky hack to get moves like DK's dash attack working.
+                if !(self.frame_index == 0.0 && self.evaluate_expression(&interrupt.test).unwrap_bool()) {
+                    self.interrupts.push(interrupt.clone());
+                }
             }
             &EventAst::PreviousInterruptAddRequirement { ref test } => {
                 if let Some(interrupt) = self.interrupts.last_mut() {

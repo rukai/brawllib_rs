@@ -152,6 +152,7 @@ impl HighLevelFighter {
 
                 if let Some(chr0) = chr0 {
                     let num_frames = match actual_name.as_ref() {
+                        "JumpSquat"    => attributes.jump_squat_frames as f32,
                         "LandingAirN"  => attributes.nair_landing_lag,
                         "LandingAirF"  => attributes.fair_landing_lag,
                         "LandingAirB"  => attributes.bair_landing_lag,
