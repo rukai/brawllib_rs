@@ -292,6 +292,7 @@ impl HighLevelFighter {
                                     bkb:         specify_throw.bkb,
                                     effect:      specify_throw.effect.clone(),
                                     sfx:         specify_throw.sfx.clone(),
+                                    grab_target: specify_throw.grab_target.clone(),
                                     i_frames:    specify_throw.i_frames,
                                 });
                             }
@@ -529,6 +530,7 @@ pub struct HighLevelThrow {
     pub bkb:         i32,
     pub effect:      HitBoxEffect,
     pub sfx:         HitBoxSound,
+    pub grab_target: GrabTarget,
     pub i_frames:    i32,
 }
 
