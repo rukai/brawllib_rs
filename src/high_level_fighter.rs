@@ -5,7 +5,7 @@ use crate::chr0::Chr0;
 use crate::fighter::Fighter;
 use crate::mdl0::bones::Bone;
 use crate::sakurai::{SectionScript, ExternalSubroutine};
-use crate::sakurai::fighter_data::misc_section::{LedgeGrab, HurtBox, BoneRefs};
+use crate::sakurai::fighter_data::misc_section::{HurtBox, BoneRefs};
 use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
 use crate::script_ast::{
     ScriptAst,
@@ -19,6 +19,7 @@ use crate::script_ast::{
     HitBoxSound,
     HitBoxSseType,
     GrabTarget,
+    LedgeGrabEnable,
 };
 use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox, VelModify};
 
@@ -31,7 +32,6 @@ pub struct HighLevelFighter {
     pub attributes:               FighterAttributes,
     pub actions:                  Vec<HighLevelAction>,
     pub subactions:               Vec<HighLevelSubaction>,
-    pub ledge_grabs:              Vec<LedgeGrab>, // TODO: Instead of a single global vec, put a copy of the relevant LedgeGrab in HighLevelFrame
     pub scripts_fragment_fighter: Vec<ScriptAst>,
     pub scripts_fragment_common:  Vec<ScriptAst>,
     pub scripts_section:          Vec<SectionScriptAst>,
@@ -146,7 +146,7 @@ impl HighLevelFighter {
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data);
+                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data, actual_name.clone());
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
@@ -298,6 +298,28 @@ impl HighLevelFighter {
                             }
                         }
 
+                        let ledge_grab_box = if script_runner.ledge_grab_enable.enabled() {
+                            // The first misc.ledge_grabs entry seems to be used for everything, not sure what the other entries are for.
+                            if let Some(ledge_grab_box) = fighter_data.misc.ledge_grab_boxes.get(0) {
+                                let left = if let LedgeGrabEnable::EnableInFrontAndBehind = script_runner.ledge_grab_enable {
+                                    ecb.left - ledge_grab_box.x_padding
+                                } else {
+                                    ledge_grab_box.x_left
+                                };
+
+                                Some(Extent {
+                                    left,
+                                    right:  ecb.right + ledge_grab_box.x_padding,
+                                    up:     ledge_grab_box.y + ledge_grab_box.height,
+                                    down:   ledge_grab_box.y,
+                                })
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        };
+
                         frames.push(HighLevelFrame {
                             throw,
                             ecb,
@@ -307,6 +329,7 @@ impl HighLevelFighter {
                             y_vel_modify,
                             x_vel_temp,
                             y_vel_temp,
+                            ledge_grab_box,
                             hurt_boxes,
                             hit_boxes:             hl_hit_boxes,
                             interruptible:         script_runner.interruptible,
@@ -326,7 +349,7 @@ impl HighLevelFighter {
                             iasa = Some(script_runner.frame_count)
                         }
 
-                        script_runner.step(actual_name.as_ref());
+                        script_runner.step();
                         prev_hit_boxes = Some(hit_boxes);
 
                         if let ChangeSubaction::Continue = script_runner.change_subaction { } else { break }
@@ -364,7 +387,6 @@ impl HighLevelFighter {
         HighLevelFighter {
             internal_name:            fighter.cased_name.clone(),
             name:                     crate::fighter_maps::fighter_name(&fighter.cased_name),
-            ledge_grabs:              fighter_data.misc.ledge_grabs.clone(),
             scripts_fragment_fighter: fragment_scripts_fighter,
             scripts_fragment_common:  fragment_scripts_common,
             scripts_section,
@@ -489,6 +511,18 @@ impl HighLevelSubaction {
         extent
     }
 
+    /// Furthest point of a ledge grab box, starting from the bps
+    /// Furthest values across all frames
+    pub fn ledge_grab_box_extent(&self) -> Extent {
+        let mut extent = Extent::new();
+        for frame in &self.frames {
+            if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
+                extent.extend(ledge_grab_box);
+            }
+        }
+        extent
+    }
+
     /// Furthest point of a hurtbox, starting from the bps
     /// Furthest values across all frames
     pub fn hurt_box_vulnerable_extent(&self) -> Option<Extent> {
@@ -538,6 +572,7 @@ pub struct HighLevelThrow {
 pub struct HighLevelFrame {
     pub hurt_boxes:            Vec<HighLevelHurtBox>,
     pub hit_boxes:             Vec<HighLevelHitBox>,
+    pub ledge_grab_box:        Option<Extent>,
     pub x_pos:                 f32,
     pub y_pos:                 f32,
     pub interruptible:         bool,

@@ -32,10 +32,10 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
         hurt_boxes.push(hurtbox(parent_data.relative_fancy_slice(offset..)));
     }
 
-    let mut ledge_grabs = vec!();
+    let mut ledge_grab_boxes = vec!();
     for i in 0..ledge_grab_list.count {
         let offset = ledge_grab_list.start_offset as usize + i as usize * LEDGE_GRAB_SIZE;
-        ledge_grabs.push(ledge_grab(parent_data.relative_fancy_slice(offset ..)));
+        ledge_grab_boxes.push(ledge_grab_box(parent_data.relative_fancy_slice(offset ..)));
     }
 
     let mut unk7s = vec!();
@@ -103,7 +103,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     MiscSection {
         final_smash_auras,
         hurt_boxes,
-        ledge_grabs,
+        ledge_grab_boxes,
         unk7s,
         bone_refs,
         item_bones,
@@ -167,12 +167,12 @@ fn hurtbox(data: FancySlice) -> HurtBox {
     }
 }
 
-fn ledge_grab(data: FancySlice) -> LedgeGrab {
-    let x      = data.f32_be(0x0);
-    let y      = data.f32_be(0x4);
-    let width  = data.f32_be(0x8);
-    let height = data.f32_be(0xc);
-    LedgeGrab { x, y, width, height }
+fn ledge_grab_box(data: FancySlice) -> LedgeGrabBox {
+    let x_left     = data.f32_be(0x0);
+    let y          = data.f32_be(0x4);
+    let x_padding  = data.f32_be(0x8);
+    let height     = data.f32_be(0xc);
+    LedgeGrabBox { x_left, y, x_padding, height }
 }
 
 fn unk7(data: FancySlice) -> Unk7 {
@@ -197,7 +197,7 @@ fn unk7(data: FancySlice) -> Unk7 {
 pub struct MiscSection {
     pub final_smash_auras: Vec<FinalSmashAura>,
     pub hurt_boxes: Vec<HurtBox>,
-    pub ledge_grabs: Vec<LedgeGrab>,
+    pub ledge_grab_boxes: Vec<LedgeGrabBox>,
     pub unk7s: Vec<Unk7>,
     pub bone_refs: BoneRefs,
     item_bones: i32,
@@ -240,12 +240,25 @@ pub enum HurtBoxZone {
     High
 }
 
+/// The up most y value of the box = y + height
+/// The down most y value of the box = y
+///
+/// When `LedgeGrabEnable::EnableInFront`:
+/// *   The fighter can only grab ledge when facing towards it
+/// *   The left x value of the box = x_left
+/// *   The right x value of the box = ecb right x value + x_padding
+/// When `LedgeGrabEnable::EnableInFrontAndBehind`:
+/// *   The fighter can grab ledge no matter the direction they are facing
+/// *   The left x value of the box = ecb left x value - x_padding
+/// *   The right x value of the box = ecb right x value + x_padding
+///
+/// Note: left is behind the fighter and right is in front of the fighter
 pub const LEDGE_GRAB_SIZE: usize = 0x10;
 #[derive(Serialize, Clone, Debug)]
-pub struct LedgeGrab {
-    pub x: f32,
+pub struct LedgeGrabBox {
+    pub x_left: f32,
     pub y: f32,
-    pub width: f32,
+    pub x_padding: f32,
     pub height: f32,
 }
 

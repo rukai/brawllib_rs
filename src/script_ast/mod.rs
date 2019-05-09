@@ -1688,6 +1688,15 @@ impl LedgeGrabEnable {
             v => LedgeGrabEnable::Unknown (v),
         }
     }
+
+    pub fn enabled(&self) -> bool {
+        match self {
+            LedgeGrabEnable::EnableInFront          => true,
+            LedgeGrabEnable::EnableInFrontAndBehind => true,
+            LedgeGrabEnable::Disable                => false,
+            LedgeGrabEnable::Unknown (_)            => false,
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]

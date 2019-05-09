@@ -258,8 +258,16 @@ fn create_state() -> WgpuState {
         primitive_topology: wgpu::PrimitiveTopology::TriangleList,
         color_states: &[wgpu::ColorStateDescriptor {
             format: wgpu::TextureFormat::Bgra8Unorm,
-            color: wgpu::BlendDescriptor::REPLACE,
-            alpha: wgpu::BlendDescriptor::REPLACE,
+            color: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendDescriptor {
+                src_factor: wgpu::BlendFactor::SrcAlpha,
+                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                operation: wgpu::BlendOperation::Add,
+            },
             write_mask: wgpu::ColorWriteFlags::ALL,
         }],
         depth_stencil_state: None,
@@ -406,11 +414,11 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             }
 
             let _color = if hurt_box.state.is_intangible() {
-                [0.0, 0.0, 1.0, 1.0]
+                [0.0, 0.0, 1.0, 0.3]
             } else if hurt_box.state.is_invincible() {
-                [0.0, 1.0, 0.0, 1.0]
+                [0.0, 1.0, 0.0, 0.3]
             } else {
-                [1.0, 1.0, 0.0, 1.0]
+                [1.0, 1.0, 0.0, 0.3]
             };
 
             let mut grid = vec!();
@@ -528,12 +536,12 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             }
 
             let _color = match hitbox.hitbox_id {
-                0 => [0.93725, 0.39216, 0.00000, 1.0], // orange
-                1 => [1.00000, 0.00000, 0.00000, 1.0], // red
-                2 => [1.00000, 0.00000, 1.00000, 1.0], // purple
-                3 => [0.09412, 0.83922, 0.78823, 1.0], // turqoise
-                4 => [0.14118, 0.83992, 0.09412, 1.0], // green
-                _ => [1.00000, 1.00000, 1.00000, 1.0], // white
+                0 => [0.93725, 0.39216, 0.00000, 0.3], // orange
+                1 => [1.00000, 0.00000, 0.00000, 0.3], // red
+                2 => [1.00000, 0.00000, 1.00000, 0.3], // purple
+                3 => [0.09412, 0.83922, 0.78823, 0.3], // turqoise
+                4 => [0.14118, 0.83992, 0.09412, 0.3], // green
+                _ => [1.00000, 1.00000, 1.00000, 0.3], // white
             };
 
             let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y + frame.y_pos, prev.z + frame.x_pos));

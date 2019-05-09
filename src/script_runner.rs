@@ -34,6 +34,7 @@ use crate::script_ast::variable_ast::{
 use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
+    pub subaction_name:              String,
     pub wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier],
     pub call_stacks:                 Vec<CallStack<'a>>,
     pub fighter_scripts:             &'a [&'a ScriptAst],
@@ -259,7 +260,7 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData) -> ScriptRunner<'a> {
+    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData, subaction_name: String) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
@@ -276,6 +277,15 @@ impl<'a> ScriptRunner<'a> {
                 wait_until: -1.0,
             });
         }
+
+        let ledge_grab_enable = match subaction_name.as_ref() {
+            "JumpF" | "JumpB" | "JumpAerialF" | "JumpAerialB" |
+            "FallF" | "FallB" | "Fall" |
+            "FallAerialF" | "FallAerialB" | "FallAerial" |
+            "FallSpecialF" | "FallSpecialB" | "FallSpecial"
+                => LedgeGrabEnable::EnableInFront,
+            _   => LedgeGrabEnable::Disable,
+        };
 
         // TODO: Need to understand what ModelVisibility.cs:269 is doing (ResetVisibility)
         //
@@ -386,12 +396,14 @@ impl<'a> ScriptRunner<'a> {
         //}
 
         let mut runner = ScriptRunner {
+            subaction_name,
             wiird_frame_speed_modifiers,
             call_stacks,
             fighter_scripts,
             common_scripts,
             section_scripts,
             subaction_index,
+            ledge_grab_enable,
             call_every_frame:      HashMap::new(),
             visited_gotos:         vec!(),
             frame_index:           0.0,
@@ -400,7 +412,6 @@ impl<'a> ScriptRunner<'a> {
             hitboxes:              [None, None, None, None, None, None, None],
             hurtbox_state_all:     HurtBoxState::Normal,
             hurtbox_states:        HashMap::new(),
-            ledge_grab_enable:     LedgeGrabEnable::Disable,
             frame_speed_modifier:  1.0,
             tag_display:           true,
             x:                     0.0,
@@ -507,14 +518,13 @@ impl<'a> ScriptRunner<'a> {
 
         // Need to run the script until the first wait, so that the script is in the valid state
         // for the first frame.
-        runner.step_script("ScriptRunner init");
+        runner.step_script();
 
         runner
     }
 
     /// Steps the main, gfx, sfx and other scripts by 1 game frame.
-    /// `action_name` can be anything, it is just used for debugging.
-    pub fn step(&mut self, action_name: &str) {
+    pub fn step(&mut self) {
         let mut fsms = vec!();
         for fsm in self.wiird_frame_speed_modifiers {
             // TODO: Because we currently only operate at the subaction level, this is the best we can do.
@@ -529,10 +539,10 @@ impl<'a> ScriptRunner<'a> {
         }
         self.frame_index += self.frame_speed_modifier;
         self.frame_count += 1;
-        self.step_script(action_name);
+        self.step_script();
     }
 
-    fn step_script(&mut self, action_name: &str) {
+    fn step_script(&mut self) {
         for rehit in self.hitbox_sets_rehit.iter_mut() {
             *rehit = false;
         }
@@ -590,7 +600,7 @@ impl<'a> ScriptRunner<'a> {
                     let external = self.call_stacks[i].calls.last().unwrap().external;
 
                     if self.call_stacks[i].calls.last().unwrap().execute {
-                        match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts, action_name) {
+                        match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts) {
                             StepEventResult::WaitUntil (value) => {
                                 self.call_stacks[i].wait_until = value;
                             }
@@ -678,7 +688,7 @@ impl<'a> ScriptRunner<'a> {
     }
 
     /// Returns the wait_until value
-    fn step_event<'b>(&mut self, event: &'b EventAst, external: bool, fighter_scripts: &[&'b ScriptAst], common_scripts: &[&'b ScriptAst], section_scripts: &'b [SectionScriptAst], action_name: &str) -> StepEventResult<'b> {
+    fn step_event<'b>(&mut self, event: &'b EventAst, external: bool, fighter_scripts: &[&'b ScriptAst], common_scripts: &[&'b ScriptAst], section_scripts: &'b [SectionScriptAst]) -> StepEventResult<'b> {
         match event {
             &EventAst::SyncWait (ref value) => {
                 return StepEventResult::WaitUntil (self.frame_index + *value);
@@ -859,7 +869,7 @@ impl<'a> ScriptRunner<'a> {
                     let damage = self.get_float_value(&args.damage);
                     self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate, damage));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_id, self.subaction_name);
                 }
             }
             &EventAst::ThrownHitBox (_) => { }
@@ -895,7 +905,7 @@ impl<'a> ScriptRunner<'a> {
                     let damage = self.get_float_value(&args.hitbox_args.damage);
                     self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate, damage));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, self.subaction_name);
                 }
             }
             &EventAst::DeleteAllHitBoxes => {
@@ -945,7 +955,7 @@ impl<'a> ScriptRunner<'a> {
                 if args.hitbox_id < self.hitboxes.len() as i32 {
                     self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_grabbox(args, interpolate));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_id, action_name);
+                    error!("invalid hitbox index {} {}", args.hitbox_id, self.subaction_name);
                 }
             }
             &EventAst::DeleteGrabBox (hitbox_id) => {
