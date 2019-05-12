@@ -20,7 +20,7 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.6"
 gif = "0.10"
-wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/kvark/wgpu", branch = "map-lock" }
+wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "4737ab5fd2856278680db46e45649783a9a052b1" }
 fancy_slice = { version = "0.1", features = [] }
 winit_input_helper = "0.2"
 
