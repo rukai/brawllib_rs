@@ -19,10 +19,10 @@ serde_derive = "1"
 rayon = "1"
 failure = "0.1"
 env_logger = "0.6"
-gif = "0.10"
-wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "4737ab5fd2856278680db46e45649783a9a052b1" }
+gif = { version = "0.10", git = "https://github.com/rukai/image-gif", rev = "9549d60e462e8fcbb47db75c9c052501301728d3" }
+wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "fba0038794933c4588cbe7f2666f32b581e8ff88" }
 fancy_slice = { version = "0.1", features = [] }
-winit_input_helper = "0.2"
+winit_input_helper = "0.3"
 
 [dev-dependencies]
 getopts = "0.2"

@@ -20,7 +20,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     let mut events_loop = EventsLoop::new();
     let mut input = WinitInputHelper::new();
 
-    let mut state = create_state();
+    let mut state = WgpuState::new();
 
     let window = Window::new(&events_loop).unwrap();
     let size = window
@@ -29,7 +29,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
         .to_physical(window.get_hidpi_factor());
 
     let mut swap_chain_descriptor = wgpu::SwapChainDescriptor {
-        usage: wgpu::TextureUsageFlags::OUTPUT_ATTACHMENT,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         format: wgpu::TextureFormat::Bgra8Unorm,
         width: size.width.round() as u32,
         height: size.height.round() as u32,
@@ -106,14 +106,14 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 }
 
 /// Returns the bytes of a gif displaying hitbox and hurtboxes
-pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
+pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
     let mut result = vec!();
 
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     let width: u16 = 400;
     let height: u16 = 300;
 
-    let mut state = create_state();
+    //let mut state = create_state();
 
     let subaction = &high_level_fighter.subactions[subaction_index];
 
@@ -132,23 +132,25 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize)
             };
             let framebuffer_descriptor = &wgpu::TextureDescriptor {
                 size: texture_extent,
-                array_size: 1,
+                array_layer_count: 1,
+                mip_level_count: 1,
+                sample_count: 1,
                 dimension: wgpu::TextureDimension::D2,
                 format: wgpu::TextureFormat::Bgra8Unorm,
-                usage: wgpu::TextureUsageFlags::all(),
+                usage: wgpu::TextureUsage::all(),
             };
 
             let framebuffer = state.device.create_texture(framebuffer_descriptor);
             let framebuffer_copy_view = wgpu::TextureCopyView {
                 texture: &framebuffer,
-                level: 0,
-                slice: 0,
+                mip_level: 0,
+                array_layer: 0,
                 origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
             };
 
             let framebuffer_out_usage = &wgpu::BufferDescriptor {
-                size: width as u32 * height as u32 * 4,
-                usage: wgpu::BufferUsageFlags::all(),
+                size: width as u64 * height as u64 * 4,
+                usage: wgpu::BufferUsage::all(),
             };
             let framebuffer_out = state.device.create_buffer(framebuffer_out_usage);
             let framebuffer_out_copy_view = wgpu::BufferCopyView {
@@ -158,12 +160,12 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize)
                 image_height: height as u32,
             };
 
-            let mut command_encoder = draw_frame(&mut state, &framebuffer.create_default_view(), width, height, true, false, high_level_fighter, subaction_index, frame_index);
+            let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, true, false, high_level_fighter, subaction_index, frame_index);
             command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
             state.device.get_queue().submit(&[command_encoder.finish()]);
 
             let frames_tx = frames_tx.clone();
-            framebuffer_out.map_read_async(0, width as u32 * height as u32 * 4, move |result: wgpu::BufferMapAsyncResult<&[u32]>| {
+            framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u32]>| {
                 match result {
                     Ok(data_u32) => {
                         let mut data_u8: Vec<u8> = vec!(0; width as usize * height as usize * 4);
@@ -185,6 +187,7 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize)
         // Needed to get the last map_read_async to run.
         state.device.get_queue().submit(&[]);
 
+        //https://gamedev.stackexchange.com/questions/111319/webgl-color-quantization
         let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
         for _ in subaction.frames.iter() {
             let mut frame_data = frames_rx.recv().unwrap();
@@ -197,107 +200,106 @@ pub fn render_gif(high_level_fighter: &HighLevelFighter, subaction_index: usize)
     result
 }
 
-struct WgpuState {
-    pub instance: wgpu::Instance,
-    pub device: wgpu::Device,
-    pub vs_module: wgpu::ShaderModule,
-    pub fs_module: wgpu::ShaderModule,
-    pub bind_group_layout: wgpu::BindGroupLayout,
-    pub render_pipeline: wgpu::RenderPipeline,
+pub struct WgpuState {
+    instance: wgpu::Instance,
+    device: wgpu::Device,
+    bind_group_layout: wgpu::BindGroupLayout,
+    render_pipeline: wgpu::RenderPipeline,
 }
 
-fn create_state() -> WgpuState {
-    let instance = wgpu::Instance::new();
-    let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
-        power_preference: wgpu::PowerPreference::LowPower,
-    });
-    let device = adapter.create_device(&wgpu::DeviceDescriptor {
-        extensions: wgpu::Extensions {
-            anisotropic_filtering: false,
-        },
-    });
-
-    // shaders
-    let vs_bytes = include_bytes!("shaders/fighter.vert.spv");
-    let vs_module = device.create_shader_module(vs_bytes);
-    let fs_bytes = include_bytes!("shaders/fighter.frag.spv");
-    let fs_module = device.create_shader_module(fs_bytes);
-
-    // layout
-    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        bindings: &[
-            wgpu::BindGroupLayoutBinding {
-                binding: 0,
-                visibility: wgpu::ShaderStageFlags::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer,
+impl WgpuState {
+    pub fn new() -> WgpuState {
+        let instance = wgpu::Instance::new();
+        let adapter = instance.get_adapter(&wgpu::AdapterDescriptor {
+            power_preference: wgpu::PowerPreference::LowPower,
+        });
+        let device = adapter.request_device(&wgpu::DeviceDescriptor {
+            limits: wgpu::Limits::default(),
+            extensions: wgpu::Extensions {
+                anisotropic_filtering: false,
             },
-        ],
-    });
+        });
 
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        bind_group_layouts: &[&bind_group_layout],
-    });
+        // shaders
+        let vs_bytes = include_bytes!("shaders/fighter.vert.spv");
+        let vs_module = device.create_shader_module(vs_bytes);
+        let fs_bytes = include_bytes!("shaders/fighter.frag.spv");
+        let fs_module = device.create_shader_module(fs_bytes);
 
-    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        layout: &pipeline_layout,
-        vertex_stage: wgpu::PipelineStageDescriptor {
-            module: &vs_module,
-            entry_point: "main",
-        },
-        fragment_stage: wgpu::PipelineStageDescriptor {
-            module: &fs_module,
-            entry_point: "main",
-        },
-        rasterization_state: wgpu::RasterizationStateDescriptor {
-            front_face: wgpu::FrontFace::Ccw,
-            cull_mode: wgpu::CullMode::None,
-            depth_bias: 0,
-            depth_bias_slope_scale: 0.0,
-            depth_bias_clamp: 0.0,
-        },
-        primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-        color_states: &[wgpu::ColorStateDescriptor {
-            format: wgpu::TextureFormat::Bgra8Unorm,
-            color: wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
-            },
-            alpha: wgpu::BlendDescriptor {
-                src_factor: wgpu::BlendFactor::SrcAlpha,
-                dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                operation: wgpu::BlendOperation::Add,
-            },
-            write_mask: wgpu::ColorWriteFlags::ALL,
-        }],
-        depth_stencil_state: None,
-        index_format: wgpu::IndexFormat::Uint16,
-        vertex_buffers: &[wgpu::VertexBufferDescriptor {
-            stride: mem::size_of::<Vertex>() as u32,
-            step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &[
-                wgpu::VertexAttributeDescriptor {
-                    attribute_index: 0,
-                    format: wgpu::VertexFormat::Float4,
-                    offset: 0,
-                },
-                wgpu::VertexAttributeDescriptor {
-                    attribute_index: 1,
-                    format: wgpu::VertexFormat::Float4,
-                    offset: 4 * 4,
+        // layout
+        let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            bindings: &[
+                wgpu::BindGroupLayoutBinding {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer,
                 },
             ],
-        }],
-        sample_count: 1,
-    });
+        });
 
-    WgpuState {
-        instance,
-        device,
-        vs_module,
-        fs_module,
-        bind_group_layout,
-        render_pipeline,
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&bind_group_layout],
+        });
+
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: &pipeline_layout,
+            vertex_stage: wgpu::PipelineStageDescriptor {
+                module: &vs_module,
+                entry_point: "main",
+            },
+            fragment_stage: Some(wgpu::PipelineStageDescriptor {
+                module: &fs_module,
+                entry_point: "main",
+            }),
+            rasterization_state: wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::None,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+            },
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[wgpu::ColorStateDescriptor {
+                format: wgpu::TextureFormat::Bgra8Unorm,
+                color_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
+            depth_stencil_state: None,
+            index_format: wgpu::IndexFormat::Uint16,
+            vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                stride: mem::size_of::<Vertex>() as u64,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &[
+                    wgpu::VertexAttributeDescriptor {
+                        shader_location: 0,
+                        format: wgpu::VertexFormat::Float4,
+                        offset: 0,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        shader_location: 1,
+                        format: wgpu::VertexFormat::Float4,
+                        offset: 4 * 4,
+                    },
+                ],
+            }],
+            sample_count: 1,
+        });
+
+        WgpuState {
+            instance,
+            device,
+            bind_group_layout,
+            render_pipeline,
+        }
     }
 }
 
@@ -308,6 +310,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: &framebuffer,
+                resolve_target: None,
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
                 clear_color: wgpu::Color {
@@ -490,9 +493,9 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                 }
             }
 
-            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
+            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
                 .fill_from_slice(&vertices_vec);
-            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
+            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
                 .fill_from_slice(&indices_vec);
 
             let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
@@ -504,7 +507,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             let uniform_buf = state.device
                 .create_buffer_mapped(
                     16,
-                    wgpu::BufferUsageFlags::UNIFORM | wgpu::BufferUsageFlags::TRANSFER_DST,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
                 )
                 .fill_from_slice(transform);
 
@@ -594,10 +597,10 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                 }
             }
 
-            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsageFlags::VERTEX)
+            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
                 .fill_from_slice(&vertices_vec);
 
-            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsageFlags::INDEX)
+            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
                 .fill_from_slice(&indices_vec);
 
             let rotation = if let Some(prev) = prev {
@@ -613,7 +616,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             let uniform_buf = state.device
                 .create_buffer_mapped(
                     16,
-                    wgpu::BufferUsageFlags::UNIFORM | wgpu::BufferUsageFlags::TRANSFER_DST,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
                 )
                 .fill_from_slice(transform);
 
