@@ -281,6 +281,14 @@ impl HighLevelFighter {
                         }
                         let ecb = option_ecb.unwrap();
 
+                        let weight_dependent_speed = match actual_name.as_ref() {
+                            "ThrowLw" => attributes.weight_dependent_throw_down,
+                            "ThrowHi" => attributes.weight_dependent_throw_up,
+                            "ThrowF" => attributes.weight_dependent_throw_forward,
+                            "ThrowB" => attributes.weight_dependent_throw_backward,
+                            _        => false,
+                        };
+
                         let mut throw = None;
                         if let Some(ref specify_throw) = script_runner.throw {
                             if script_runner.throw_activate {
@@ -294,6 +302,7 @@ impl HighLevelFighter {
                                     sfx:         specify_throw.sfx.clone(),
                                     grab_target: specify_throw.grab_target.clone(),
                                     i_frames:    specify_throw.i_frames,
+                                    weight_dependent_speed,
                                 });
                             }
                         }
@@ -557,15 +566,16 @@ pub struct HighLevelScripts {
 pub struct HighLevelThrow {
     // TODO: I imagine the bone is used to determine the location the character is thrown from.
     // Transform the bone into an xy offset.
-    pub damage:      i32,
-    pub trajectory:  i32,
-    pub kbg:         i32,
-    pub wdsk:        i32,
-    pub bkb:         i32,
-    pub effect:      HitBoxEffect,
-    pub sfx:         HitBoxSound,
-    pub grab_target: GrabTarget,
-    pub i_frames:    i32,
+    pub damage:                 i32,
+    pub trajectory:             i32,
+    pub kbg:                    i32,
+    pub wdsk:                   i32,
+    pub bkb:                    i32,
+    pub effect:                 HitBoxEffect,
+    pub sfx:                    HitBoxSound,
+    pub grab_target:            GrabTarget,
+    pub i_frames:               i32,
+    pub weight_dependent_speed: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]

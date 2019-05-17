@@ -167,6 +167,22 @@ fn fighter_attributes(data: FancySlice) -> FighterAttributes {
         egg_size:                          data.f32_be(0x1ac),
         hip_n_bone2:                       data.u32_be(0x1cc),
         x_rot_n_bone:                      data.u32_be(0x1e0),
+        camera_initial_y_offset:           data.f32_be(0x1f8),
+        camera_size_front:                 data.f32_be(0x1fc),
+        camera_size_back:                  data.f32_be(0x200),
+        camera_size_top:                   data.f32_be(0x204),
+        camera_size_bottom:                data.f32_be(0x208),
+        zoom_camera_size_front:            data.f32_be(0x210),
+        zoom_camera_size_back:             data.f32_be(0x214),
+        zoom_camera_size_top:              data.f32_be(0x218),
+        zoom_camera_size_bottom:           data.f32_be(0x21c),
+        head_n_bone:                       data.u32_be(0x220),
+        pause_camera_zoom_distance:        data.f32_be(0x244),
+        magnifying_glass_size:             data.f32_be(0x244),
+        weight_dependent_throw_down:       data.u32_be(0x2dc) & 0b0001 == 0,
+        weight_dependent_throw_up:         data.u32_be(0x2dc) & 0b0010 == 0,
+        weight_dependent_throw_forward:    data.u32_be(0x2dc) & 0b0100 == 0,
+        weight_dependent_throw_backward:   data.u32_be(0x2dc) & 0b1000 == 0,
     }
 }
 
@@ -276,6 +292,22 @@ pub struct FighterAttributes {
     pub egg_size: f32,
     pub hip_n_bone2: u32,
     pub x_rot_n_bone: u32, // bone to be grabbed from?
+    pub camera_initial_y_offset: f32,
+    pub camera_size_front: f32,
+    pub camera_size_back: f32,
+    pub camera_size_top: f32,
+    pub camera_size_bottom: f32,
+    pub zoom_camera_size_front: f32,
+    pub zoom_camera_size_back: f32,
+    pub zoom_camera_size_top: f32,
+    pub zoom_camera_size_bottom: f32,
+    pub head_n_bone: u32,
+    pub pause_camera_zoom_distance: f32,
+    pub magnifying_glass_size: f32,
+    pub weight_dependent_throw_down: bool,
+    pub weight_dependent_throw_up: bool,
+    pub weight_dependent_throw_forward: bool,
+    pub weight_dependent_throw_backward: bool,
 }
 
 bitflags! {
