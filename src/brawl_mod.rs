@@ -46,7 +46,12 @@ impl BrawlMod {
 
         let mut mod_fighter_dir = None;
         if let Some(mod_path) = &self.mod_path {
-            for dir in fs::read_dir(mod_path).unwrap() {
+            let dir_reader = match fs::read_dir(mod_path) {
+                Ok(dir) => dir,
+                Err(err) => bail!("Cannot read brawl mod directory: {}", err)
+            };
+
+            for dir in dir_reader {
                 if let Ok(dir) = dir {
                     let path = dir.path().join("pf/fighter");
                     if path.exists() {
