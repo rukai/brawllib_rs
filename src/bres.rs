@@ -43,6 +43,25 @@ pub struct Bres {
     pub children: Vec<BresChild>
 }
 
+impl Bres {
+    pub fn compile(&self) -> Vec<u8> {
+        let mut output = vec!();
+
+        // create bres header
+        output.extend("bres".chars().map(|x| x as u8));
+        output.extend(&[0xfe, 0xff, 0x00, 0x00, 0x00, 0x06, 0xbf, 0x80, 0x00, 0x10, 0x00, 0x02]); // TODO: I just copied these from one value, check what they mean on brawlbox
+
+        for child in &self.children {
+            match &child.data {
+                BresChildData::Bres (bres) => output.extend(bres.compile()),
+                _ => { }
+            }
+        }
+
+        output
+    }
+}
+
 const ROOT_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct BresChild {

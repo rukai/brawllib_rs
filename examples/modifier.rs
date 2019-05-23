@@ -1,11 +1,11 @@
-use brawllib_rs::high_level_fighter::HighLevelFighter;
 use brawllib_rs::brawl_mod::BrawlMod;
-use brawllib_rs::renderer;
 
 use getopts::Options;
 
 use std::path::PathBuf;
 use std::env;
+use std::fs::File;
+use std::io::Write;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -22,7 +22,6 @@ fn main() {
     opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
     opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
     opts.optopt("f", "fighter", "fighter name", "FIGHTER_NAME");
-    opts.optopt("a", "subaction", "subaction name", "ACTION_NAME");
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -49,14 +48,6 @@ fn main() {
         return;
     };
 
-    let subaction_name = if let Some(subaction_name) = matches.opt_str("a") {
-        subaction_name
-    } else {
-        println!("Need to pass a subaction name\n");
-        print_usage(program, opts);
-        return;
-    };
-
     let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
 
     let fighters = match brawl_mod.load_fighters(true) {
@@ -69,14 +60,10 @@ fn main() {
 
     for fighter in fighters {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
-            let hl_fighter = HighLevelFighter::new(&fighter);
-            for (i, subaction) in hl_fighter.subactions.iter().enumerate() {
-                if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
-                    renderer::render_window(&hl_fighter, i);
-                    return;
-                }
-            }
-            println!("Passed subaction was not found");
+            let model = fighter.models.get(0).unwrap().compile();
+            let mut file = File::create("modifier_output.pac").unwrap();
+            file.write_all(&model).unwrap();
+
             return;
         }
     }
