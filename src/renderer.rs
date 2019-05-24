@@ -184,12 +184,12 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             });
         }
 
-        // Needed to get the last map_read_async to run.
-        state.device.get_queue().submit(&[]);
-
         //https://gamedev.stackexchange.com/questions/111319/webgl-color-quantization
         let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
         for _ in subaction.frames.iter() {
+            // Needed to get the last map_read_async to run.
+            state.device.poll(true);
+
             let mut frame_data = frames_rx.recv().unwrap();
             let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut frame_data);
             encoder.write_frame(&gif_frame).unwrap();

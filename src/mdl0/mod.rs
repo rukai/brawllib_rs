@@ -62,7 +62,7 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
             enable_extents:     data.u8    (props_offset + 0x22),
             env_mtx_mode:       data.u8    (props_offset + 0x23),
             data_offset:        data.i32_be(props_offset + 0x24),
-            extents:  mbox::mbox(data.relative_fancy_slice(props_offset + 0x28..)),
+            extents: mbox::mbox(data.relative_fancy_slice(props_offset + 0x28..)),
         })
     };
 
@@ -150,6 +150,26 @@ pub struct Mdl0 {
     pub objects: Option<Vec<Object>>,
     pub texture_refs: Option<Vec<Texture>>,
     pub palette_refs: Option<Vec<Palette>>,
+}
+
+impl Mdl0 {
+    pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
+        let mut output = vec!();
+
+        // create bres header
+        output.extend("MDL0".chars().map(|x| x as u8));
+        output.extend(&i32::to_be_bytes(0x512e)); // size
+        output.extend(&i32::to_be_bytes(self.version));
+        output.extend(&i32::to_be_bytes(bres_offset));
+
+        match self.version {
+            0xA => { }
+            0xB => { }
+            _   => { }
+        }
+
+        output
+    }
 }
 
 #[derive(Clone, Debug)]

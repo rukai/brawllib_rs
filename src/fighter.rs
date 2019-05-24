@@ -269,8 +269,8 @@ impl Fighter {
                         for bres_child in bres.children.iter() {
                             match &bres_child.data {
                                 &BresChildData::Bres (ref model) => {
-                                    for model_child in model.children.iter() {
-                                        // A check like this would be useful but it doesnt account for from scratch mod fighters.
+                                    for model_child in model.iter() {
+                                        // A check like this would be useful but it doesnt account for cloned mod fighters.
                                         // `if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() { }`
                                         // Instead, the first model is the characters model, so we just return it immediately.
 
@@ -327,8 +327,8 @@ impl Fighter {
                 &ArcChildData::Bres (ref bres) => {
                     for bres_child in bres.children.iter() {
                         match &bres_child.data {
-                            &BresChildData::Bres (ref bres) => {
-                                for bres_child in bres.children.iter() {
+                            &BresChildData::Bres (ref children) => {
+                                for bres_child in children.iter() {
                                     match &bres_child.data {
                                         &BresChildData::Bres (_) => {
                                             panic!("Not expecting bres at this level");

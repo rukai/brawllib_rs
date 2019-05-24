@@ -78,7 +78,7 @@ impl Arc {
             let start = output.len();
             output.extend(&i16::to_be_bytes(child.ty));
             output.extend(&i16::to_be_bytes(child.index));
-            output.extend(&i32::to_be_bytes(child.size));
+            output.extend(&i32::to_be_bytes(child.size)); // TODO: remove this field and calculate it instead
             output.push(child.group_index);
             output.push(0x00);
             output.extend(&i16::to_be_bytes(child.redirect_index));

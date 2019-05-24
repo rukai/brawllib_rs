@@ -60,7 +60,8 @@ pub(crate) fn fragment_scripts(parent_data: FancySlice, known_scripts: &[&[Scrip
         // the fragment scripts may refer to their own fragment scripts
         let mut all = known_scripts.to_vec();
         all.push(&fragments);
-        fragments.extend(fragment_scripts(parent_data, &all, ignore_origins, wii_memory));
+        let inner_fragments = fragment_scripts(parent_data, &all, ignore_origins, wii_memory);
+        fragments.extend(inner_fragments);
     }
     fragments
 }
