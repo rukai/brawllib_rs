@@ -156,7 +156,7 @@ impl Mdl0 {
     pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
         let mut output = vec!();
 
-        // create bres header
+        // create mdl0 header
         output.extend("MDL0".chars().map(|x| x as u8));
         output.extend(&i32::to_be_bytes(0x512e)); // size
         output.extend(&i32::to_be_bytes(self.version));

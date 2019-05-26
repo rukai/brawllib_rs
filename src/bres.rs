@@ -4,6 +4,7 @@ use crate::util;
 use crate::resources;
 use crate::chr0::*;
 use crate::mdl0::*;
+use crate::plt0::*;
 
 pub(crate) fn bres(data: FancySlice) -> Bres {
     let endian         = data.u16_be(0x4);
@@ -25,12 +26,16 @@ fn bres_group(data: FancySlice) -> Vec<BresChild> {
         let child_data = match tag.as_ref() {
             "CHR0" => BresChildData::Chr0 (chr0(child_data)),
             "MDL0" => BresChildData::Mdl0 (mdl0(child_data)),
+            "PLT0" => BresChildData::Plt0 (plt0(child_data)),
             "" => BresChildData::Bres (bres_group(data.relative_fancy_slice(resource.data_offset as usize ..))), // TODO: I suspect the match on "" is succeeding by accident
             _  => BresChildData::Unknown (tag),
         };
 
         children.push(BresChild {
-            data_offset: resource.data_offset,
+            id:          resource.id,
+            flag:        resource.flag,
+            left_index:  resource.left_index,
+            right_index: resource.right_index,
             name:        resource.string,
             data:        child_data,
         });
@@ -72,7 +77,7 @@ impl Bres {
         let mut leaf_children_size = 0;
         let mut to_process = vec!(&self.children);
         while to_process.len() > 0 {
-            let children = to_process.pop().unwrap();
+            let children = to_process.remove(0);
             let resource_header_offset = BRES_HEADER_SIZE + ROOT_HEADER_SIZE + root_output.len();
 
             // create resources header
@@ -119,10 +124,10 @@ impl Bres {
                 }
 
                 // create each resource
-                root_output.extend(&u16::to_be_bytes(0)); // TODO: id
-                root_output.extend(&u16::to_be_bytes(1)); // TODO: flag
-                root_output.extend(&u16::to_be_bytes(2)); // TODO: left_index
-                root_output.extend(&u16::to_be_bytes(3)); // TODO: right_index
+                root_output.extend(&u16::to_be_bytes(child.id));
+                root_output.extend(&u16::to_be_bytes(child.flag));
+                root_output.extend(&u16::to_be_bytes(child.left_index));
+                root_output.extend(&u16::to_be_bytes(child.right_index));
                 root_output.extend(&i32::to_be_bytes(4)); // TODO: string_offset
                 root_output.extend(&i32::to_be_bytes(data_offset));
             }
@@ -178,6 +183,7 @@ impl BresChild {
                 output
             }
             BresChildData::Mdl0 (child) => child.compile(bres_offset),
+            BresChildData::Plt0 (child) => child.compile(bres_offset),
             _ => vec!(),
         }
     }
@@ -209,7 +215,10 @@ impl BresChild {
 const ROOT_HEADER_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct BresChild {
-    data_offset: i32,
+    pub id: u16,
+    pub flag: u16,
+    pub left_index: u16,
+    pub right_index: u16,
     pub name: String,
     pub data: BresChildData
 }
@@ -218,6 +227,7 @@ pub struct BresChild {
 pub enum BresChildData {
     Chr0 (Chr0),
     Mdl0 (Mdl0),
+    Plt0 (Plt0),
     Bres (Vec<BresChild>),
     Unknown (String)
 }

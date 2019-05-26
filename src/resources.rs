@@ -31,10 +31,10 @@ pub(crate) const RESOURCE_HEADER_SIZE: usize = 0x8;
 pub(crate) const RESOURCE_SIZE: usize = 0x10;
 #[derive(Clone, Debug)]
 pub struct Resource {
-    id:              u16,
-    flag:            u16,
-    left_index:      u16,
-    right_index:     u16,
+    pub id:          u16,
+    pub flag:        u16,
+    pub left_index:  u16,
+    pub right_index: u16,
     pub data_offset: i32,
     pub string:      String,
 }
