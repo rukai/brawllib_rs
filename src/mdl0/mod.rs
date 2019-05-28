@@ -16,7 +16,7 @@ use textures::Texture;
 use vertices::Vertices;
 use bones::Bone;
 use objects::Object;
-use definitions::Definition;
+use definitions::Definitions;
 
 pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
     let _size        = data.i32_be(0x4);
@@ -80,8 +80,8 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
     let mut texture_refs = None; // TODO: Bleh I think the naming of this and children is wrong
     let mut palette_refs = None;
 
-    let fur_version = version >= 10;
-    let num_children = if fur_version { 13 } else { 11 };
+    let fur_version = version >= 0xA;
+    let num_children = if fur_version { 0xD } else { 0xB };
     for i in 0..num_children {
         let offset = 0x10 + i * 0x4;
 
@@ -89,25 +89,25 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
         if resources_offset != 0 {
             let resources = resources::resources(data.relative_fancy_slice(resources_offset as usize .. ));
             match i {
-                6  if fur_version => { fur_vectors = Some(resources) }
-                7  if fur_version => { fur_layer_coords = Some(resources) }
-                8  if fur_version => { materials = Some(resources) }
-                9  if fur_version => { shaders = Some(resources) }
-                10 if fur_version => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                11 if fur_version => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                12 if fur_version => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                0 => { definitions = Some(definitions::definitions(data.relative_fancy_slice(resources_offset as usize..), resources)) }
-                1 => { bones = Some(bones::bones(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                2 => { vertices = Some(vertices::vertices(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                3 => { normals = Some(resources) }
-                4 => { colors = Some(resources) }
-                5 => { uv = Some(resources) }
-                6 => { materials = Some(resources) }
-                7 => { shaders = Some(resources) }
-                8 => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                9 => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                10 => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                _ => { unreachable!() }
+                0x6 if fur_version => { fur_vectors = Some(resources) }
+                0x7 if fur_version => { fur_layer_coords = Some(resources) }
+                0x8 if fur_version => { materials = Some(resources) }
+                0x9 if fur_version => { shaders = Some(resources) }
+                0xA if fur_version => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0xB if fur_version => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0xC if fur_version => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0x0 => { definitions = Some(definitions::definitions(data.relative_fancy_slice(resources_offset as usize..), resources)) }
+                0x1 => { bones = Some(bones::bones(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0x2 => { vertices = Some(vertices::vertices(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0x3 => { normals = Some(resources) }
+                0x4 => { colors = Some(resources) }
+                0x5 => { uv = Some(resources) }
+                0x6 => { materials = Some(resources) }
+                0x7 => { shaders = Some(resources) }
+                0x8 => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0x9 => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                0xA => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
+                _   => { unreachable!() }
             }
         }
     }
@@ -137,7 +137,7 @@ pub struct Mdl0 {
     pub name: String,
     version: i32,
     pub props: Option<Mdl0Props>,
-    pub definitions: Option<Vec<Definition>>,
+    pub definitions: Option<Definitions>,
     pub bones: Option<Bone>,
     pub vertices: Option<Vec<Vertices>>,
     normals: Option<Vec<Resource>>,
@@ -154,6 +154,7 @@ pub struct Mdl0 {
 
 impl Mdl0 {
     pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
+        println!("{:#?}", self);
         let mut output = vec!();
 
         // create mdl0 header
@@ -162,11 +163,69 @@ impl Mdl0 {
         output.extend(&i32::to_be_bytes(self.version));
         output.extend(&i32::to_be_bytes(bres_offset));
 
-        match self.version {
-            0xA => { }
-            0xB => { }
-            _   => { }
+        // TODO: Determine version from the fields used
+        let props_offset = match self.version {
+            0x08 => 0x40,
+            0x09 => 0x40,
+            0x0A => 0x48,
+            0x0B => 0x4C,
+            _    => panic!("Unknown MDL0 version"),
+        };
+
+        let num_props = match (&self.fur_vectors, &self.fur_layer_coords) {
+            (Some(_), Some(_)) => 0xD,
+            (None, None)       => 0xB,
+            _                  => panic!("Can't have just one of the fur fields set to Some(_)"),
+        };
+
+        let header_size = props_offset + num_props;
+
+        let definitions = self.definitions.as_ref().unwrap().compile();
+
+        output.extend(&i32::to_be_bytes(header_size)); // definitions_offset
+        output.extend(&i32::to_be_bytes(header_size + definitions.len() as i32)); // bones_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: vertices_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: normals_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: colors_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: uv_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: materials_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: shaders_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: objects_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: texture_refs_offset
+        output.extend(&i32::to_be_bytes(0)); // TODO: palette_refs_offset
+
+        if self.version >= 0xA {
+            output.extend(&i32::to_be_bytes(0)); // TODO: fur_vectors_offset
+            output.extend(&i32::to_be_bytes(0)); // TODO: fur_layer_coords_offset
         }
+        if self.version >= 0xB {
+            output.extend(&i32::to_be_bytes(0)); // TODO: An extra something ... goes here
+        }
+
+        output.extend(&i32::to_be_bytes(0)); // TODO: string_offset
+
+        // TODO: Many of these should be generated rather than stored
+        if let Some(props) = &self.props {
+            output.extend(&u32::to_be_bytes(props.header_len));
+            output.extend(&i32::to_be_bytes(props.mdl0offset));
+            output.extend(&i32::to_be_bytes(props.scaling_rule));
+            output.extend(&i32::to_be_bytes(props.tex_matrix_mode));
+            output.extend(&i32::to_be_bytes(props.num_vertices));
+            output.extend(&i32::to_be_bytes(props.num_triangles));
+            output.extend(&i32::to_be_bytes(props.orig_path_offset));
+            output.extend(&i32::to_be_bytes(props.num_nodes));
+            output.push(props.need_nrm_mtx_array);
+            output.push(props.need_tex_mtx_array);
+            output.push(props.enable_extents);
+            output.push(props.env_mtx_mode);
+            output.extend(&i32::to_be_bytes(props.data_offset));
+            output.extend(&props.extents.compile());
+        }
+
+        // TODO: What is the data here???
+        output.extend(&vec!(0x00; 0x8));
+
+        output.extend(definitions);
 
         output
     }

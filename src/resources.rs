@@ -38,4 +38,3 @@ pub struct Resource {
     pub data_offset: i32,
     pub string:      String,
 }
-
