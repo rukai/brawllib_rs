@@ -14,12 +14,12 @@ pub(crate) fn resources(data: FancySlice) -> Vec<Resource> {
         let string_offset = data.i32_be(child_index + 8);
 
         resources.push(Resource {
-            id:          data.u16_be(child_index as usize),
-            flag:        data.u16_be(child_index as usize + 0x2),
-            left_index:  data.u16_be(child_index as usize + 0x4),
-            right_index: data.u16_be(child_index as usize + 0x6),
-            data_offset: data.i32_be(child_index + 0xc),
-            string:      data.str(string_offset as usize).unwrap().to_string(),
+            //id:          data.u16_be(child_index as usize),
+            flag:          data.u16_be(child_index as usize + 0x2),
+            //left_index:  data.u16_be(child_index as usize + 0x4),
+            //right_index: data.u16_be(child_index as usize + 0x6),
+            data_offset:   data.i32_be(child_index + 0xc),
+            string:        data.str(string_offset as usize).unwrap().to_string(),
         });
     }
 
@@ -31,10 +31,7 @@ pub(crate) const RESOURCE_HEADER_SIZE: usize = 0x8;
 pub(crate) const RESOURCE_SIZE: usize = 0x10;
 #[derive(Clone, Debug)]
 pub struct Resource {
-    pub id:          u16,
-    pub flag:        u16,
-    pub left_index:  u16,
-    pub right_index: u16,
+    flag:            u16,
     pub data_offset: i32,
     pub string:      String,
 }

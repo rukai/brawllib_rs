@@ -20,9 +20,9 @@ impl Definitions {
         // insert the dummy child
         output.extend(&[0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let data_offset = 0; // TODO
+        //let data_offset = 0; // TODO
 
-        for definition in &self.values {
+        for _definition in &self.values {
             //output.extend(&u16::to_be_bytes(child.id));
             //output.extend(&u16::to_be_bytes(child.flag));
             //output.extend(&u16::to_be_bytes(child.left_index));
@@ -61,7 +61,7 @@ pub(crate) fn definitions(data: FancySlice, resources: Vec<Resource>) -> Definit
 
 impl Definition {
     pub fn compile(&self) -> Vec<u8> {
-        let mut output = vec!();
+        let output = vec!();
 
         output
     }

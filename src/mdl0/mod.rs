@@ -154,7 +154,6 @@ pub struct Mdl0 {
 
 impl Mdl0 {
     pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
-        println!("{:#?}", self);
         let mut output = vec!();
 
         // create mdl0 header

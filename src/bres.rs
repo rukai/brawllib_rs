@@ -32,10 +32,6 @@ fn bres_group(data: FancySlice) -> Vec<BresChild> {
         };
 
         children.push(BresChild {
-            id:          resource.id,
-            flag:        resource.flag,
-            left_index:  resource.left_index,
-            right_index: resource.right_index,
             name:        resource.string,
             data:        child_data,
         });
@@ -85,11 +81,17 @@ impl Bres {
             root_output.extend(&i32::to_be_bytes(resources_size as i32));
             root_output.extend(&i32::to_be_bytes(children.len() as i32)); // num_children
 
-            // insert the dummy child
-            root_output.extend(&[0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+            // insert the dummy resource
+            let root_resource = 1;
+            root_output.extend(&[0xff, 0xff]); // id
+            root_output.extend(&u16::to_be_bytes(0)); // flag
+            root_output.extend(&u16::to_be_bytes(root_resource)); // left_index
+            root_output.extend(&u16::to_be_bytes(0)); // right_index
+            root_output.extend(&i32::to_be_bytes(0)); // string_offset
+            root_output.extend(&i32::to_be_bytes(0)); // data_offset
 
             let mut data_offset_current = resources_size;
-            for child in children.iter() {
+            for (i, child) in children.iter().enumerate() {
                 let data_offset = match child.data {
                     BresChildData::Bres (_) => data_offset_current as i32,
                     _ =>
@@ -123,12 +125,19 @@ impl Bres {
                     }
                 }
 
+                let mut name = child.name.clone();
+                let index_component = (name.len() as u16 - 1) << 3;
+                let char_component = most_significant_different_bit(name.pop().unwrap() as u8, 0) as u16;
+                let id = index_component | char_component;
+                let left_index = (i + 1) as u16;
+                let right_index = (i + 1) as u16;
+
                 // create each resource
-                root_output.extend(&u16::to_be_bytes(child.id));
-                root_output.extend(&u16::to_be_bytes(child.flag));
-                root_output.extend(&u16::to_be_bytes(child.left_index));
-                root_output.extend(&u16::to_be_bytes(child.right_index));
-                root_output.extend(&i32::to_be_bytes(4)); // TODO: string_offset
+                root_output.extend(&u16::to_be_bytes(id));
+                root_output.extend(&u16::to_be_bytes(0));
+                root_output.extend(&u16::to_be_bytes(left_index));
+                root_output.extend(&u16::to_be_bytes(right_index));
+                root_output.extend(&i32::to_be_bytes(0)); // TODO: string_offset
                 root_output.extend(&i32::to_be_bytes(data_offset));
             }
         }
@@ -168,6 +177,16 @@ impl Bres {
 
         output
     }
+}
+
+fn most_significant_different_bit(b0: u8, b1: u8) -> u8 {
+    for i in 0..8 {
+        let bit = 0x80 >> i;
+        if b0 & bit != b1 & bit {
+            return 7 - i;
+        }
+    }
+    0
 }
 
 impl BresChild {
@@ -215,10 +234,6 @@ impl BresChild {
 const ROOT_HEADER_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct BresChild {
-    pub id: u16,
-    pub flag: u16,
-    pub left_index: u16,
-    pub right_index: u16,
     pub name: String,
     pub data: BresChildData
 }
