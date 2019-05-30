@@ -1,6 +1,7 @@
 use std::mem;
 use std::sync::mpsc;
 use std::f32::consts;
+use std::thread;
 
 use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
 use wgpu::winit::{EventsLoop, VirtualKeyCode, Window};
@@ -107,97 +108,107 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
 /// Returns the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
-    let mut result = vec!();
-
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     let width: u16 = 400;
     let height: u16 = 300;
 
-    //let mut state = create_state();
-
     let subaction = &high_level_fighter.subactions[subaction_index];
 
-    // DRAW!
-    {
-        let (frames_tx, frames_rx) = mpsc::channel();
+    let (frames_tx, frames_rx) = mpsc::channel();
+    let (gif_tx, gif_rx) = mpsc::channel();
 
-        for (frame_index, _) in subaction.frames.iter().enumerate() {
-            // Create buffers
-            // We recreate the buffers for each frame, reusing them would mean we need to wait for stuff to finish.
-            // Maybe I can implement pooling later.
-            let texture_extent = wgpu::Extent3d {
-                width: width as u32,
-                height: height as u32,
-                depth: 1
-            };
-            let framebuffer_descriptor = &wgpu::TextureDescriptor {
-                size: texture_extent,
-                array_layer_count: 1,
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: wgpu::TextureFormat::Bgra8Unorm,
-                usage: wgpu::TextureUsage::all(),
-            };
+    // Spawns a thread that takes the rendered frames and quantizes the pixels into a paletted gif
+    //TODO: Quantization takes up 80% of the processing time. Maybe I can implement my own faster quantizer, possibly run it on the gpu: https://gamedev.stackexchange.com/questions/111319/webgl-color-quantization
+    let subaction_len = subaction.frames.len();
+    thread::spawn(move || {
+        let mut result = vec!();
+        {
+            let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
+            for _ in 0..subaction_len {
+                let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
+                let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut frame_data);
+                encoder.write_frame(&gif_frame).unwrap();
+            }
+            encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
+        }
+        gif_tx.send(result).unwrap();
+    });
 
-            let framebuffer = state.device.create_texture(framebuffer_descriptor);
-            let framebuffer_copy_view = wgpu::TextureCopyView {
-                texture: &framebuffer,
-                mip_level: 0,
-                array_layer: 0,
-                origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
-            };
+    // Render each frame, sending it to the gif thread
+    for (frame_index, _) in subaction.frames.iter().enumerate() {
+        // Create buffers
+        // We recreate the buffers for each frame, reusing them would mean we need to wait for stuff to finish.
+        // Maybe I can implement pooling later.
+        let texture_extent = wgpu::Extent3d {
+            width: width as u32,
+            height: height as u32,
+            depth: 1
+        };
+        let framebuffer_descriptor = &wgpu::TextureDescriptor {
+            size: texture_extent,
+            array_layer_count: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            usage: wgpu::TextureUsage::all(),
+        };
 
-            let framebuffer_out_usage = &wgpu::BufferDescriptor {
-                size: width as u64 * height as u64 * 4,
-                usage: wgpu::BufferUsage::all(),
-            };
-            let framebuffer_out = state.device.create_buffer(framebuffer_out_usage);
-            let framebuffer_out_copy_view = wgpu::BufferCopyView {
-                buffer: &framebuffer_out,
-                offset: 0,
-                row_pitch: 0,
-                image_height: height as u32,
-            };
+        let framebuffer = state.device.create_texture(framebuffer_descriptor);
+        let framebuffer_copy_view = wgpu::TextureCopyView {
+            texture: &framebuffer,
+            mip_level: 0,
+            array_layer: 0,
+            origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
+        };
 
-            let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, false, false, high_level_fighter, subaction_index, frame_index);
-            command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
-            state.device.get_queue().submit(&[command_encoder.finish()]);
+        let framebuffer_out_usage = &wgpu::BufferDescriptor {
+            size: width as u64 * height as u64 * 4,
+            usage: wgpu::BufferUsage::all(),
+        };
+        let framebuffer_out = state.device.create_buffer(framebuffer_out_usage);
+        let framebuffer_out_copy_view = wgpu::BufferCopyView {
+            buffer: &framebuffer_out,
+            offset: 0,
+            row_pitch: 0,
+            image_height: height as u32,
+        };
 
-            let frames_tx = frames_tx.clone();
-            framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u32]>| {
-                match result {
-                    Ok(data_u32) => {
-                        let mut data_u8: Vec<u8> = vec!(0; width as usize * height as usize * 4);
-                        for (i, value) in data_u32.data.iter().enumerate() {
-                            data_u8[i * 4 + 0] = ((*value & 0x00FF0000) >> 16) as u8;
-                            data_u8[i * 4 + 1] = ((*value & 0x0000FF00) >> 08) as u8;
-                            data_u8[i * 4 + 2] = ((*value & 0x000000FF) >> 00) as u8;
-                            data_u8[i * 4 + 3] = ((*value & 0xFF000000) >> 24) as u8;
-                        }
-                        frames_tx.send(data_u8).unwrap();
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, false, false, high_level_fighter, subaction_index, frame_index);
+        command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
+        state.device.get_queue().submit(&[command_encoder.finish()]);
+
+        let frames_tx = frames_tx.clone();
+        framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u32]>| {
+            match result {
+                Ok(data_u32) => {
+                    let mut data_u8: Vec<u8> = vec!(0; width as usize * height as usize * 4);
+                    for (i, value) in data_u32.data.iter().enumerate() {
+                        data_u8[i * 4 + 0] = ((*value & 0x00FF0000) >> 16) as u8;
+                        data_u8[i * 4 + 1] = ((*value & 0x0000FF00) >> 08) as u8;
+                        data_u8[i * 4 + 2] = ((*value & 0x000000FF) >> 00) as u8;
+                        data_u8[i * 4 + 3] = ((*value & 0xFF000000) >> 24) as u8;
                     }
-                    Err(error) => {
-                        panic!("map_read_async failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
-                    }
+                    frames_tx.send(data_u8).unwrap();
                 }
-            });
-        }
-
-        //https://gamedev.stackexchange.com/questions/111319/webgl-color-quantization
-        let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
-        for _ in subaction.frames.iter() {
-            // Needed to get the last map_read_async to run.
-            state.device.poll(true);
-
-            let mut frame_data = frames_rx.recv().unwrap();
-            let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut frame_data);
-            encoder.write_frame(&gif_frame).unwrap();
-        }
-        encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
+                Err(error) => {
+                    panic!("map_read_async failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
+                }
+            }
+        });
     }
 
-    result
+    loop {
+        match gif_rx.try_recv() {
+            Err(_) => {
+                // Needed to get the last map_read_async to run.
+                state.device.poll(true);
+            }
+            Ok(value) => {
+                return value
+            }
+        }
+    }
 }
 
 pub struct WgpuState {

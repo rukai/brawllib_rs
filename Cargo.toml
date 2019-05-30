@@ -20,8 +20,7 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.6"
 gif = { version = "0.10", git = "https://github.com/rukai/image-gif", rev = "9549d60e462e8fcbb47db75c9c052501301728d3" }
-#wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "84a9f0b8f442e027b909b120c8d2b43064b708c2" }
-wgpu = { version = "0.2", features = ["vulkan"], path = "/home/rubic/Projects/Crates/wgpu/wgpu-rs" }
+wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "44ce0875f1cb339c802f9233e10e4ba42ee97bd1" }
 fancy_slice = { version = "0.1", features = [] }
 winit_input_helper = "0.3"
 
