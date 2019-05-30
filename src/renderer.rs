@@ -42,7 +42,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
     let mut frame_index = 0;
     let mut wireframe = false;
-    let mut perspective = true;
+    let mut perspective = false;
     let mut app_state = State::Play;
 
     while !input.quit() {
@@ -160,7 +160,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
                 image_height: height as u32,
             };
 
-            let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, true, false, high_level_fighter, subaction_index, frame_index);
+            let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, false, false, high_level_fighter, subaction_index, frame_index);
             command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
             state.device.get_queue().submit(&[command_encoder.finish()]);
 
@@ -371,12 +371,13 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             else {
                 width = height * aspect;
             }
+
             cgmath::ortho(
                 -width  / 2.0,
                 width   / 2.0,
                 -height / 2.0,
                 height  / 2.0,
-                1.0,
+                -1000.0,
                 1000.0,
             )
         };
