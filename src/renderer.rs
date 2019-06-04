@@ -126,7 +126,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
             for _ in 0..subaction_len {
                 let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
-                let gif_frame = gif::Frame::from_rgba(width as u16, height as u16, &mut frame_data);
+                let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
                 encoder.write_frame(&gif_frame).unwrap();
             }
             encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
@@ -151,7 +151,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8Unorm,
-            usage: wgpu::TextureUsage::all(),
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
@@ -162,11 +162,11 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
         };
 
-        let framebuffer_out_usage = &wgpu::BufferDescriptor {
+        let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
             size: width as u64 * height as u64 * 4,
-            usage: wgpu::BufferUsage::all(),
+            usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::TRANSFER_DST,
         };
-        let framebuffer_out = state.device.create_buffer(framebuffer_out_usage);
+        let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
         let framebuffer_out_copy_view = wgpu::BufferCopyView {
             buffer: &framebuffer_out,
             offset: 0,
@@ -179,29 +179,37 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         state.device.get_queue().submit(&[command_encoder.finish()]);
 
         let frames_tx = frames_tx.clone();
-        framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u32]>| {
+        framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u8]>| {
             match result {
-                Ok(data_u32) => {
-                    let mut data_u8: Vec<u8> = vec!(0; width as usize * height as usize * 4);
-                    for (i, value) in data_u32.data.iter().enumerate() {
-                        data_u8[i * 4 + 0] = ((*value & 0x00FF0000) >> 16) as u8;
-                        data_u8[i * 4 + 1] = ((*value & 0x0000FF00) >> 08) as u8;
-                        data_u8[i * 4 + 2] = ((*value & 0x000000FF) >> 00) as u8;
-                        data_u8[i * 4 + 3] = ((*value & 0xFF000000) >> 24) as u8;
+                Ok(data) => {
+                    let data = data.data;
+                    let pixel_count = width as usize * height as usize;
+                    let mut result = data.to_vec();
+                    for i in 0..pixel_count {
+                          let b = result[i * 4 + 0];
+                        //let g = result[i * 4 + 1];
+                          let r = result[i * 4 + 2];
+                        //let a = result[i * 4 + 3];
+
+                          result[i * 4 + 0] = r;
+                        //result[i * 4 + 1] = g;
+                          result[i * 4 + 2] = b;
+                        //result[i * 4 + 3] = a;
                     }
-                    frames_tx.send(data_u8).unwrap();
+                    frames_tx.send(result).unwrap();
                 }
                 Err(error) => {
                     panic!("map_read_async failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
                 }
             }
         });
+        state.device.poll(true);
     }
 
     loop {
         match gif_rx.try_recv() {
             Err(_) => {
-                // Needed to get the last map_read_async to run.
+                // Needed to get the map_read_async to run.
                 state.device.poll(true);
             }
             Ok(value) => {
