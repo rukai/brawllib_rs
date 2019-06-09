@@ -348,6 +348,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
 
         let mut subaction_extent = subaction.hurt_box_extent();
         subaction_extent.extend(&subaction.hit_box_extent());
+        subaction_extent.extend(&subaction.ledge_grab_box_extent());
+
         let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
         let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
         let extent_height = subaction_extent.up    - subaction_extent.down;
@@ -657,6 +659,55 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             rpass.set_index_buffer(&indices, 0);
             rpass.set_vertex_buffers(&[(&vertices, 0)]);
             rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+        }
+
+        if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
+            let _color = [1.0, 1.0, 1.0, 0.5];
+            let vertices_array = [
+                Vertex { _pos: [0.0, ledge_grab_box.up,   ledge_grab_box.left,  1.0], _color },
+                Vertex { _pos: [1.0, ledge_grab_box.up,   ledge_grab_box.right, 1.0], _color },
+                Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.left,  1.0], _color },
+                Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.right, 1.0], _color },
+            ];
+
+            let indices_array: [u16; 6] = [
+                0, 1, 2,
+                1, 2, 3,
+            ];
+
+            let vertices = state.device.create_buffer_mapped(vertices_array.len(), wgpu::BufferUsage::VERTEX)
+                .fill_from_slice(&vertices_array);
+
+            let indices = state.device.create_buffer_mapped(indices_array.len(), wgpu::BufferUsage::INDEX)
+                .fill_from_slice(&indices_array);
+
+            let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device
+                .create_buffer_mapped(
+                    16,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::TRANSFER_DST,
+                )
+                .fill_from_slice(transform);
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..64,
+                        },
+                    },
+                ],
+            });
+
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_index_buffer(&indices, 0);
+            rpass.set_vertex_buffers(&[(&vertices, 0)]);
+            rpass.draw_indexed(0..indices_array.len() as u32, 0, 0..1);
         }
     }
 
