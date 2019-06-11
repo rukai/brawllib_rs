@@ -626,9 +626,14 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
                 .fill_from_slice(&indices_vec);
 
             let rotation = if let Some(prev) = prev {
-                let source_angle = Vector3::new(0.0, 1.0, 0.0);
                 let diff = (prev - next).normalize();
-                Quaternion::from_arc(source_angle, diff, None).into()
+                if diff.x.is_nan() {
+                    // This occurs when prev == next
+                    Matrix4::identity()
+                } else {
+                    let source_angle = Vector3::new(0.0, 1.0, 0.0);
+                    Quaternion::from_arc(source_angle, diff, None).into()
+                }
             } else {
                 Matrix4::identity()
             };
