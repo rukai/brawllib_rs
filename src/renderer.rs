@@ -106,6 +106,14 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     }
 }
 
+#[derive(PartialEq)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
+}
+
 /// Returns the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
@@ -118,15 +126,43 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
     let (gif_tx, gif_rx) = mpsc::channel();
 
     // Spawns a thread that takes the rendered frames and quantizes the pixels into a paletted gif
-    //TODO: Quantization takes up 80% of the processing time. Maybe I can implement my own faster quantizer, possibly run it on the gpu: https://gamedev.stackexchange.com/questions/111319/webgl-color-quantization
+    // alex-charlton.com/posts/Dithering_on_the_GPU/
     let subaction_len = subaction.frames.len();
     thread::spawn(move || {
         let mut result = vec!();
         {
             let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
             for _ in 0..subaction_len {
-                let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
-                let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
+                let frame_data: Vec<u8> = frames_rx.recv().unwrap();
+
+                let pixel_count = width as usize * height as usize;
+                let mut pixels = vec!(0; pixel_count);
+                let mut colors: Vec<Color> = Vec::with_capacity(0xFF);
+
+                for i in 0..pixel_count {
+                    let color = Color {
+                        r: frame_data[i * 4 + 0],
+                        g: frame_data[i * 4 + 1],
+                        b: frame_data[i * 4 + 2],
+                        a: frame_data[i * 4 + 3],
+                    };
+                    if let Some(color_index) = colors.iter().position(|x| x == &color) {
+                        pixels[i] = color_index as u8;
+                    } else {
+                        colors.push(color);
+                        pixels[i] = colors.len() as u8 - 1;
+                    }
+                }
+
+                let mut palette = vec!(0; colors.len() * 3);
+                for (i, color) in colors.iter().enumerate() {
+                    palette[i * 3 + 0] = color.r;
+                    palette[i * 3 + 1] = color.g;
+                    palette[i * 3 + 2] = color.b;
+                }
+
+                let gif_frame = gif::Frame::from_palette_pixels(width as u16, height as u16, pixels.as_slice(), &palette, None);
+                //let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
                 encoder.write_frame(&gif_frame).unwrap();
             }
             encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
