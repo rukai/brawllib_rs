@@ -1,5 +1,6 @@
 use std::mem;
 use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
 use std::f32::consts;
 use std::thread;
 
@@ -13,6 +14,14 @@ use crate::high_level_fighter::{HighLevelFighter, CollisionBoxValues};
 struct Vertex {
     _pos:   [f32; 4],
     _color: [f32; 4],
+}
+
+#[derive(PartialEq)]
+struct Color {
+    r: u8,
+    g: u8,
+    b: u8,
+    a: u8,
 }
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
@@ -106,16 +115,8 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     }
 }
 
-#[derive(PartialEq)]
-struct Color {
-    r: u8,
-    g: u8,
-    b: u8,
-    a: u8,
-}
-
-/// Returns the bytes of a gif displaying hitbox and hurtboxes
-pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
+/// Returns a receier of the bytes of a gif displaying hitbox and hurtboxes
+pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Receiver<Vec<u8>> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     let width: u16 = 400;
     let height: u16 = 300;
@@ -133,36 +134,8 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         {
             let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
             for _ in 0..subaction_len {
-                let frame_data: Vec<u8> = frames_rx.recv().unwrap();
-
-                let pixel_count = width as usize * height as usize;
-                let mut pixels = vec!(0; pixel_count);
-                let mut colors: Vec<Color> = Vec::with_capacity(0xFF);
-
-                for i in 0..pixel_count {
-                    let color = Color {
-                        r: frame_data[i * 4 + 0],
-                        g: frame_data[i * 4 + 1],
-                        b: frame_data[i * 4 + 2],
-                        a: frame_data[i * 4 + 3],
-                    };
-                    if let Some(color_index) = colors.iter().position(|x| x == &color) {
-                        pixels[i] = color_index as u8;
-                    } else {
-                        colors.push(color);
-                        pixels[i] = colors.len() as u8 - 1;
-                    }
-                }
-
-                let mut palette = vec!(0; colors.len() * 3);
-                for (i, color) in colors.iter().enumerate() {
-                    palette[i * 3 + 0] = color.r;
-                    palette[i * 3 + 1] = color.g;
-                    palette[i * 3 + 2] = color.b;
-                }
-
-                let gif_frame = gif::Frame::from_palette_pixels(width as u16, height as u16, pixels.as_slice(), &palette, None);
-                //let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
+                let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
+                let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
                 encoder.write_frame(&gif_frame).unwrap();
             }
             encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
@@ -187,7 +160,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8Unorm,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::TRANSFER_SRC,
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
@@ -242,6 +215,12 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         state.device.poll(true);
     }
 
+    gif_rx
+}
+
+/// Returns the bytes of a gif displaying hitbox and hurtboxes
+pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
+    let gif_rx = render_gif(state, high_level_fighter, subaction_index);
     loop {
         match gif_rx.try_recv() {
             Err(_) => {
@@ -355,6 +334,10 @@ impl WgpuState {
             bind_group_layout,
             render_pipeline,
         }
+    }
+
+    pub fn poll(&self) {
+        self.device.poll(true);
     }
 }
 
