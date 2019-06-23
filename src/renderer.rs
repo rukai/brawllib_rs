@@ -24,6 +24,8 @@ struct Color {
     a: u8,
 }
 
+const SAMPLE_COUNT: u32 = 8;
+
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
 pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
@@ -325,7 +327,7 @@ impl WgpuState {
                     },
                 ],
             }],
-            sample_count: 1,
+            sample_count: SAMPLE_COUNT,
         });
 
         WgpuState {
@@ -344,11 +346,27 @@ impl WgpuState {
 fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
+    let multisampled_texture_extent = wgpu::Extent3d {
+        width: width as u32,
+        height: height as u32,
+        depth: 1
+    };
+    let multisampled_framebuffer_descriptor = &wgpu::TextureDescriptor {
+        size: multisampled_texture_extent,
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count: SAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Bgra8Unorm,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::TRANSFER_SRC,
+    };
+
+    let multisampled_framebuffer = state.device.create_texture(multisampled_framebuffer_descriptor);
     {
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &framebuffer,
-                resolve_target: None,
+                attachment: &multisampled_framebuffer.create_default_view(),
+                resolve_target: Some(framebuffer),
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
                 clear_color: wgpu::Color {
