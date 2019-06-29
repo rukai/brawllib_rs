@@ -756,6 +756,37 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x1A, 0x08, None,             None,             None) => EventAst::CameraNormal,
+            (0x21, 0x00, None,             None,             None) => EventAst::RemoveFlashEffect,
+            (0x21, 0x01, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                if let Some(&Value(v3)) = args.get(3) {
+                    EventAst::FlashEffectOverlay { red: v0, green: v1, blue: v2, alpha: v3 }
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x21, 0x02, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                if let (Some(&Value(v3)), Some(&Value(v4))) = (args.get(3), args.get(4)) {
+                    EventAst::SetColorOfFlashEffectOverlay { transition_time: v0, red: v1, green: v2, blue: v3, alpha: v4 }
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x21, 0x05, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                if let (Some(&Value(v3)), Some(&Scalar(v4)), Some(&Scalar(v5))) = (args.get(3), args.get(4), args.get(5)) {
+                    EventAst::FlashEffectLight { red: v0, green: v1, blue: v2, alpha: v3, light_source_x: v4, light_source_y: v5 }
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+            (0x21, 0x07, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                if let (Some(&Value(v3)), Some(&Value(v4))) = (args.get(3), args.get(4)) {
+                    EventAst::SetColorOfFlashEffectLight { transition_time: v0, red: v1, green: v2, blue: v3, alpha: v4 }
+                } else {
+                    EventAst::Unknown (event.clone())
+                }
+            }
+
+            // Items
             (0x1F, 0x00, Some(&Value(v0)), None,             None) => EventAst::ItemPickup { unk1: v0, unk2: None, unk3: None, unk4: None },
             (0x1F, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ItemPickup { unk1: v0, unk2: Some(v1), unk3: None, unk4: None },
             (0x1F, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => 
@@ -1141,6 +1172,18 @@ pub enum EventAst {
     CameraCloseup (CameraCloseup),
     /// Return the camera to its normal settings.
     CameraNormal,
+    /// Remove all currently active flash effects
+    RemoveFlashEffect,
+    /// Generate a flash overlay effect over the characer with the specified colors and opacity.
+    /// Replaces any currently active flash effects.
+    FlashEffectOverlay { red: i32, green: i32, blue: i32, alpha: i32 },
+    /// Change the color of the current flash overlay effect.
+    SetColorOfFlashEffectOverlay { transition_time: i32, red: i32, green: i32, blue: i32, alpha: i32 },
+    /// Generate a flash lighting effect over the character with the specified colors, opacity and angle.
+    /// Replaces any currently active flash effects.
+    FlashEffectLight { red: i32, green: i32, blue: i32, alpha: i32, light_source_x: f32, light_source_y: f32 },
+    /// Changes the color of the current flash light effect.
+    SetColorOfFlashEffectLight { transition_time: i32, red: i32, green: i32, blue: i32, alpha: i32 },
     /// Cause the character to receive the closest item in range.
     ItemPickup { unk1: i32, unk2: Option<i32>, unk3: Option<i32>, unk4: Option<i32> },
     /// Cause the character to throw the currently held item.

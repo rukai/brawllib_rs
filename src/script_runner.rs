@@ -1211,6 +1211,13 @@ impl<'a> ScriptRunner<'a> {
             }
             &EventAst::CameraCloseup (_) => { }
             &EventAst::CameraNormal => { }
+            &EventAst::RemoveFlashEffect => { }
+            &EventAst::FlashEffectOverlay { .. } => { }
+            &EventAst::SetColorOfFlashEffectOverlay { .. } => { }
+            &EventAst::FlashEffectLight { .. } => { }
+            &EventAst::SetColorOfFlashEffectLight { .. } => { }
+
+            // items
             &EventAst::ItemPickup { .. } => { }
             &EventAst::ItemThrow { .. } => { }
             &EventAst::ItemThrow2 { .. } => { }
