@@ -29,7 +29,7 @@ pub(crate) fn fragment_scripts(parent_data: FancySlice, known_scripts: &[&[Scrip
                         found_offset = Some(*offset);
                     }
                 }
-                if event.namespace == 0x0D && event.code == 0x00 { // if the event is a ConcurrentInfiniteLoop
+                if event.namespace == 0x0D && (event.code == 0x00 || event.code == 0x05) { // if the event is a CallEveryFrame or IndependentSubroutine
                     if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(1) {
                         if !ignore_origins.contains(origin) {
                             found_offset = Some(*offset);
@@ -274,9 +274,11 @@ pub enum Requirement {
     ButtonTap,
     EnteringOrIsInHitLag,
     ArticleExists,
+    IsOversteppingAnEdge,
     HasAFloorBelowThePlayer,
     ChangeInAirGroundState,
     ArticleAvailable,
+    CurrentTriggeredStatusID,
     HoldingItem,
     HoldingItemOfType,
     LightItemIsInGrabRange,
@@ -290,7 +292,7 @@ pub enum Requirement {
     IsNotInDamagingLens,
     ButtonPress,
     ButtonRelease,
-    ButtonPressed,
+    ButtonHeld,
     ButtonNotPressed,
     StickDirectionPressed,
     StickDirectionNotPressed,
@@ -302,7 +304,19 @@ pub enum Requirement {
     IsHoldingSomeoneInGrab,
     HitboxHasConnected,
     PickUpItem,
+    /// PM Only
+    SDIInput,
+    /// PM Only
+    ShieldInputPress,
+    /// PM Only
+    ShieldInputHeld,
+    /// PM Only
+    TauntInputPress,
+    /// PM Only
+    TauntInputHeld,
     HitByCapeEffect,
+    /// Independent Subroutine WiiRD code Only
+    ThreadIsNull,
     Always,
     InWalljump,
     InWallCling,
@@ -336,9 +350,11 @@ impl Requirement {
             0x000F => Requirement::ButtonTap,
             0x0014 => Requirement::EnteringOrIsInHitLag,
             0x0015 => Requirement::ArticleExists,
+            0x0016 => Requirement::IsOversteppingAnEdge,
             0x0017 => Requirement::HasAFloorBelowThePlayer,
             0x001B => Requirement::ChangeInAirGroundState,
             0x001C => Requirement::ArticleAvailable,
+            0x001D => Requirement::CurrentTriggeredStatusID,
             0x001F => Requirement::HoldingItem,
             0x0020 => Requirement::HoldingItemOfType,
             0x0021 => Requirement::LightItemIsInGrabRange,
@@ -352,7 +368,7 @@ impl Requirement {
             0x002F => Requirement::IsNotInDamagingLens,
             0x0030 => Requirement::ButtonPress,
             0x0031 => Requirement::ButtonRelease,
-            0x0032 => Requirement::ButtonPressed,
+            0x0032 => Requirement::ButtonHeld,
             0x0033 => Requirement::ButtonNotPressed,
             0x0034 => Requirement::StickDirectionPressed,
             0x0035 => Requirement::StickDirectionNotPressed,
@@ -365,6 +381,12 @@ impl Requirement {
             0x003d => Requirement::HitboxHasConnected,
             0x0047 => Requirement::PickUpItem,
             0x004C => Requirement::HitByCapeEffect,
+            0x004D => Requirement::SDIInput,
+            0x004E => Requirement::ShieldInputPress,
+            0x004f => Requirement::ShieldInputHeld,
+            0x0050 => Requirement::TauntInputPress,
+            0x0051 => Requirement::TauntInputHeld,
+            0x0060 => Requirement::ThreadIsNull,
             0x00FF => Requirement::Always,
             0x2711 => Requirement::InWalljump,
             0x2712 => Requirement::InWallCling,

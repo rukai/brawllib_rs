@@ -148,6 +148,9 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x01, 0x01, None,             None,                  None) => EventAst::LoopRest,
             (0x0D, 0x00, Some(&Value(v0)), Some(&Offset(ref v1)), None) => EventAst::CallEveryFrame { thread_id: v0, offset: v1.clone() },
             (0x0D, 0x01, Some(&Value(v0)), None,                  None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
+            (0x0D, 0x05, Some(&Value(v0)), Some(&Offset(ref v1)), None) => EventAst::IndependentSubroutine { thread_id: v0, offset: v1.clone() },
+            (0x0D, 0x06, Some(&Value(v0)), None,                  None) => EventAst::RemoveIndependentSubroutine { thread_id: v0 },
+            (0x0D, 0x07, Some(&Value(v0)), Some(&Value(v1)),      None) => EventAst::SetIndependentSubroutineThreadType { thread_id: v0, thread_type: v1 },
 
             // change action
             (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
@@ -191,13 +194,15 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x02, 0x0B, Some(&Value(v0)),  None,             None) => EventAst::DisableInterruptGroup (InterruptType::new(v0)),
             (0x02, 0x0C, Some(&Value(v0)),  None,             None) => EventAst::ClearInterruptGroup (InterruptType::new(v0)),
             (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupts,
+            (0x64, 0x01, None,              None,             None) => EventAst::DisallowInterrupts,
             (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
             (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
 
             // timing
-            (0x04, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetFrame (v0),
+            (0x04, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetAnimationFrame (v0),
             (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: 0 },
             (0x04, 0x07, Some(&Scalar(v0)), Some(&Value(v1)), None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: v1 },
+            (0x04, 0x14, Some(&Scalar(v0)), None,             None) => EventAst::SetAnimationAndTimerFrame (v0),
             (0x0c, 0x23, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::TimeManipulation (v0, v1),
 
             // misc state
@@ -459,6 +464,19 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     EventAst::Unknown(event.clone())
                 }
             }
+            (0x06, 0x14, Some(&Value(v0)), Some(v1), None) => {
+                let add_damage = match v1 {
+                    Value(constant)        => Some(FloatValue::Constant (*constant as f32)),
+                    Variable(ref variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
+                    _ => None,
+                };
+                if let Some(add_damage) = add_damage {
+                    EventAst::AddHitBoxDamage { hitbox_id: v0, add_damage }
+                } else {
+                    EventAst::Unknown(event.clone())
+                }
+            }
+            (0x06, 0x14, a,                b,                c,  ) => panic!("{:?} {:?} {:?}", a , b, c),
 
             // hurtboxes
             (0x06, 0x05, Some(&Value(v0)), None,             None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(v0) },
@@ -525,6 +543,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x0E, 0x06, Some(&Value(v0)),        None,                    None) => EventAst::DisableMovement (DisableMovement::new(v0)),
             (0x0E, 0x07, Some(&Value(v0)),        None,                    None) => EventAst::DisableMovement2 (DisableMovement::new(v0)),
             (0x0E, 0x02, Some(&Value(v0)),        None,                    None) => EventAst::ResetVerticalVelocityAndAcceleration (v0 == 1),
+            (0x17, 0x00, None,                    None,                    None) => EventAst::NormalizePhysics,
 
             // sound
             (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
@@ -763,6 +782,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x1F, 0x07, Some(&Value(v0)), None,              None) => EventAst::Item1F { unk: v0 },
             (0x1F, 0x08, Some(&Value(v0)), None,              None) => EventAst::ItemCreate { unk: v0 },
             (0x1F, 0x09, Some(&Bool(v0)),  None,              None) => EventAst::ItemVisibility (v0),
+            (0x1F, 0x0A, None,             None,              None) => EventAst::ItemDelete,
             (0x1F, 0x0C, Some(&Value(v0)), None,              None) => EventAst::BeamSwordTrail { unk: v0 },
             _ => EventAst::Unknown (event.clone())
         };
@@ -897,6 +917,15 @@ pub enum EventAst {
     CallEveryFrame { thread_id: i32, offset: Offset },
     /// Stops the execution of a loop created with CallEveryFrame
     RemoveCallEveryFrame { thread_id: i32 },
+    /// Runs a subroutine once, the subroutine will persist even after the end of the action.
+    /// Requires the Independent Subroutines code by Mawootad.
+    IndependentSubroutine { thread_id: i32, offset: Offset },
+    /// Stops the execution of a loop created with IndependentSubroutine
+    /// Requires the Independent Subroutines code by Mawootad.
+    RemoveIndependentSubroutine { thread_id: i32 },
+    /// Sets the thread_id to a custom thread type
+    /// Requires the Independent Subroutines code by Mawootad.
+    SetIndependentSubroutineThreadType { thread_id: i32, thread_type: i32 },
     /// Enables the given interrupt ID on any interrupt type.
     EnableInterrupt (i32),
     /// Disables the given interrupt ID on any interrupt type.
@@ -921,14 +950,18 @@ pub enum EventAst {
     InterruptAddRequirement { interrupt_type: InterruptType, interrupt_id: i32, test: Expression },
     /// Allow the current action to be interrupted by another action.
     AllowInterrupts,
+    /// Disallow the current action to be interrupted by another action.
+    DisallowInterrupts,
     /// Change the current subaction.
     ChangeSubaction (i32),
     /// Change the current subaction, restarting the frame count.
     ChangeSubactionRestartFrame (i32),
     /// Changes the current frame of the animation. Does not change the frame of the subaction (i.e. timers and such are unaffected).
-    SetFrame (f32),
+    SetAnimationFrame (f32),
     /// Dictates the frame speed of the subaction. Example: setting to 2 makes the animation and timers occur twice as fast.
     FrameSpeedModifier { multiplier: f32, unk: i32 },
+    /// Changes the current frame of the animation and the current frame of timers.
+    SetAnimationAndTimerFrame (f32),
     /// Change the speed of time for various parts of the environment.
     TimeManipulation (i32, i32),
     /// Specify whether the character is on or off the ground.
@@ -964,6 +997,8 @@ pub enum EventAst {
     SpecifyThrow (SpecifyThrow),
     /// Apply the previously specified throw
     ApplyThrow (ApplyThrow),
+    /// Adds the specified amount of damage to the specified hitbox.
+    AddHitBoxDamage { hitbox_id: i32, add_damage: FloatValue },
     /// Set the state of all of the characters hurtboxes.
     ChangeHurtBoxStateAll { state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox.
@@ -1026,6 +1061,8 @@ pub enum EventAst {
     DisableMovement2 (DisableMovement),
     /// When set to 1, vertical speed and acceleration are reset back to 0.
     ResetVerticalVelocityAndAcceleration (bool),
+    /// Returns to normal physics.
+    NormalizePhysics,
     /// Play a specified sound effect.
     SoundEffect1 (i32),
     /// Play a specified sound effect.
@@ -1126,6 +1163,8 @@ pub enum EventAst {
     ItemCreate { unk: i32 },
     /// Determines the visibility of the currently held item.
     ItemVisibility (bool),
+    /// Deletes the currently held item.
+    ItemDelete,
     /// Creates a beam sword trail. Probably has more uses among battering weapons.
     BeamSwordTrail { unk: i32 },
     /// Unknown event.

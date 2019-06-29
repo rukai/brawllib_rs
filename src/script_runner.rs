@@ -44,6 +44,7 @@ pub struct ScriptRunner<'a> {
     pub visited_gotos:               Vec<i32>,
     pub subaction_index:             usize,
     pub frame_index:                 f32, // affected by frame speed modifiers
+    pub animation_index:             f32, // affected by frame speed modifiers, usually in sync with frame_index but not always because some commands affect only animation_index
     pub frame_count:                 usize, // goes up by exactly 1 every frame, only used for external statistics like iasa
     pub interruptible:               bool,
     pub hitboxes:                    [Option<ScriptCollisionBox>; 7],
@@ -407,6 +408,7 @@ impl<'a> ScriptRunner<'a> {
             call_every_frame:      HashMap::new(),
             visited_gotos:         vec!(),
             frame_index:           0.0,
+            animation_index:       0.0,
             frame_count:           0,
             interruptible:         false,
             hitboxes:              [None, None, None, None, None, None, None],
@@ -538,6 +540,7 @@ impl<'a> ScriptRunner<'a> {
             self.frame_speed_modifier = fsm.frame_speed;
         }
         self.frame_index += self.frame_speed_modifier;
+        self.animation_index += self.frame_speed_modifier;
         self.frame_count += 1;
         self.step_script();
     }
@@ -785,6 +788,9 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::RemoveCallEveryFrame { thread_id } => {
                 self.call_every_frame.remove(&thread_id);
             }
+            &EventAst::IndependentSubroutine { .. } => { } // TODO
+            &EventAst::RemoveIndependentSubroutine { .. } => { } // TODO
+            &EventAst::SetIndependentSubroutineThreadType { .. } => { } // TODO
             &EventAst::DisableInterrupt (_) => { } // TODO
             &EventAst::EnableInterrupt (_) => { } // TODO
             &EventAst::ToggleInterrupt { .. } => { } // TODO
@@ -810,6 +816,9 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::AllowInterrupts => {
                 self.interruptible = true;
             }
+            &EventAst::DisallowInterrupts => {
+                self.interruptible = false;
+            }
             &EventAst::ChangeSubaction (v0) => {
                 self.change_subaction = ChangeSubaction::ChangeSubaction (v0);
             }
@@ -818,7 +827,11 @@ impl<'a> ScriptRunner<'a> {
             }
 
             // timing
-            &EventAst::SetFrame (v0) => {
+            &EventAst::SetAnimationFrame (v0) => {
+                self.animation_index = v0;
+            }
+            &EventAst::SetAnimationAndTimerFrame (v0) => {
+                self.animation_index = v0;
                 self.frame_index = v0;
             }
             &EventAst::FrameSpeedModifier { multiplier, .. } => {
@@ -985,6 +998,14 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::ApplyThrow (_) => {
                 self.throw_activate = true;
             }
+            &EventAst::AddHitBoxDamage { hitbox_id, ref add_damage } => {
+                let add_damage = self.get_float_value(&add_damage);
+                if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
+                    if let CollisionBoxValues::Hit (ref mut hitbox) = hitbox.values {
+                        hitbox.damage += add_damage;
+                    }
+                }
+            }
 
             // hurtboxes
             &EventAst::ChangeHurtBoxStateAll { ref state } => {
@@ -1096,6 +1117,7 @@ impl<'a> ScriptRunner<'a> {
                     self.y_vel_modify = VelModify::Set(0.0);
                 }
             }
+            &EventAst::NormalizePhysics => { } // TODO
 
             // sound
             &EventAst::SoundEffect1 (_) => { }
@@ -1195,12 +1217,13 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::ItemDrop => { }
             &EventAst::ItemConsume { .. } => { }
             &EventAst::ItemSetProperty { .. } => { }
-            &EventAst::Item1F { .. } => { }
-            &EventAst::ItemCreate { .. } => { }
-            &EventAst::BeamSwordTrail { .. } => { }
-            &EventAst::ItemVisibility (_) => { }
             &EventAst::FireWeapon => { }
             &EventAst::FireProjectile => { }
+            &EventAst::Item1F { .. } => { }
+            &EventAst::ItemCreate { .. } => { }
+            &EventAst::ItemVisibility (_) => { }
+            &EventAst::ItemDelete => { }
+            &EventAst::BeamSwordTrail { .. } => { }
 
             // do nothing
             &EventAst::Unknown (ref event) => {

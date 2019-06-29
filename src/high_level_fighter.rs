@@ -169,8 +169,8 @@ impl HighLevelFighter {
                     let mut x_pos = 0.0;
                     let mut y_pos = 0.0;
 
-                    while script_runner.frame_index < num_frames {
-                        let chr0_frame_index = script_runner.frame_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
+                    while script_runner.animation_index < num_frames {
+                        let chr0_frame_index = script_runner.animation_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                         let (animation_xyz_offset, frame_bones) = HighLevelFighter::transform_bones(
                             &first_bone,
                             &fighter_data.misc.bone_refs,
