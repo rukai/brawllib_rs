@@ -53,20 +53,20 @@ impl HighLevelFighter {
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
-        let fragment_scripts_fighter: Vec<ScriptAst> = fighter_sakurai.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_main:           Vec<ScriptAst> = fighter_data.subaction_main  .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_gfx:            Vec<ScriptAst> = fighter_data.subaction_gfx   .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_sfx:            Vec<ScriptAst> = fighter_data.subaction_sfx   .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_other:          Vec<ScriptAst> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_fighter: Vec<_> = fighter_sakurai.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_main:           Vec<_> = fighter_data.subaction_main  .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_gfx:            Vec<_> = fighter_data.subaction_gfx   .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_sfx:            Vec<_> = fighter_data.subaction_sfx   .iter().map(|x| ScriptAst::new(x)).collect();
+        let subaction_other:          Vec<_> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
 
-        let fragment_scripts_common: Vec<ScriptAst> = fighter_sakurai_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_common: Vec<_> = fighter_sakurai_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
 
-        let scripts_section: Vec<SectionScriptAst> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x, &fighter_sakurai.external_subroutines)).collect();
+        let scripts_section: Vec<_> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x, &fighter_sakurai.external_subroutines)).collect();
 
-        let entry_actions_common: Vec<ScriptAst> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
-        let entry_actions:        Vec<ScriptAst> = fighter_data       .entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
-        let exit_actions_common:  Vec<ScriptAst> = fighter_data_common.exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
-        let exit_actions:         Vec<ScriptAst> = fighter_data       .exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
+        let entry_actions_common: Vec<_> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
+        let entry_actions:        Vec<_> = fighter_data       .entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
+        let exit_actions_common:  Vec<_> = fighter_data_common.exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
+        let exit_actions:         Vec<_> = fighter_data       .exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
 
         let mut fighter_scripts = vec!();
         for script in fragment_scripts_fighter.iter()
@@ -101,21 +101,30 @@ impl HighLevelFighter {
 
         let mut actions = vec!();
         for i in 0..entry_actions_common.len() {
-            // TODO: Handle override tab stuff here
-            actions.push(HighLevelAction {
-                name:         format!("{} (Common)", crate::action_names::action_name(i)),
-                script_entry: entry_actions_common[i].clone(),
-                script_exit:  exit_actions_common[i].clone(),
-                common:       true,
-            });
+            let name = crate::action_names::action_name(i);
+
+            let entry_action_override = fighter_data.entry_action_overrides.iter().find(|x| x.action_id == i as u32);
+            let (script_entry, script_entry_common) = if let Some(action_override) = entry_action_override {
+                (ScriptAst::new(&action_override.script), false)
+            } else {
+                (entry_actions_common[i].clone(), true)
+            };
+            let exit_action_override = fighter_data.exit_action_overrides.iter().find(|x| x.action_id == i as u32);
+            let (script_exit, script_exit_common) = if let Some(action_override) = exit_action_override {
+                (ScriptAst::new(&action_override.script), false)
+            } else {
+                (exit_actions_common[i].clone(), true)
+            };
+            actions.push(HighLevelAction { name, script_entry, script_exit, script_entry_common, script_exit_common });
         }
 
         for i in 0..entry_actions.len() {
             actions.push(HighLevelAction {
-                name:         crate::action_names::action_name(0x112 + i),
-                script_entry: entry_actions[i].clone(),
-                script_exit:  exit_actions[i].clone(),
-                common:       false,
+                name:                crate::action_names::action_name(0x112 + i),
+                script_entry:        entry_actions[i].clone(),
+                script_entry_common: false,
+                script_exit:         exit_actions[i].clone(),
+                script_exit_common:  false,
             });
         }
 
@@ -476,7 +485,9 @@ pub struct HighLevelAction {
     pub script_entry: ScriptAst,
     pub script_exit:  ScriptAst,
     /// This is needed to determine where Goto/Subroutine events are pointing
-    pub common: bool,
+    pub script_entry_common: bool,
+    /// This is needed to determine where Goto/Subroutine events are pointing
+    pub script_exit_common: bool,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -1160,4 +1171,3 @@ impl SectionScriptAst {
         }
     }
 }
-

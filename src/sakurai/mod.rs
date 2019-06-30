@@ -42,7 +42,7 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) 
         let name = data.str(string_table_offset + string_offset as usize).unwrap().to_string();
 
         // The offset_linked_list is a pointer to the offset argument used by a subroutine/goto call that is making an external call.
-        // However the since the value in subroutine/goto offset argument has no purpose as its an external call, it is instead used to point to another value subroutine/goto offset argument.
+        // However since the value in subroutine/goto offset argument has no purpose as its an external call, it is instead used to point to another value subroutine/goto offset argument.
         // This forms a linked list between all the subroutine/goto offset arguments that make the same external call.
         while offset_linked_list > 0 && offset_linked_list < size {
             offsets.push(offset_linked_list);
@@ -64,7 +64,7 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) 
             "data" if item => SectionData::ItemData(item_data::arc_item_data(parent_data, data, wii_memory)),
             "data"         => SectionData::FighterData(fighter_data::arc_fighter_data(parent_data, data, wii_memory)),
             "dataCommon"   => SectionData::FighterDataCommon(fighter_data_common::arc_fighter_data_common(parent_data, data, wii_memory)),
-            _            => SectionData::None
+            _              => SectionData::None
         };
 
         if name.starts_with("gameAnimCmd_") || name.starts_with("effectAnimCmd_") || name.starts_with("statusAnimCmdGroup_") || name.starts_with("statusAnimCmdPre_") {
@@ -88,6 +88,12 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) 
                 all_scripts.push(data.subaction_gfx.as_slice());
                 all_scripts.push(data.subaction_sfx.as_slice());
                 all_scripts.push(data.subaction_other.as_slice());
+                for override_script in &data.entry_action_overrides {
+                    all_scripts_sub.push(override_script.script.clone());
+                }
+                for override_script in &data.exit_action_overrides {
+                    all_scripts_sub.push(override_script.script.clone());
+                }
             }
             SectionData::FighterDataCommon(data_common) => {
                 all_scripts.push(data_common.entry_actions.as_slice());
