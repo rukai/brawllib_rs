@@ -191,10 +191,10 @@ fn fighter_attributes(data: FancySlice) -> FighterAttributes {
         head_n_bone:                       data.u32_be(0x220),
         pause_camera_zoom_distance:        data.f32_be(0x244),
         magnifying_glass_size:             data.f32_be(0x244),
-        weight_dependent_throw_down:       data.u32_be(0x2dc) & 0b0001 == 0,
-        weight_dependent_throw_up:         data.u32_be(0x2dc) & 0b0010 == 0,
-        weight_dependent_throw_forward:    data.u32_be(0x2dc) & 0b0100 == 0,
-        weight_dependent_throw_backward:   data.u32_be(0x2dc) & 0b1000 == 0,
+        weight_dependent_throw_backward:   data.u32_be(0x2dc) & 0b0001 == 0,
+        weight_dependent_throw_forward:    data.u32_be(0x2dc) & 0b0010 == 0,
+        weight_dependent_throw_up:         data.u32_be(0x2dc) & 0b0100 == 0,
+        weight_dependent_throw_down:       data.u32_be(0x2dc) & 0b1000 == 0,
     }
 }
 
