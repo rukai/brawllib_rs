@@ -47,14 +47,13 @@ fn main() {
         }
     };
 
+    let fighters: Vec<_> = fighters.iter().filter(|x| x.cased_name.to_lowercase() != "poketrainer").collect();
+
     println!("Bad overlapping hitboxes:");
     println!("If there are 2 Hitboxes occupying the exact same space and one or more hits both grounded and aerial opponents.");
     println!("Or if there are 3 hitboxes occupying the exact same space.");
     println!("This is bad because sometimes it doesnt work correctly, resulting in a hitbox hitting that should never be possible e.g. https://twitter.com/ShaydonJohn/status/1147308339753127936");
-    for fighter in fighters {
-        if fighter.cased_name.to_lowercase() == "poketrainer" {
-            continue;
-        }
+    for fighter in fighters.iter() {
         let fighter = HighLevelFighter::new(&fighter);
         'subactions: for subaction in &fighter.subactions {
             for frame in &subaction.frames {
@@ -86,6 +85,18 @@ fn main() {
                         continue 'subactions;
                     }
                 }
+            }
+        }
+    }
+
+    println!("\nCreating an unconditional interrupt on the first line of a subaction:");
+    println!("This was used by PMDT before action overrides were understood.");
+    println!("All of these cases should be replaced with action overrides so that move staling is properly handled.");
+    for fighter in fighters {
+        let fighter = HighLevelFighter::new(&fighter);
+        for subaction in &fighter.subactions {
+            if subaction.bad_interrupts {
+                println!("{} {}", fighter.name, subaction.name);
             }
         }
     }

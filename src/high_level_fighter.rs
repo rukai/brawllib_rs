@@ -396,7 +396,9 @@ impl HighLevelFighter {
                     _             => None,
                 };
 
-                HighLevelSubaction { name, iasa, landing_lag, frames, animation_flags, scripts }
+                let bad_interrupts = script_runner.bad_interrupts.len() > 0;
+
+                HighLevelSubaction { name, iasa, landing_lag, frames, animation_flags, scripts, bad_interrupts }
             }).collect()
         } else {
             vec!()
@@ -498,6 +500,8 @@ pub struct HighLevelSubaction {
     pub landing_lag:     Option<f32>,
     pub animation_flags: AnimationFlags,
     pub scripts:         HighLevelScripts,
+    /// A hack where bad interrupts are ignored was used to process this subaction
+    pub bad_interrupts:  bool,
 }
 
 impl HighLevelSubaction {

@@ -76,7 +76,9 @@ pub struct ScriptRunner<'a> {
     /// Children of these bones are also visible
     pub invisible_bones: Vec<i32>,
     /// Each Interrupt is rechecked every frame after being created
-    pub interrupts:            Vec<Interrupt>,
+    pub interrupts: Vec<Interrupt>,
+    /// As a hack to get some subactions working we store "bad interrupts" here instead.
+    pub bad_interrupts:        Vec<Interrupt>,
     pub hitbox_sets_rehit:     [bool; 10],
     pub slope_contour_stand:   Option<i32>,
     pub slope_contour_full:    Option<(i32, i32)>,
@@ -431,6 +433,7 @@ impl<'a> ScriptRunner<'a> {
             reverse_direction:     false,
             change_subaction:      ChangeSubaction::Continue,
             interrupts:            vec!(),
+            bad_interrupts:        vec!(),
             hitbox_sets_rehit:     [false; 10],
             slope_contour_stand:   None,
             slope_contour_full:    None,
@@ -802,6 +805,8 @@ impl<'a> ScriptRunner<'a> {
                 // This is a super hacky hack to get moves like DK's dash attack working.
                 if !(self.frame_index == 0.0 && self.evaluate_expression(&interrupt.test).unwrap_bool()) {
                     self.interrupts.push(interrupt.clone());
+                } else {
+                    self.bad_interrupts.push(interrupt.clone());
                 }
             }
             &EventAst::PreviousInterruptAddRequirement { ref test } => {
