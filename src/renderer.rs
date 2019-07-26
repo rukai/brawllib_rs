@@ -41,6 +41,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
         .to_physical(window.get_hidpi_factor());
 
     let mut swap_chain_descriptor = wgpu::SwapChainDescriptor {
+        present_mode: wgpu::PresentMode::Vsync,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         format: wgpu::TextureFormat::Bgra8Unorm,
         width: size.width.round() as u32,
