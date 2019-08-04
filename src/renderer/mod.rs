@@ -4,11 +4,17 @@ use std::sync::mpsc::Receiver;
 use std::f32::consts;
 use std::thread;
 
-use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
-use wgpu::winit::{EventsLoop, VirtualKeyCode, Window};
+use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise, Rotation, EuclideanSpace};
+use wgpu::winit::{EventsLoop, Window};
 use winit_input_helper::WinitInputHelper;
 
-use crate::high_level_fighter::{HighLevelFighter, CollisionBoxValues};
+use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction, CollisionBoxValues};
+
+mod app;
+mod camera;
+
+use app::App;
+use camera::Camera;
 
 #[derive(Clone, Copy)]
 struct Vertex {
@@ -25,6 +31,41 @@ struct Color {
 }
 
 const SAMPLE_COUNT: u32 = 8;
+
+fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera {
+    let mut subaction_extent = subaction.hurt_box_extent();
+    subaction_extent.extend(&subaction.hit_box_extent());
+    subaction_extent.extend(&subaction.ledge_grab_box_extent());
+
+    let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
+    let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
+    let extent_height = subaction_extent.up    - subaction_extent.down;
+    let extent_width  = subaction_extent.right - subaction_extent.left;
+    let extent_aspect = extent_width / extent_height;
+    let aspect = width as f32 / height as f32;
+    let fov = 40.0;
+
+    let radius = (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
+    let fov_rad = fov * consts::PI / 180.0;
+
+    let mut camera_distance = radius / (fov_rad / 2.0).tan();
+
+    // This logic probably only works because this.pixel_width >= this.pixel_height is always true
+    if extent_aspect > aspect {
+        camera_distance /= aspect;
+    }
+    else if extent_width > extent_height {
+        camera_distance /= extent_aspect;
+    }
+
+    let target = Point3::new(0.0, extent_middle_y, extent_middle_z);
+
+    Camera {
+        rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
+        distance: camera_distance,
+        target,
+    }
+}
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
@@ -53,62 +94,32 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
     let subaction = &high_level_fighter.subactions[subaction_index];
 
-    let mut frame_index = 0;
-    let mut wireframe = false;
-    let mut perspective = false;
-    let mut app_state = State::Play;
+    let width = swap_chain_descriptor.width as u16;
+    let height = swap_chain_descriptor.height as u16;
+    let camera = new_camera(subaction, width, height);
+    let mut app = App::new(camera);
 
     while !input.quit() {
-        if input.key_pressed(VirtualKeyCode::Key1) {
-            wireframe = !wireframe;
-        }
-        if input.key_pressed(VirtualKeyCode::Key2) {
-            perspective = !perspective;
-        }
-
-        if input.key_pressed(VirtualKeyCode::Back) {
-            // TODO: Reset camera
-            frame_index = 0; // TODO: Probably delete this later, resetting frame_index is kind of only useful for debugging.
-        }
-        if input.key_pressed(VirtualKeyCode::Space) || input.key_pressed(VirtualKeyCode::Right) {
-            app_state = State::StepForward;
-        }
-        if input.key_pressed(VirtualKeyCode::Left) {
-            app_state = State::StepBackward;
-        }
-        if input.key_pressed(VirtualKeyCode::Return) {
-            app_state = State::Play;
-        }
-
-        // advance frame
-        match app_state {
-            State::StepForward | State::Play => {
-                frame_index += 1;
-                if frame_index >= subaction.frames.len() {
-                    frame_index = 0;
-                }
-            }
-            State::StepBackward => {
-                if frame_index == 0 {
-                    frame_index = subaction.frames.len() - 1;
-                } else {
-                    frame_index -= 1
-                }
-            }
-            State::Pause => { }
-        }
-
-        if let State::StepForward | State::StepBackward = app_state {
-            app_state = State::Pause;
-        }
+        input.update(&mut events_loop);
+        app.update(&input, subaction);
 
         {
             let framebuffer = swap_chain.get_next_texture();
-            let command_encoder = draw_frame(&mut state, &framebuffer.view, swap_chain_descriptor.width as u16, swap_chain_descriptor.height as u16, perspective, wireframe, high_level_fighter, subaction_index, frame_index);
+            let command_encoder = draw_frame(
+                &mut state,
+                &framebuffer.view,
+                width,
+                height,
+                app.perspective,
+                app.wireframe,
+                high_level_fighter,
+                subaction_index,
+                app.frame_index,
+                &app.camera,
+            );
             state.device.get_queue().submit(&[command_encoder.finish()]);
         }
 
-        input.update(&mut events_loop);
         if let Some(size) = input.window_resized() {
             let physical = size.to_physical(window.get_hidpi_factor());
             swap_chain_descriptor.width = physical.width.round() as u32;
@@ -118,7 +129,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     }
 }
 
-/// Returns a receier of the bytes of a gif displaying hitbox and hurtboxes
+/// Returns a receiver of the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Receiver<Vec<u8>> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     let width: u16 = 400;
@@ -186,7 +197,8 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             image_height: height as u32,
         };
 
-        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, false, false, high_level_fighter, subaction_index, frame_index);
+        let camera = new_camera(subaction, width, height);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width, height, false, false, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
         state.device.get_queue().submit(&[command_encoder.finish()]);
 
@@ -344,7 +356,7 @@ impl WgpuState {
     }
 }
 
-fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize) -> wgpu::CommandEncoder {
+fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
     let multisampled_texture_extent = wgpu::Extent3d {
@@ -384,34 +396,22 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
         let subaction = &high_level_fighter.subactions[subaction_index];
         let frame = &subaction.frames[frame_index];
 
+        // TODO: Should this stuff go in the camera? Lets not duplicate it...
         let mut subaction_extent = subaction.hurt_box_extent();
         subaction_extent.extend(&subaction.hit_box_extent());
         subaction_extent.extend(&subaction.ledge_grab_box_extent());
 
-        let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
-        let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
         let extent_height = subaction_extent.up    - subaction_extent.down;
         let extent_width  = subaction_extent.right - subaction_extent.left;
         let extent_aspect = extent_width / extent_height;
         let aspect = width as f32 / height as f32;
         let fov = 40.0;
 
-        let radius = (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
         let fov_rad = fov * consts::PI / 180.0;
 
-        let mut camera_distance = radius / (fov_rad / 2.0).tan();
-
-        // This logic probably only works because this.pixel_width >= this.pixel_height is always true
-        if extent_aspect > aspect {
-            camera_distance /= aspect;
-        }
-        else if extent_width > extent_height {
-            camera_distance /= extent_aspect;
-        }
-
-        let camera_target   = Point3::new(0.0,             extent_middle_y, extent_middle_z);
-        let camera_location = Point3::new(camera_distance, extent_middle_y, extent_middle_z);
-        let view = Matrix4::look_at(camera_location, camera_target, Vector3::new(0.0, -1.0, 0.0));
+        let camera_offset = camera.rotation.rotate_point(Point3::new(camera.distance, 0.0, 0.0));
+        let camera_location = camera.target + camera_offset.to_vec();
+        let view = Matrix4::look_at(camera_location, camera.target, Vector3::new(0.0, -1.0, 0.0));
 
         let projection = if perspective {
             cgmath::perspective(
@@ -755,11 +755,4 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
     }
 
     command_encoder
-}
-
-enum State {
-    Play,
-    StepForward,
-    StepBackward,
-    Pause,
 }
