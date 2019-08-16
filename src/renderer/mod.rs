@@ -270,10 +270,10 @@ impl WgpuState {
         });
 
         // shaders
-        let vs_bytes = include_bytes!("shaders/fighter.vert.spv");
-        let vs_module = device.create_shader_module(vs_bytes);
-        let fs_bytes = include_bytes!("shaders/fighter.frag.spv");
-        let fs_module = device.create_shader_module(fs_bytes);
+        let vs = include_bytes!("shaders/fighter.vert.spv");
+        let vs_module = device.create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&vs[..])).unwrap());
+        let fs = include_bytes!("shaders/fighter.frag.spv");
+        let fs_module = device.create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&fs[..])).unwrap());
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {

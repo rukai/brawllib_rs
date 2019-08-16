@@ -20,7 +20,7 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.6"
 gif = "0.10"
-wgpu = { version = "0.2", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "2bca2b891a1bc74d9a606f8fc7095f261323b2da" }
+wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "79b5342ee2972b219e1ba08173b4d6c88b191344" }
 fancy_slice = { version = "0.1", features = [] }
 winit_input_helper = "0.3"
 
