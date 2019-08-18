@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 use std::f32::consts;
 use std::thread;
 
-use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise, Rotation, EuclideanSpace};
+use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
 use wgpu::winit::{EventsLoop, Window};
 use winit_input_helper::WinitInputHelper;
 
@@ -61,9 +61,10 @@ fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera
     let target = Point3::new(0.0, extent_middle_y, extent_middle_z);
 
     Camera {
-        rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
-        distance: camera_distance,
         target,
+        radius: camera_distance,
+        phi: std::f32::consts::PI / 2.0,
+        theta: std::f32::consts::PI / 2.0,
     }
 }
 
@@ -409,8 +410,12 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
 
         let fov_rad = fov * consts::PI / 180.0;
 
-        let camera_offset = camera.rotation.rotate_point(Point3::new(camera.distance, 0.0, 0.0));
-        let camera_location = camera.target + camera_offset.to_vec();
+        let camera_offset = Vector3::new(
+            camera.radius * camera.phi.sin() * camera.theta.sin(),
+            camera.radius * camera.phi.cos(),
+            camera.radius * camera.phi.sin() * camera.theta.cos(),
+        );
+        let camera_location = camera.target + camera_offset;
         let view = Matrix4::look_at(camera_location, camera.target, Vector3::new(0.0, -1.0, 0.0));
 
         let projection = if perspective {

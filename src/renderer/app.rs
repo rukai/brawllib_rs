@@ -50,6 +50,35 @@ impl App {
             self.state = State::Play;
         }
 
+        let small = 0.00001;
+
+        if input.mouse_held(0) {
+            let diff = input.mouse_diff();
+            self.camera.theta += diff.0 / 100.0;
+            self.camera.phi -= diff.1 / 100.0;
+        }
+
+        if self.camera.theta > std::f32::consts::PI * 2.0 {
+            self.camera.theta = 0.0;
+        }
+        else if self.camera.theta < 0.0 {
+            self.camera.theta = std::f32::consts::PI * 2.0;
+        }
+
+        if self.camera.phi > std::f32::consts::PI - small {
+            self.camera.phi = std::f32::consts::PI - small;
+        }
+        else if self.camera.phi < small {
+            self.camera.phi = small;
+        }
+        println!("({}, {})", self.camera.phi, self.camera.theta);
+
+        self.camera.radius -= input.scroll_diff() * 2.0;
+        let min_camera_radius = 0.0000001;
+        if self.camera.radius < min_camera_radius {
+            self.camera.radius = min_camera_radius;
+        }
+
         // advance frame
         match self.state {
             State::StepForward | State::Play => {
