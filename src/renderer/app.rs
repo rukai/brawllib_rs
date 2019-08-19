@@ -54,7 +54,7 @@ impl App {
 
         if input.mouse_held(0) {
             let diff = input.mouse_diff();
-            self.camera.theta += diff.0 / 100.0;
+            self.camera.theta -= diff.0 / 100.0;
             self.camera.phi -= diff.1 / 100.0;
         }
 
@@ -71,7 +71,6 @@ impl App {
         else if self.camera.phi < small {
             self.camera.phi = small;
         }
-        println!("({}, {})", self.camera.phi, self.camera.theta);
 
         self.camera.radius -= input.scroll_diff() * 2.0;
         let min_camera_radius = 0.0000001;

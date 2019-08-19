@@ -64,7 +64,7 @@ fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera
         target,
         radius: camera_distance,
         phi: std::f32::consts::PI / 2.0,
-        theta: std::f32::consts::PI / 2.0,
+        theta: std::f32::consts::PI * 3.0 / 2.0,
     }
 }
 
@@ -421,7 +421,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             camera.radius * camera.phi.sin() * camera.theta.cos(),
         );
         let camera_location = camera.target + camera_offset;
-        let view = Matrix4::look_at(camera_location, camera.target, Vector3::new(0.0, -1.0, 0.0));
+        let view = Matrix4::look_at(camera_location, camera.target, Vector3::new(0.0, 1.0, 0.0));
 
         let projection = if perspective {
             cgmath::perspective(
