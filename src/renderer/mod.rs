@@ -113,6 +113,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
                 height,
                 app.perspective,
                 app.wireframe,
+                app.render_ecb,
                 high_level_fighter,
                 subaction_index,
                 app.frame_index,
@@ -199,7 +200,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         };
 
         let camera = new_camera(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_view(None), width, height, false, false, high_level_fighter, subaction_index, frame_index, &camera);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_view(None), width, height, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
         state.device.get_queue().submit(&[command_encoder.finish(None)]);
 
@@ -362,7 +363,7 @@ impl WgpuState {
     }
 }
 
-fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, render_ecb: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
     let multisampled_texture_extent = wgpu::Extent3d {
@@ -718,9 +719,121 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16
             let _color = [1.0, 1.0, 1.0, 0.5];
             let vertices_array = [
                 Vertex { _pos: [0.0, ledge_grab_box.up,   ledge_grab_box.left,  1.0], _color },
-                Vertex { _pos: [1.0, ledge_grab_box.up,   ledge_grab_box.right, 1.0], _color },
+                Vertex { _pos: [0.0, ledge_grab_box.up,   ledge_grab_box.right, 1.0], _color },
                 Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.left,  1.0], _color },
                 Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.right, 1.0], _color },
+            ];
+
+            let indices_array: [u16; 6] = [
+                0, 1, 2,
+                1, 2, 3,
+            ];
+
+            let vertices = state.device.create_buffer_mapped(vertices_array.len(), wgpu::BufferUsage::VERTEX)
+                .fill_from_slice(&vertices_array);
+
+            let indices = state.device.create_buffer_mapped(indices_array.len(), wgpu::BufferUsage::INDEX)
+                .fill_from_slice(&indices_array);
+
+            let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device
+                .create_buffer_mapped(
+                    16,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                )
+                .fill_from_slice(transform);
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..64,
+                        },
+                    },
+                ],
+            });
+
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_index_buffer(&indices, 0);
+            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
+            rpass.draw_indexed(0..indices_array.len() as u32, 0, 0..1);
+        }
+
+        if render_ecb {
+            // transN
+            let _color = if frame.ecb.transn_y == frame.ecb.bottom {
+                [0.0, 1.0, 0.0, 1.0]
+            } else {
+                [1.0, 1.0, 1.0, 1.0]
+            };
+
+            let mut vertices_vec: Vec<Vertex> = vec!();
+            let mut indices_vec: Vec<u16> = vec!();
+
+            let iterations = 40;
+            vertices_vec.push(Vertex { _pos: [0.0, 0.0, 0.0, 1.0], _color });
+            for i in 0..iterations {
+                let angle = i as f32 * 2.0 * consts::PI / (iterations as f32);
+                let (sin, cos) = angle.sin_cos();
+                let x = cos * 0.3;
+                let y = sin * 0.3;
+                vertices_vec.push(Vertex { _pos: [0.0, y, x, 1.0], _color });
+                indices_vec.push(0);
+                indices_vec.push(i + 1);
+                indices_vec.push((i + 1) % iterations + 1);
+            }
+
+            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
+                .fill_from_slice(&vertices_vec);
+
+            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
+                .fill_from_slice(&indices_vec);
+
+            let model = Matrix4::from_translation(Vector3::new(
+                0.0,
+                frame.y_pos + frame.ecb.transn_y,
+                frame.x_pos + frame.ecb.transn_x,
+            ));
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device
+                .create_buffer_mapped(
+                    16,
+                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+                )
+                .fill_from_slice(transform);
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buf,
+                            range: 0..64,
+                        },
+                    },
+                ],
+            });
+
+            rpass.set_bind_group(0, &bind_group, &[]);
+            rpass.set_index_buffer(&indices, 0);
+            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
+            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+
+            // ECB
+            let _color = [0.945, 0.361, 0.0392, 1.0];
+            let mid_y = (frame.ecb.top + frame.ecb.bottom) / 2.0;
+            let vertices_array = [
+                Vertex { _pos: [0.0, frame.ecb.top,    0.0,             1.0], _color },
+                Vertex { _pos: [0.0, mid_y,            frame.ecb.left,  1.0], _color },
+                Vertex { _pos: [0.0, mid_y,            frame.ecb.right, 1.0], _color },
+                Vertex { _pos: [0.0, frame.ecb.bottom, 0.0,             1.0], _color },
             ];
 
             let indices_array: [u16; 6] = [

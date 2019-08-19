@@ -14,6 +14,7 @@ pub(crate) struct App {
     pub frame_index: usize,
     pub wireframe: bool,
     pub perspective: bool,
+    pub render_ecb: bool,
     pub camera: Camera,
     state: State,
 }
@@ -24,6 +25,7 @@ impl App {
             frame_index: 0,
             wireframe: false,
             perspective: false,
+            render_ecb: false,
             camera,
             state: State::Play,
         }
@@ -35,6 +37,9 @@ impl App {
         }
         if input.key_pressed(VirtualKeyCode::Key2) {
             self.perspective = !self.perspective;
+        }
+        if input.key_pressed(VirtualKeyCode::Key3) {
+            self.render_ecb = !self.render_ecb;
         }
         if input.key_pressed(VirtualKeyCode::Back) {
             // TODO: Reset camera
