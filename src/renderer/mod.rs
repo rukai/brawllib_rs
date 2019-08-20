@@ -95,22 +95,31 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 
     let subaction = &high_level_fighter.subactions[subaction_index];
 
-    let width = swap_chain_descriptor.width as u16;
-    let height = swap_chain_descriptor.height as u16;
-    let camera = new_camera(subaction, width, height);
+    let camera = new_camera(
+        subaction,
+        swap_chain_descriptor.width as u16,
+        swap_chain_descriptor.height as u16,
+    );
     let mut app = App::new(camera);
 
     while !input.quit() {
         input.update(&mut events_loop);
         app.update(&input, subaction);
 
+        if let Some(size) = input.window_resized() {
+            let physical = size.to_physical(window.get_hidpi_factor());
+            swap_chain_descriptor.width = physical.width.round() as u32;
+            swap_chain_descriptor.height = physical.height.round() as u32;
+            swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
+        }
+
         {
             let framebuffer = swap_chain.get_next_texture();
             let command_encoder = draw_frame(
                 &mut state,
                 &framebuffer.view,
-                width,
-                height,
+                swap_chain_descriptor.width,
+                swap_chain_descriptor.height,
                 app.perspective,
                 app.wireframe,
                 app.render_ecb,
@@ -121,19 +130,13 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
             );
             state.device.get_queue().submit(&[command_encoder.finish(None)]);
         }
-
-        if let Some(size) = input.window_resized() {
-            let physical = size.to_physical(window.get_hidpi_factor());
-            swap_chain_descriptor.width = physical.width.round() as u32;
-            swap_chain_descriptor.height = physical.height.round() as u32;
-            swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
-        }
     }
 }
 
 /// Returns a receiver of the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Receiver<Vec<u8>> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
+    // restricted to u16 because of the gif library we are using
     let width: u16 = 400;
     let height: u16 = 300;
 
@@ -200,7 +203,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         };
 
         let camera = new_camera(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_view(None), width, height, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_view(None), width as u32, height as u32, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
         state.device.get_queue().submit(&[command_encoder.finish(None)]);
 
@@ -363,7 +366,7 @@ impl WgpuState {
     }
 }
 
-fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u16, height: u16, perspective: bool, wireframe: bool, render_ecb: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
     let multisampled_texture_extent = wgpu::Extent3d {
