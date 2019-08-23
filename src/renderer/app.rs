@@ -1,5 +1,5 @@
 use winit_input_helper::WinitInputHelper;
-use wgpu::winit::{VirtualKeyCode};
+use winit::event::VirtualKeyCode;
 use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::Camera;
 
@@ -10,18 +10,18 @@ pub(crate) enum State {
     Pause,
 }
 
-pub(crate) struct App {
+pub(crate) struct AppState {
     pub frame_index: usize,
-    pub wireframe: bool,
+    pub wireframe:   bool,
     pub perspective: bool,
-    pub render_ecb: bool,
-    pub camera: Camera,
-    state: State,
+    pub render_ecb:  bool,
+    pub camera:      Camera,
+    state:           State,
 }
 
-impl App {
-    pub fn new(camera: Camera) -> App {
-        App {
+impl AppState {
+    pub fn new(camera: Camera) -> AppState {
+        AppState {
             frame_index: 0,
             wireframe: false,
             perspective: false,
@@ -31,7 +31,7 @@ impl App {
         }
     }
 
-    pub fn update(&mut self, input: &WinitInputHelper, subaction: &HighLevelSubaction) {
+    pub fn update(&mut self, input: &WinitInputHelper<()>, subaction: &HighLevelSubaction) {
         if input.key_pressed(VirtualKeyCode::Key1) {
             self.wireframe = !self.wireframe;
         }

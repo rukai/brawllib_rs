@@ -1,7 +1,7 @@
 [package]
 name = "brawllib_rs"
 edition = "2018"
-version = "0.17.0" # not actually released because wgpu needs to be released first.
+version = "0.17.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "Brawl character file parser, based on brawlbox/brawllib"
 license = "MIT"
@@ -20,9 +20,11 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.6"
 gif = "0.10"
-wgpu = { version = "0.3", features = ["vulkan"], git = "https://github.com/gfx-rs/wgpu-rs", rev = "e2b6727eb087a26690cf2946b7379840af3fd677" }
+wgpu = { version = "0.3", features = ["vulkan"] }
 fancy_slice = { version = "0.1", features = [] }
-winit_input_helper = "0.3"
+winit = "0.20.0-alpha3"
+winit_input_helper = "0.4.0-alpha3"
+raw-window-handle = "0.1"
 
 [dev-dependencies]
 getopts = "0.2"

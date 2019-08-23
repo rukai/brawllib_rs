@@ -5,15 +5,18 @@ use std::f32::consts;
 use std::thread;
 
 use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
-use wgpu::winit::{EventsLoop, Window};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::{WindowBuilder, Window};
+use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
+use raw_window_handle::HasRawWindowHandle as _;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction, CollisionBoxValues};
 
 mod app;
 mod camera;
 
-use app::App;
+use app::AppState;
 use camera::Camera;
 
 #[derive(Clone, Copy)]
@@ -68,69 +71,104 @@ fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera
     }
 }
 
+/// Glues together:
+/// *   AppState: All application logic goes in here
+/// *   WgpuState: All rendering logic goes in here
+/// *   Other bits and pieces missing from WgpuState because they aren't needed for rendering to GIF.
+struct App {
+    wgpu_state: WgpuState,
+    app_state: AppState,
+    input: WinitInputHelper<()>,
+    window: Window,
+    surface: wgpu::Surface,
+    swap_chain: wgpu::SwapChain,
+    swap_chain_descriptor: wgpu::SwapChainDescriptor,
+    high_level_fighter: HighLevelFighter,
+    subaction_index: usize,
+}
+
+impl App {
+    fn new(event_loop: &EventLoop<()>, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> App {
+        let input = WinitInputHelper::new();
+
+        let wgpu_state = WgpuState::new();
+
+        let window = WindowBuilder::new().build(&event_loop).unwrap();
+        let size = window
+            .inner_size()
+            .to_physical(window.hidpi_factor());
+
+        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
+            present_mode: wgpu::PresentMode::Vsync,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: wgpu::TextureFormat::Bgra8Unorm,
+            width: size.width.round() as u32,
+            height: size.height.round() as u32,
+        };
+
+        let surface = wgpu_state.instance.create_surface(window.raw_window_handle());
+        let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
+
+        let subaction = &high_level_fighter.subactions[subaction_index];
+
+        let camera = new_camera(
+            subaction,
+            swap_chain_descriptor.width as u16,
+            swap_chain_descriptor.height as u16,
+        );
+        let app_state = AppState::new(camera);
+
+        let high_level_fighter = high_level_fighter.clone();
+
+        App { wgpu_state, app_state, input, window, surface, swap_chain, swap_chain_descriptor, high_level_fighter, subaction_index }
+    }
+
+    fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
+        if self.input.update(event) {
+            if self.input.quit() {
+                *control_flow = ControlFlow::Exit;
+            }
+
+            let subaction = &self.high_level_fighter.subactions[self.subaction_index];
+            self.app_state.update(&self.input, subaction);
+
+            if let Some(size) = self.input.window_resized() {
+                let physical = size.to_physical(self.window.hidpi_factor());
+                self.swap_chain_descriptor.width = physical.width.round() as u32;
+                self.swap_chain_descriptor.height = physical.height.round() as u32;
+                self.swap_chain = self.wgpu_state.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+            }
+
+            {
+                let framebuffer = self.swap_chain.get_next_texture();
+                let command_encoder = draw_frame(
+                    &mut self.wgpu_state,
+                    &framebuffer.view,
+                    self.swap_chain_descriptor.width,
+                    self.swap_chain_descriptor.height,
+                    self.app_state.perspective,
+                    self.app_state.wireframe,
+                    self.app_state.render_ecb,
+                    &self.high_level_fighter,
+                    self.subaction_index,
+                    self.app_state.frame_index,
+                    &self.app_state.camera,
+                );
+                self.wgpu_state.device.get_queue().submit(&[command_encoder.finish()]);
+            }
+        }
+    }
+}
+
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
 pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
-    let mut events_loop = EventsLoop::new();
-    let mut input = WinitInputHelper::new();
+    let event_loop = EventLoop::new();
+    let mut app = App::new(&event_loop, high_level_fighter, subaction_index);
 
-    let mut state = WgpuState::new();
-
-    let window = Window::new(&events_loop).unwrap();
-    let size = window
-        .get_inner_size()
-        .unwrap()
-        .to_physical(window.get_hidpi_factor());
-
-    let mut swap_chain_descriptor = wgpu::SwapChainDescriptor {
-        present_mode: wgpu::PresentMode::Vsync,
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        format: wgpu::TextureFormat::Bgra8Unorm,
-        width: size.width.round() as u32,
-        height: size.height.round() as u32,
-    };
-
-    let surface = state.instance.create_surface(&window);
-    let mut swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
-
-    let subaction = &high_level_fighter.subactions[subaction_index];
-
-    let camera = new_camera(
-        subaction,
-        swap_chain_descriptor.width as u16,
-        swap_chain_descriptor.height as u16,
-    );
-    let mut app = App::new(camera);
-
-    while !input.quit() {
-        input.update(&mut events_loop);
-        app.update(&input, subaction);
-
-        if let Some(size) = input.window_resized() {
-            let physical = size.to_physical(window.get_hidpi_factor());
-            swap_chain_descriptor.width = physical.width.round() as u32;
-            swap_chain_descriptor.height = physical.height.round() as u32;
-            swap_chain = state.device.create_swap_chain(&surface, &swap_chain_descriptor);
-        }
-
-        {
-            let framebuffer = swap_chain.get_next_texture();
-            let command_encoder = draw_frame(
-                &mut state,
-                &framebuffer.view,
-                swap_chain_descriptor.width,
-                swap_chain_descriptor.height,
-                app.perspective,
-                app.wireframe,
-                app.render_ecb,
-                high_level_fighter,
-                subaction_index,
-                app.frame_index,
-                &app.camera,
-            );
-            state.device.get_queue().submit(&[command_encoder.finish(None)]);
-        }
-    }
+    event_loop.run(move |event, _, control_flow| {
+        app.update(event, control_flow);
+    });
 }
 
 /// Returns a receiver of the bytes of a gif displaying hitbox and hurtboxes
@@ -203,9 +241,9 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         };
 
         let camera = new_camera(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_view(None), width as u32, height as u32, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
-        state.device.get_queue().submit(&[command_encoder.finish(None)]);
+        state.device.get_queue().submit(&[command_encoder.finish()]);
 
         let frames_tx = frames_tx.clone();
         framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u8]>| {
@@ -264,15 +302,15 @@ pub struct WgpuState {
 impl WgpuState {
     pub fn new() -> WgpuState {
         let instance = wgpu::Instance::new();
-        let adapter = instance.get_adapter(Some(&wgpu::RequestAdapterOptions {
+        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
-        }));
-        let device = adapter.request_device(Some(&wgpu::DeviceDescriptor {
+        });
+        let device = adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
-        }));
+        });
 
         // shaders
         let vs = include_bytes!("shaders/fighter.vert.spv");
@@ -286,10 +324,7 @@ impl WgpuState {
                 wgpu::BindGroupLayoutBinding {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer,
-                    dynamic: false,
-                    multisampled: false,
-                    texture_dimension: wgpu::TextureViewDimension::D2,
+                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                 },
             ],
         });
@@ -388,7 +423,7 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
     {
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &multisampled_framebuffer.create_view(None),
+                attachment: &multisampled_framebuffer.create_default_view(),
                 resolve_target: Some(framebuffer),
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
