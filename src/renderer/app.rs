@@ -10,13 +10,20 @@ pub(crate) enum State {
     Pause,
 }
 
+pub (crate) enum InvulnerableType {
+    Hit,
+    Grab,
+    TrapItem,
+}
+
 pub(crate) struct AppState {
-    pub frame_index: usize,
-    pub wireframe:   bool,
-    pub perspective: bool,
-    pub render_ecb:  bool,
-    pub camera:      Camera,
-    state:           State,
+    pub frame_index:       usize,
+    pub wireframe:         bool,
+    pub perspective:       bool,
+    pub render_ecb:        bool,
+    pub invulnerable_type: InvulnerableType,
+    pub camera:            Camera,
+    state:                 State,
 }
 
 impl AppState {
@@ -26,6 +33,7 @@ impl AppState {
             wireframe: false,
             perspective: false,
             render_ecb: false,
+            invulnerable_type: InvulnerableType::Hit,
             camera,
             state: State::Play,
         }
@@ -53,6 +61,15 @@ impl AppState {
         }
         if input.key_pressed(VirtualKeyCode::Return) {
             self.state = State::Play;
+        }
+        if input.key_pressed(VirtualKeyCode::Q) {
+            self.invulnerable_type = InvulnerableType::Hit;
+        }
+        if input.key_pressed(VirtualKeyCode::W) {
+            self.invulnerable_type = InvulnerableType::Grab;
+        }
+        if input.key_pressed(VirtualKeyCode::E) {
+            self.invulnerable_type = InvulnerableType::TrapItem;
         }
 
         let small = 0.00001;

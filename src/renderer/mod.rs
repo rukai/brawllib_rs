@@ -16,7 +16,7 @@ use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction, CollisionB
 mod app;
 mod camera;
 
-use app::AppState;
+use app::{AppState, InvulnerableType};
 use camera::Camera;
 
 #[derive(Clone, Copy)]
@@ -149,6 +149,7 @@ impl App {
                     self.app_state.perspective,
                     self.app_state.wireframe,
                     self.app_state.render_ecb,
+                    &self.app_state.invulnerable_type,
                     &self.high_level_fighter,
                     self.subaction_index,
                     self.app_state.frame_index,
@@ -241,7 +242,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         };
 
         let camera = new_camera(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, high_level_fighter, subaction_index, frame_index, &camera);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
         state.device.get_queue().submit(&[command_encoder.finish()]);
 
@@ -401,7 +402,7 @@ impl WgpuState {
     }
 }
 
-fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
     let multisampled_texture_extent = wgpu::Extent3d {
@@ -530,7 +531,19 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
             } else if hurt_box.state.is_invincible() {
                 [0.0, 1.0, 0.0, 0.3]
             } else {
-                [1.0, 1.0, 0.0, 0.3]
+                match invulnerable_type {
+                    InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
+                    InvulnerableType::Grab => if hurt_box.hurt_box.grabbable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
+                    InvulnerableType::TrapItem => if hurt_box.hurt_box.trap_item_hittable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
+                }
             };
 
             let mut grid = vec!();

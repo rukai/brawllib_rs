@@ -149,6 +149,9 @@ fn hurtbox(data: FancySlice) -> HurtBox {
     let region     = ((flags & 0b0000_0000_0110_0000) >> 5) as u8;
     let bone_index = ((flags & 0b1111_1111_1000_0000) >> 7) as u16;
 
+    let grabbable = region == 0 || region == 3;
+    let trap_item_hittable = region == 2 || region == 3;
+
     let zone = match zone {
         0 => HurtBoxZone::Low,
         1 => HurtBoxZone::Middle,
@@ -162,7 +165,8 @@ fn hurtbox(data: FancySlice) -> HurtBox {
         radius,
         enabled,
         zone,
-        region,
+        grabbable,
+        trap_item_hittable,
         bone_index,
     }
 }
@@ -229,7 +233,8 @@ pub struct HurtBox {
     pub radius: f32,
     pub enabled: bool,
     pub zone: HurtBoxZone,
-    pub region: u8,
+    pub grabbable: bool,
+    pub trap_item_hittable: bool,
     pub bone_index: u16,
 }
 
