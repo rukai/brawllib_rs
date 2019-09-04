@@ -9,7 +9,6 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::{WindowBuilder, Window};
 use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
-use raw_window_handle::HasRawWindowHandle as _;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction, CollisionBoxValues};
 
@@ -106,7 +105,7 @@ impl App {
             height: size.height.round() as u32,
         };
 
-        let surface = wgpu_state.instance.create_surface(window.raw_window_handle());
+        let surface = wgpu::Surface::create(&window);
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let subaction = &high_level_fighter.subactions[subaction_index];
@@ -294,7 +293,6 @@ pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevel
 }
 
 pub struct WgpuState {
-    instance: wgpu::Instance,
     device: wgpu::Device,
     bind_group_layout: wgpu::BindGroupLayout,
     render_pipeline: wgpu::RenderPipeline,
@@ -302,10 +300,10 @@ pub struct WgpuState {
 
 impl WgpuState {
     pub fn new() -> WgpuState {
-        let instance = wgpu::Instance::new();
-        let adapter = instance.request_adapter(&wgpu::RequestAdapterOptions {
+        let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::LowPower,
-        });
+            backends: wgpu::BackendBit::PRIMARY,
+        }).unwrap();
         let device = adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
@@ -390,7 +388,6 @@ impl WgpuState {
         });
 
         WgpuState {
-            instance,
             device,
             bind_group_layout,
             render_pipeline,
