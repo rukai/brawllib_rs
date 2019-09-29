@@ -154,7 +154,7 @@ impl App {
                     self.app_state.frame_index,
                     &self.app_state.camera,
                 );
-                self.wgpu_state.device.get_queue().submit(&[command_encoder.finish()]);
+                self.wgpu_state.queue.submit(&[command_encoder.finish()]);
             }
         }
     }
@@ -243,7 +243,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         let camera = new_camera(subaction, width, height);
         let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, high_level_fighter, subaction_index, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
-        state.device.get_queue().submit(&[command_encoder.finish()]);
+        state.queue.submit(&[command_encoder.finish()]);
 
         let frames_tx = frames_tx.clone();
         framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u8]>| {
@@ -294,6 +294,7 @@ pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevel
 
 pub struct WgpuState {
     device: wgpu::Device,
+    queue: wgpu::Queue,
     bind_group_layout: wgpu::BindGroupLayout,
     render_pipeline: wgpu::RenderPipeline,
 }
@@ -304,7 +305,7 @@ impl WgpuState {
             power_preference: wgpu::PowerPreference::LowPower,
             backends: wgpu::BackendBit::PRIMARY,
         }).unwrap();
-        let device = adapter.request_device(&wgpu::DeviceDescriptor {
+        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
@@ -389,6 +390,7 @@ impl WgpuState {
 
         WgpuState {
             device,
+            queue,
             bind_group_layout,
             render_pipeline,
         }
