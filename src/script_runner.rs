@@ -933,6 +933,8 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
+            &EventAst::DefensiveCollision { .. } => {
+            }
             &EventAst::MoveHitBox (ref move_hitbox) => {
                 if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
                     hitbox.bone_index = move_hitbox.new_bone as i16;

@@ -384,6 +384,13 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
+            (0x06, 0x17, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+                EventAst::DefensiveCollision {
+                    ty: DefensiveCollisionType::new(v0),
+                    unk: v1,
+                    direction: DefensiveCollisionDirection::new(v2),
+                }
+            }
             (0x06, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
                 if let (Some(&Scalar(v3)), Some(&Scalar(v4))) = (args.get(3), args.get(4)) {
                     EventAst::MoveHitBox (MoveHitBox {
@@ -1010,6 +1017,8 @@ pub enum EventAst {
     DeleteAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     /// Create a hitbox with the even more parameters.
     CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
+    /// Enables a defensive collision box e.g. links shield
+    DefensiveCollision { ty: DefensiveCollisionType, unk: i32, direction: DefensiveCollisionDirection },
     /// Repositions an already-existing hitbox.
     MoveHitBox (MoveHitBox),
     /// Changes a specific hitbox's damage to the new amount. Only guaranteed to work on a HitBox
@@ -1644,6 +1653,40 @@ pub struct SpecialHitBoxArguments {
     pub freeze_frame_disable: bool,
     pub unk5:                 bool,
     pub flinchless:           bool,
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum DefensiveCollisionType {
+    Block,
+    Reflect,
+    Unknown (i32),
+}
+
+impl DefensiveCollisionType {
+    fn new(value: i32) -> Self {
+        match value {
+            2 => DefensiveCollisionType::Block,
+            3 => DefensiveCollisionType::Reflect,
+            v => DefensiveCollisionType::Unknown (v),
+        }
+    }
+}
+
+#[derive(Serialize, Clone, Debug)]
+pub enum DefensiveCollisionDirection {
+    Front,
+    FrontAndBack,
+    Unknown (i32),
+}
+
+impl DefensiveCollisionDirection {
+    fn new(value: i32) -> Self {
+        match value {
+            1 => DefensiveCollisionDirection::Front,
+            2 => DefensiveCollisionDirection::FrontAndBack,
+            v => DefensiveCollisionDirection::Unknown (v),
+        }
+    }
 }
 
 #[derive(Serialize, Clone, Debug)]
