@@ -6,7 +6,7 @@ use std::thread;
 
 use cgmath::{Matrix4, Vector3, Point3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
 use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::{WindowBuilder, Window};
+use winit::window::Window;
 use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
@@ -45,9 +45,9 @@ fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera
     let extent_width  = subaction_extent.right - subaction_extent.left;
     let extent_aspect = extent_width / extent_height;
     let aspect = width as f32 / height as f32;
-    let fov = 40.0;
 
     let radius = (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
+    let fov = 40.0;
     let fov_rad = fov * consts::PI / 180.0;
 
     let mut camera_distance = radius / (fov_rad / 2.0).tan();
@@ -92,7 +92,7 @@ impl App {
 
         let wgpu_state = WgpuState::new();
 
-        let window = WindowBuilder::new().build(&event_loop).unwrap();
+        let window = Window::new(&event_loop).unwrap();
         let size = window
             .inner_size()
             .to_physical(window.hidpi_factor());

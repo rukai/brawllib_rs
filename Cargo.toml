@@ -20,11 +20,11 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.7"
 gif = "0.10"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "697393df4793e1a58578209885036114adfb9213" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "012d08d64de924da93289c2b51fb06b22d7348cf" }
 fancy_slice = { version = "0.1", features = [] }
-winit = "0.20.0-alpha3"
-winit_input_helper = "0.4.0-alpha3"
-raw-window-handle = "0.1"
+winit = "0.20.0-alpha4"
+winit_input_helper = "0.4.0-alpha4"
+raw-window-handle = "0.3"
 
 [dev-dependencies]
 getopts = "0.2"
