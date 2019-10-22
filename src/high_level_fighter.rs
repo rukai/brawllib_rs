@@ -374,16 +374,14 @@ impl HighLevelFighter {
                     }
                 }
 
-                let iasa = if let Some(iasa) = iasa {
-                    iasa
-                } else {
-                    match actual_name.as_ref() {
+                if iasa.is_none() {
+                    iasa = match actual_name.as_ref() {
                         "LandingAirN"  | "LandingAirF" |
                         "LandingAirB"  | "LandingAirHi" |
                         "LandingAirLw" | "LandingLight" |
                         "LandingHeavy" | "LandingFallSpecial"
-                          => script_runner.frame_count,
-                        _ => 0
+                          => Some(script_runner.frame_count),
+                        _ => None
                     }
                 };
 
@@ -495,7 +493,7 @@ pub struct HighLevelAction {
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelSubaction {
     pub name:            String,
-    pub iasa:            usize,
+    pub iasa:            Option<usize>,
     pub frames:          Vec<HighLevelFrame>,
     pub landing_lag:     Option<f32>,
     pub animation_flags: AnimationFlags,
