@@ -51,3 +51,4 @@ pub mod wiird_runner;
 mod util;
 mod action_names;
 mod fighter_maps;
+mod init_hack_script;

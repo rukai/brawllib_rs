@@ -22,6 +22,7 @@ use crate::script_ast::{
     LedgeGrabEnable,
 };
 use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox, VelModify};
+use crate::init_hack_script::init_hack_script;
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
@@ -151,11 +152,12 @@ impl HighLevelFighter {
                 let animation_flags = subaction_flags.animation_flags.clone();
 
                 let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
-                let action_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
+                let subaction_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
+                let init_hack_script = init_hack_script(&fighter.cased_name, &actual_name);
 
                 let mut frames: Vec<HighLevelFrame> = vec!();
                 let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &action_scripts, &fighter_scripts, &common_scripts, &scripts_section, &fighter_data, actual_name.clone());
+                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &subaction_scripts, &fighter_scripts, &common_scripts, &scripts_section, &init_hack_script, &fighter_data, actual_name.clone());
                 let mut iasa = None;
                 let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 

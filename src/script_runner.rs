@@ -263,7 +263,7 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], fighter_data: &ArcFighterData, subaction_name: String) -> ScriptRunner<'a> {
+    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], init_hack_script: &Block, fighter_data: &ArcFighterData, subaction_name: String) -> ScriptRunner<'a> {
         let mut call_stacks = vec!();
         for script in subaction_scripts {
             let calls = vec!(Call {
@@ -520,6 +520,10 @@ impl<'a> ScriptRunner<'a> {
             landing_lag: false,
             random_access_bool: vec!(false; 0x100), // normally has 8-16 bytes allocated
         };
+
+        for event in &init_hack_script.events {
+            runner.step_event(event, false, &[], &[], &[]);
+        }
 
         // Need to run the script until the first wait, so that the script is in the valid state
         // for the first frame.
@@ -1269,6 +1273,7 @@ impl<'a> ScriptRunner<'a> {
                     Requirement::FacingRight => true,
                     Requirement::HasntTethered3Times => true,
                     Requirement::IsNotInDamagingLens => true,
+                    Requirement::BoolIsTrue => self.evaluate_expression(&unary.value).unwrap_bool(),
                     _ => false
                 })
             }
@@ -1640,8 +1645,9 @@ enum ExprResult {
 impl ExprResult {
     fn unwrap_bool(&self) -> bool {
         match self {
-            ExprResult::Bool (result) => *result,
-            _ => panic!("ExprResult was {:?} instead of bool", self)
+            ExprResult::Bool  (result) => *result,
+            ExprResult::Int   (value)  => *value != 0,
+            ExprResult::Float (value)  => *value != 0.0,
         }
     }
 }
