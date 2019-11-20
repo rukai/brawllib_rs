@@ -9,6 +9,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
+use zerocopy::AsBytes;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction, CollisionBoxValues};
 
@@ -18,7 +19,8 @@ mod camera;
 use app::{AppState, InvulnerableType};
 use camera::Camera;
 
-#[derive(Clone, Copy)]
+#[repr(C)]
+#[derive(Clone, Copy, AsBytes)]
 struct Vertex {
     _pos:   [f32; 4],
     _color: [f32; 4],
@@ -139,7 +141,7 @@ impl App {
             }
 
             {
-                let framebuffer = self.swap_chain.get_next_texture();
+                let framebuffer = self.swap_chain.get_next_texture().unwrap();
                 let command_encoder = draw_frame(
                     &mut self.wgpu_state,
                     &framebuffer.view,
@@ -225,7 +227,7 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             texture: &framebuffer,
             mip_level: 0,
             array_layer: 0,
-            origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0 },
+            origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
         };
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
@@ -246,30 +248,28 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
         state.queue.submit(&[command_encoder.finish()]);
 
         let frames_tx = frames_tx.clone();
-        framebuffer_out.map_read_async(0, width as u64 * height as u64 * 4, move |result: wgpu::BufferMapAsyncResult<&[u8]>| {
-            match result {
-                Ok(data) => {
-                    let data = data.data;
-                    let pixel_count = width as usize * height as usize;
-                    let mut result = data.to_vec();
-                    for i in 0..pixel_count {
-                          let b = result[i * 4 + 0];
-                        //let g = result[i * 4 + 1];
-                          let r = result[i * 4 + 2];
-                        //let a = result[i * 4 + 3];
+        // TODO: don't block
+        match futures::executor::block_on(framebuffer_out.map_read(0, width as u64 * height as u64 * 4)) {
+            Ok(data) => {
+                let pixel_count = width as usize * height as usize;
+                let mut result = data.as_slice().to_vec();
+                for i in 0..pixel_count {
+                      let b = result[i * 4 + 0];
+                    //let g = result[i * 4 + 1];
+                      let r = result[i * 4 + 2];
+                    //let a = result[i * 4 + 3];
 
-                          result[i * 4 + 0] = r;
-                        //result[i * 4 + 1] = g;
-                          result[i * 4 + 2] = b;
-                        //result[i * 4 + 3] = a;
-                    }
-                    frames_tx.send(result).unwrap();
+                      result[i * 4 + 0] = r;
+                    //result[i * 4 + 1] = g;
+                      result[i * 4 + 2] = b;
+                    //result[i * 4 + 3] = a;
                 }
-                Err(error) => {
-                    panic!("map_read_async failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
-                }
+                frames_tx.send(result).unwrap();
             }
-        });
+            Err(error) => {
+                panic!("map_read failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
+            }
+        };
         state.device.poll(true);
     }
 
@@ -282,7 +282,7 @@ pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevel
     loop {
         match gif_rx.try_recv() {
             Err(_) => {
-                // Needed to get the map_read_async to run.
+                // Needed to get the map_read to run.
                 state.device.poll(true);
             }
             Ok(value) => {
@@ -301,10 +301,12 @@ pub struct WgpuState {
 
 impl WgpuState {
     pub fn new() -> WgpuState {
-        let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::LowPower,
-            backends: wgpu::BackendBit::PRIMARY,
-        }).unwrap();
+        let adapter = wgpu::Adapter::request(
+            &wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::LowPower,
+            },
+            wgpu::BackendBit::PRIMARY,
+        ).unwrap();
         let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
@@ -614,10 +616,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 }
             }
 
-            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&vertices_vec);
-            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&indices_vec);
+            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
 
             let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
             let transform_scale = Matrix4::from_scale(radius);
@@ -625,12 +625,10 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
 
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device
-                .create_buffer_mapped(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(transform);
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
             let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &state.bind_group_layout,
@@ -718,11 +716,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 }
             }
 
-            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&vertices_vec);
-
-            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&indices_vec);
+            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
 
             let rotation = if let Some(prev) = prev {
                 let diff = (prev - next).normalize();
@@ -739,12 +734,10 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
             let model = Matrix4::from_translation(next) * rotation;
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device
-                .create_buffer_mapped(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(transform);
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
             let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &state.bind_group_layout,
@@ -779,21 +772,16 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 1, 2, 3,
             ];
 
-            let vertices = state.device.create_buffer_mapped(vertices_array.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&vertices_array);
-
-            let indices = state.device.create_buffer_mapped(indices_array.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&indices_array);
+            let vertices = state.device.create_buffer_with_data(vertices_array.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_array.as_bytes(), wgpu::BufferUsage::INDEX);
 
             let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device
-                .create_buffer_mapped(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(transform);
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
             let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &state.bind_group_layout,
@@ -838,11 +826,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 indices_vec.push((i + 1) % iterations + 1);
             }
 
-            let vertices = state.device.create_buffer_mapped(vertices_vec.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&vertices_vec);
-
-            let indices = state.device.create_buffer_mapped(indices_vec.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&indices_vec);
+            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
 
             let model = Matrix4::from_translation(Vector3::new(
                 0.0,
@@ -851,12 +836,10 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
             ));
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device
-                .create_buffer_mapped(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(transform);
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
             let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &state.bind_group_layout,
@@ -891,21 +874,16 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 1, 2, 3,
             ];
 
-            let vertices = state.device.create_buffer_mapped(vertices_array.len(), wgpu::BufferUsage::VERTEX)
-                .fill_from_slice(&vertices_array);
-
-            let indices = state.device.create_buffer_mapped(indices_array.len(), wgpu::BufferUsage::INDEX)
-                .fill_from_slice(&indices_array);
+            let vertices = state.device.create_buffer_with_data(vertices_array.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_array.as_bytes(), wgpu::BufferUsage::INDEX);
 
             let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
             let transform = projection.clone() * view.clone() * model;
             let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device
-                .create_buffer_mapped(
-                    16,
-                    wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-                )
-                .fill_from_slice(transform);
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
             let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &state.bind_group_layout,
