@@ -39,7 +39,7 @@ impl AppState {
         }
     }
 
-    pub fn update(&mut self, input: &WinitInputHelper<()>, subaction: &HighLevelSubaction) {
+    pub fn update(&mut self, input: &WinitInputHelper, subaction: &HighLevelSubaction) {
         if input.key_pressed(VirtualKeyCode::Key1) {
             self.wireframe = !self.wireframe;
         }

@@ -79,8 +79,8 @@ fn new_camera(subaction: &HighLevelSubaction, width: u16, height: u16) -> Camera
 struct App {
     wgpu_state: WgpuState,
     app_state: AppState,
-    input: WinitInputHelper<()>,
-    window: Window,
+    input: WinitInputHelper,
+    _window: Window,
     surface: wgpu::Surface,
     swap_chain: wgpu::SwapChain,
     swap_chain_descriptor: wgpu::SwapChainDescriptor,
@@ -94,20 +94,18 @@ impl App {
 
         let wgpu_state = WgpuState::new();
 
-        let window = Window::new(&event_loop).unwrap();
-        let size = window
-            .inner_size()
-            .to_physical(window.hidpi_factor());
+        let _window = Window::new(&event_loop).unwrap();
+        let size = _window.inner_size();
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             present_mode: wgpu::PresentMode::Vsync,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: wgpu::TextureFormat::Bgra8Unorm,
-            width: size.width.round() as u32,
-            height: size.height.round() as u32,
+            width: size.width,
+            height: size.height,
         };
 
-        let surface = wgpu::Surface::create(&window);
+        let surface = wgpu::Surface::create(&_window);
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let subaction = &high_level_fighter.subactions[subaction_index];
@@ -121,7 +119,7 @@ impl App {
 
         let high_level_fighter = high_level_fighter.clone();
 
-        App { wgpu_state, app_state, input, window, surface, swap_chain, swap_chain_descriptor, high_level_fighter, subaction_index }
+        App { wgpu_state, app_state, input, _window, surface, swap_chain, swap_chain_descriptor, high_level_fighter, subaction_index }
     }
 
     fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
@@ -134,9 +132,8 @@ impl App {
             self.app_state.update(&self.input, subaction);
 
             if let Some(size) = self.input.window_resized() {
-                let physical = size.to_physical(self.window.hidpi_factor());
-                self.swap_chain_descriptor.width = physical.width.round() as u32;
-                self.swap_chain_descriptor.height = physical.height.round() as u32;
+                self.swap_chain_descriptor.width = size.width;
+                self.swap_chain_descriptor.height = size.height;
                 self.swap_chain = self.wgpu_state.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
             }
 
