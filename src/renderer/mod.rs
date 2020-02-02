@@ -400,8 +400,16 @@ impl WgpuState {
     }
 }
 
+struct Draw {
+    bind_group:  wgpu::BindGroup,
+    vertices:    wgpu::Buffer,
+    indices:     wgpu::Buffer,
+    indices_len: usize,
+}
+
 fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+    let mut draws = vec!();
 
     let multisampled_texture_extent = wgpu::Extent3d {
         width: width as u32,
@@ -419,10 +427,12 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
     };
 
     let multisampled_framebuffer = state.device.create_texture(multisampled_framebuffer_descriptor);
+
     {
+        let attachment = multisampled_framebuffer.create_default_view();
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &multisampled_framebuffer.create_default_view(),
+                attachment: &attachment,
                 resolve_target: Some(framebuffer),
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
@@ -640,10 +650,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 ],
             });
 
-            rpass.set_bind_group(0, &bind_group, &[]);
-            rpass.set_index_buffer(&indices, 0);
-            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
-            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+            let indices_len = indices_vec.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
         }
 
         for hitbox in frame.hit_boxes.iter() {
@@ -749,10 +757,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 ],
             });
 
-            rpass.set_bind_group(0, &bind_group, &[]);
-            rpass.set_index_buffer(&indices, 0);
-            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
-            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+            let indices_len = indices_vec.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
         }
 
         if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
@@ -793,10 +799,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 ],
             });
 
-            rpass.set_bind_group(0, &bind_group, &[]);
-            rpass.set_index_buffer(&indices, 0);
-            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
-            rpass.draw_indexed(0..indices_array.len() as u32, 0, 0..1);
+            let indices_len = indices_array.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
         }
 
         if render_ecb {
@@ -851,10 +855,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 ],
             });
 
-            rpass.set_bind_group(0, &bind_group, &[]);
-            rpass.set_index_buffer(&indices, 0);
-            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
-            rpass.draw_indexed(0..indices_vec.len() as u32, 0, 0..1);
+            let indices_len = indices_vec.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
 
             // ECB
             let _color = [0.945, 0.361, 0.0392, 1.0];
@@ -895,10 +897,15 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
                 ],
             });
 
-            rpass.set_bind_group(0, &bind_group, &[]);
-            rpass.set_index_buffer(&indices, 0);
-            rpass.set_vertex_buffers(0, &[(&vertices, 0)]);
-            rpass.draw_indexed(0..indices_array.len() as u32, 0, 0..1);
+            let indices_len = indices_array.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
+        }
+
+        for draw in &draws {
+            rpass.set_bind_group(0, &draw.bind_group, &[]);
+            rpass.set_index_buffer(&draw.indices, 0);
+            rpass.set_vertex_buffers(0, &[(&draw.vertices, 0)]);
+            rpass.draw_indexed(0..draw.indices_len as u32, 0, 0..1);
         }
     }
 
