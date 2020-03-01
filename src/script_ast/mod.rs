@@ -1042,6 +1042,9 @@ pub enum EventAst {
     /// Set the state of all of the characters hurtboxes.
     ChangeHurtBoxStateAll { state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox.
+    ///
+    /// Setting HurtBoxState::Invincible state with this command is broken.
+    /// It either has no effect or sets the state to Normal. (I havent confirmed which)
     ChangeHurtBoxStateSpecific { bone: i32, state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox to the global value.
     UnchangeHurtBoxStateSpecific,

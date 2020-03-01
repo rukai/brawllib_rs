@@ -1023,7 +1023,16 @@ impl<'a> ScriptRunner<'a> {
                 self.hurtbox_state_all = state.clone();
             }
             &EventAst::ChangeHurtBoxStateSpecific { bone, ref state } => {
-                self.hurtbox_states.insert(high_level_fighter::get_bone_index(bone), state.clone());
+                match state {
+                    HurtBoxState::Invincible => {
+                        // Setting HurtBoxState::Invincible state with this command is broken.
+                        // It either has no effect or sets the state to Normal.
+                        // I havent confirmed which, so the current implementation just does nothing.
+                    }
+                    _ => {
+                        self.hurtbox_states.insert(high_level_fighter::get_bone_index(bone), state.clone());
+                    }
+                }
             }
             &EventAst::UnchangeHurtBoxStateSpecific => {
                 self.hurtbox_states.clear();
