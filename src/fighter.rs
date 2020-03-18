@@ -84,20 +84,21 @@ impl Fighter {
             .map(|a| a.windows(4).any(|b| b == psa_sequence))
             .unwrap_or(false);
 
-        let motion_etc_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
         let motion_file_name = format!("Fit{}Motion.pac", fighter_data.cased_name);
-        let motion = if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
+        let motion_etc_file_name = format!("Fit{}MotionEtc.pac", fighter_data.cased_name);
+        // we prioritise the Motion.pac file because sometimes mods replace a MotionEtc.pac with a Motion.pac (but never the other way around)
+        let motion = if let Some(data) = fighter_data.data.get(&motion_file_name) {
+            // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
+            // Currently I dont need that file at all (What does it even contain?)
+            // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
             let data = FancySlice::new(data);
             arc::arc(data, wii_memory, false)
         } else {
-            if let Some(data) = fighter_data.data.get(&motion_file_name) {
-                // TODO: I'm going to need better abstractions here as I cant read the Fit{}Etc file
-                // Currently I dont need that file at all (What does it even contain?)
-                // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
+            if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
                 let data = FancySlice::new(data);
                 arc::arc(data, wii_memory, false)
             } else {
-                error!("Failed to load {}, Missing motion file: {}", fighter_data.cased_name, motion_etc_file_name);
+                error!("Failed to load {}, Missing motion file: {} or {}", fighter_data.cased_name, motion_file_name, motion_etc_file_name);
                 return None;
             }
         };
