@@ -98,7 +98,7 @@ impl App {
         let size = _window.inner_size();
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
-            present_mode: wgpu::PresentMode::Vsync,
+            present_mode: wgpu::PresentMode::Fifo,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
             format: wgpu::TextureFormat::Bgra8Unorm,
             width: size.width,
@@ -231,12 +231,13 @@ pub fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, 
             size: width as u64 * height as u64 * 4,
             usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
         };
+        let bytes_per_pixel = 4 * 4;
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
         let framebuffer_out_copy_view = wgpu::BufferCopyView {
             buffer: &framebuffer_out,
             offset: 0,
-            row_pitch: 0,
-            image_height: height as u32,
+            bytes_per_row: width as u32 * bytes_per_pixel, // multiple of 256 bytes??? wtf? yikes!
+            rows_per_image: height as u32,
         };
 
         let camera = new_camera(subaction, width, height);
@@ -303,13 +304,14 @@ impl WgpuState {
                 power_preference: wgpu::PowerPreference::LowPower,
             },
             wgpu::BackendBit::PRIMARY,
-        ).unwrap();
-        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+        );
+        let adapter = futures::executor::block_on(adapter).unwrap();
+        let (device, queue) = futures::executor::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
-        });
+        }));
 
         // shaders
         let vs = include_bytes!("shaders/fighter.vert.spv");
@@ -320,7 +322,7 @@ impl WgpuState {
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
-                wgpu::BindGroupLayoutBinding {
+                wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
                     ty: wgpu::BindingType::UniformBuffer { dynamic: false },
@@ -903,8 +905,8 @@ fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32
 
         for draw in &draws {
             rpass.set_bind_group(0, &draw.bind_group, &[]);
-            rpass.set_index_buffer(&draw.indices, 0);
-            rpass.set_vertex_buffers(0, &[(&draw.vertices, 0)]);
+            rpass.set_index_buffer(&draw.indices, 0, 0);
+            rpass.set_vertex_buffer(0, &draw.vertices, 0, 0);
             rpass.draw_indexed(0..draw.indices_len as u32, 0, 0..1);
         }
     }
