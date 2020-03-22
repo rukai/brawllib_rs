@@ -12,27 +12,26 @@ pub(crate) struct Vertex {
 }
 
 pub struct WgpuState {
-    pub(crate) device: wgpu::Device,
-    pub(crate) queue: wgpu::Queue,
+    pub(crate) device:            wgpu::Device,
+    pub(crate) queue:             wgpu::Queue,
     pub(crate) bind_group_layout: wgpu::BindGroupLayout,
-    pub(crate) render_pipeline: wgpu::RenderPipeline,
+    pub(crate) render_pipeline:   wgpu::RenderPipeline,
 }
 
 impl WgpuState {
-    pub fn new() -> WgpuState {
+    pub async fn new() -> WgpuState {
         let adapter = wgpu::Adapter::request(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::LowPower,
             },
             wgpu::BackendBit::PRIMARY,
-        );
-        let adapter = futures::executor::block_on(adapter).unwrap();
-        let (device, queue) = futures::executor::block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+        ).await.unwrap();
+        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
-        }));
+        }).await;
 
         // shaders
         let vs = include_bytes!("shaders/fighter.vert.spv");
