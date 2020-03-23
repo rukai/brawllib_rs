@@ -980,11 +980,11 @@ impl HitBoxValues {
     }
 
     pub fn can_hit_waddle_dee_doo(&self) -> bool {
-        self.can_hit1 || self.can_hit12
+        self.can_hit1 && self.can_hit12
     }
 
     pub fn can_hit_pikmin(&self) -> bool {
-        self.can_hit1 || self.can_hit12
+        self.can_hit1 && self.can_hit12
     }
 
     pub fn can_hit_sse(&self) -> bool {
@@ -992,31 +992,31 @@ impl HitBoxValues {
     }
 
     pub fn can_hit_gyro(&self) -> bool {
-        self.can_hit4 || self.can_hit11
+        self.can_hit4 && self.can_hit11
     }
 
     pub fn can_hit_snake_grenade(&self) -> bool {
-        self.can_hit4 || self.can_hit11
+        self.can_hit4 && self.can_hit11
     }
 
     pub fn can_hit_mr_saturn(&self) -> bool {
-        self.can_hit4 || self.can_hit11
+        self.can_hit4 && self.can_hit11
     }
 
     pub fn can_hit_stage_non_wall_ceiling_floor(&self) -> bool {
-        self.can_hit7 || self.can_hit11
+        self.can_hit7 && self.can_hit11
     }
 
     pub fn can_hit_wall_ceiling_floor(&self) -> bool {
-        self.can_hit8 || self.can_hit11
+        self.can_hit8 && self.can_hit11
     }
 
     pub fn can_hit_link_bomb(&self) -> bool {
-        self.can_hit9 || self.can_hit10
+        self.can_hit9 && self.can_hit10
     }
 
     pub fn can_hit_bobomb(&self) -> bool {
-        self.can_hit9 || self.can_hit10
+        self.can_hit9 && self.can_hit10
     }
 }
 
