@@ -116,7 +116,7 @@ pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevel
         match gif_rx.try_recv() {
             Err(_) => {
                 // Needed to get the map_read to run. // TODO: Might not be needed anymore?
-                state.device.poll(true);
+                state.device.poll(wgpu::Maintain::Wait);
             }
             Ok(value) => {
                 return value

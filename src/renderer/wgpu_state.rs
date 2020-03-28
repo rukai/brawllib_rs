@@ -87,23 +87,25 @@ impl WgpuState {
                 write_mask: wgpu::ColorWrite::ALL,
             }],
             depth_stencil_state: None,
-            index_format: wgpu::IndexFormat::Uint16,
-            vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                stride: mem::size_of::<Vertex>() as u64,
-                step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        shader_location: 0,
-                        format: wgpu::VertexFormat::Float4,
-                        offset: 0,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        shader_location: 1,
-                        format: wgpu::VertexFormat::Float4,
-                        offset: 4 * 4,
-                    },
-                ],
-            }],
+            vertex_state: wgpu::VertexStateDescriptor {
+                index_format: wgpu::IndexFormat::Uint16,
+                vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                    stride: mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttributeDescriptor {
+                            shader_location: 0,
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 0,
+                        },
+                        wgpu::VertexAttributeDescriptor {
+                            shader_location: 1,
+                            format: wgpu::VertexFormat::Float4,
+                            offset: 4 * 4,
+                        },
+                    ],
+                }],
+            },
             sample_count: SAMPLE_COUNT,
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
@@ -118,6 +120,6 @@ impl WgpuState {
     }
 
     pub fn poll(&self) {
-        self.device.poll(true);
+        self.device.poll(wgpu::Maintain::Wait);
     }
 }
