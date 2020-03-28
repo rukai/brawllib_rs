@@ -5,8 +5,6 @@ use std::path::{Path, PathBuf};
 
 use crate::fighter::Fighter;
 use crate::wii_memory::WiiMemory;
-use crate::wiird::WiiRDBlock;
-use crate::wiird;
 use crate::wiird_runner;
 use crate::arc;
 
@@ -98,51 +96,66 @@ impl BrawlMod {
 
     pub fn load_wiird_codeset_raw(&self) -> Result<Vec<u8>, Error> {
         // RSBE01.gct is usually located in the codes folder but can also be in the main sub folder e.g. LXP 2.1
-        // So, just check every subdirectory of the root.
+        // Additionally P+ now has a second codeset file called BOOST.GCT
+        // So we will load every *.gct file from within every subdirectory of the root.
+        // If we have already read a file of the same name, we assert the contents are equal, then skip it.
+        // Once all files are loaded, strip the headers and concatenate them in a deterministic fashion.
+
+        struct GCTFile {
+            pub name: String,
+            pub data: Vec<u8>,
+        }
+
+        let mut gct_files: Vec<GCTFile> = vec!();
         if let Some(mod_path) = &self.mod_path {
-            for dir in fs::read_dir(mod_path).unwrap() {
-                if let Ok(dir) = dir {
-                    let codeset_path = dir.path().join("RSBE01.gct");
-                    if codeset_path.exists() {
-                        let mut data: Vec<u8> = vec!();
-                        match File::open(&codeset_path) {
-                            Ok(mut file) => {
-                                if let Err(err) = file.read_to_end(&mut data) {
-                                    bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err);
+            for entry in fs::read_dir(mod_path).unwrap() {
+                if let Ok(entry) = entry {
+                    if entry.path().is_dir() {
+                        let child_dir = entry.path();
+                        for entry in fs::read_dir(child_dir).unwrap() {
+                            if let Ok(entry) = entry {
+                                let name = entry.file_name().into_string().unwrap();
+                                if name.ends_with(".gct") || name.ends_with(".GCT") {
+                                    let codeset_path = entry.path();
+                                    if codeset_path.exists() {
+                                        let mut data: Vec<u8> = vec!();
+                                        match File::open(&codeset_path) {
+                                            Ok(mut file) => {
+                                                if let Err(err) = file.read_to_end(&mut data) {
+                                                    bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err);
+                                                }
+                                            }
+                                            Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
+                                        }
+
+                                        if data.len() < 8 {
+                                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+                                        }
+                                        if let Some(matching_file) = gct_files.iter().find(|x| x.name == name) {
+                                            assert_eq!(matching_file.data, data);
+                                        }
+                                        else {
+                                            gct_files.push(GCTFile { name, data });
+                                        }
+                                    }
                                 }
                             }
-                            Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
                         }
-
-                        if data.len() < 8 {
-                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
-                        }
-
-                        return Ok(data[8..].to_vec()) // Skip the header
                     }
                 }
             }
-            bail!("Cannot find the WiiRD codeset (RSBE01.gct)");
         } else {
             bail!("Not a mod, vanilla brawl does not have a WiiRD codeset.");
         }
-    }
 
-    pub fn load_wiird_codeset(&self) -> Result<WiiRDBlock, Error> {
-        // RSBE01.gct is usually located in the codes folder but can also be in the main sub folder e.g. LXP 2.1
-        // So, just check every subdirectory of the root.
-        if let Some(mod_path) = &self.mod_path {
-            for dir in fs::read_dir(mod_path).unwrap() {
-                if let Ok(dir) = dir {
-                    let codeset_path = dir.path().join("RSBE01.gct");
-                    if codeset_path.exists() {
-                        return wiird::wiird_load_gct(&codeset_path)
-                    }
-                }
-            }
-            bail!("Cannot find the WiiRD codeset (RSBE01.gct)");
-        } else {
-            bail!("Not a mod, vanilla brawl does not have a WiiRD codeset.");
+        // Very important that the resulting wiird_codeset is deterministic
+        // Will make issues much easier to reproduce.
+        gct_files.sort_by_key(|x| x.name.clone());
+
+        let mut result = vec!();
+        for gct_file in gct_files {
+            result.extend(&gct_file.data[8..]); // skip the header
         }
+        Ok(result)
     }
 }

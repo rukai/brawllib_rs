@@ -4,6 +4,10 @@ use crate::wiird::{GeckoOperation, AddAddress, JumpFlag};
 
 use crate::wii_memory::WiiMemory;
 
+// My initial attempt at this, parsed the codeset into an AST.
+// But that was a TERRIBLE idea because its impossible to tell if you are currently parsing data or instructions.
+// So dont ever try to do that again :)
+
 pub fn process(codeset: &[u8], buffer: &mut [u8], buffer_ram_location: u32) -> WiiMemory {
     let mut memory = WiiMemory::new();
     let mut gecko_registers = [0_u32; 0x10];
