@@ -1,8 +1,10 @@
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 
-use crate::wiird::{GeckoOperation, AddAddress, JumpFlag};
-
 use crate::wii_memory::WiiMemory;
+
+mod wiird;
+
+use wiird::{GeckoOperation, AddAddress, JumpFlag};
 
 // My initial attempt at this, parsed the codeset into an AST.
 // But that was a TERRIBLE idea because its impossible to tell if you are currently parsing data or instructions.

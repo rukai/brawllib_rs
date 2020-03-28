@@ -46,7 +46,6 @@ pub mod script_runner;
 pub mod user_data;
 pub mod wii_memory;
 pub mod wii_texture_formats;
-pub mod wiird;
 pub mod wiird_runner;
 mod util;
 mod action_names;
