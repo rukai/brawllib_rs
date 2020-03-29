@@ -155,7 +155,7 @@ impl Fighter {
         let required_fighter_id = crate::fighter_maps::fighter_id(&fighter_data.cased_name);
         while fighter_byte != 0 {
             fighter_byte = wii_memory.read_u8(offset);
-            if fighter_byte == required_fighter_id {
+            if required_fighter_id.map(|id| id == fighter_byte).unwrap_or(false) || fighter_byte == 0xFF {
                 wiird_frame_speed_modifiers.push(WiiRDFrameSpeedModifier {
                     action:              wii_memory.read_u8(offset + 2) & 0xF0 == 0,
                     action_subaction_id: wii_memory.read_u16(offset + 2) & 0x0FFF,
