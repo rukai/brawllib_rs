@@ -48,6 +48,7 @@ impl WgpuState {
                     ty: wgpu::BindingType::UniformBuffer { dynamic: false },
                 },
             ],
+            label: None,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {

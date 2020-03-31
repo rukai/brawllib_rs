@@ -16,7 +16,7 @@ struct Draw {
 }
 
 pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
-    let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+    let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut draws = vec!();
 
     let multisampled_texture_extent = wgpu::Extent3d {
@@ -32,6 +32,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         dimension: wgpu::TextureDimension::D2,
         format: wgpu::TextureFormat::Bgra8Unorm,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+        label: None,
     };
 
     let multisampled_framebuffer = state.device.create_texture(multisampled_framebuffer_descriptor);
@@ -256,6 +257,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                         },
                     },
                 ],
+                label: None,
             });
 
             let indices_len = indices_vec.len();
@@ -363,6 +365,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                         },
                     },
                 ],
+                label: None,
             });
 
             let indices_len = indices_vec.len();
@@ -405,6 +408,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                         },
                     },
                 ],
+                label: None,
             });
 
             let indices_len = indices_array.len();
@@ -461,6 +465,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                         },
                     },
                 ],
+                label: None,
             });
 
             let indices_len = indices_vec.len();
@@ -503,6 +508,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                         },
                     },
                 ],
+                label: None,
             });
 
             let indices_len = indices_array.len();

@@ -11,6 +11,5 @@ layout(set = 0, binding = 0) uniform Locals {
 
 void main() {
     gl_Position = u_transform * a_pos;
-    gl_Position.y *= -1;
     v_color = a_color;
 }

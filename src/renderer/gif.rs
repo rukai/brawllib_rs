@@ -8,7 +8,13 @@ use crate::renderer::camera::Camera;
 use crate::renderer::wgpu_state::WgpuState;
 use crate::renderer::draw::draw_frame;
 
+
 /// Returns a receiver of the bytes of a gif displaying hitbox and hurtboxes
+///
+/// Most of the time is spent CPU side waiting for the color quantization thread to finish.
+/// So if you are batch rendering gifs you will get a massive speedup by running multiple `render_gif`s concurrently.
+///
+/// TODO: I should probably only expose a wrapper of this function that calls executor::block_on, so the user doesnt have to care about async
 pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Receiver<Vec<u8>> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     // restricted to u16 because of the gif library we are using
@@ -54,6 +60,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             dimension: wgpu::TextureDimension::D2,
             format: wgpu::TextureFormat::Bgra8Unorm,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+            label: None,
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
@@ -67,6 +74,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
             size: width as u64 * height as u64 * 4,
             usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
+            label: None,
         };
         let bytes_per_pixel = 4;
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
@@ -83,7 +91,11 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         state.queue.submit(&[command_encoder.finish()]);
 
         let frames_tx = frames_tx.clone();
-        match framebuffer_out.map_read(0, width as u64 * height as u64 * 4).await {
+        let read = framebuffer_out.map_read(0, width as u64 * height as u64 * 4);
+
+        state.poll();
+
+        match read.await {
             Ok(data) => {
                 let pixel_count = width as usize * height as usize;
                 let mut result = data.as_slice().to_vec();
@@ -112,15 +124,5 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
 /// Returns the bytes of a gif displaying hitbox and hurtboxes
 pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
     let gif_rx = futures::executor::block_on(render_gif(state, high_level_fighter, subaction_index));
-    loop {
-        match gif_rx.try_recv() {
-            Err(_) => {
-                // Needed to get the map_read to run. // TODO: Might not be needed anymore?
-                state.device.poll(wgpu::Maintain::Wait);
-            }
-            Ok(value) => {
-                return value
-            }
-        }
-    }
+    gif_rx.recv().unwrap()
 }
