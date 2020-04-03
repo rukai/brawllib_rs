@@ -26,7 +26,6 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     };
     let multisampled_framebuffer_descriptor = &wgpu::TextureDescriptor {
         size: multisampled_texture_extent,
-        array_layer_count: 1,
         mip_level_count: 1,
         sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,

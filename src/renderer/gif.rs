@@ -54,7 +54,6 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
         let framebuffer_descriptor = &wgpu::TextureDescriptor {
             size: texture_extent,
-            array_layer_count: 1,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,

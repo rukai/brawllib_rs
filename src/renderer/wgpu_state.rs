@@ -19,10 +19,11 @@ pub struct WgpuState {
 }
 
 impl WgpuState {
-    pub async fn new() -> WgpuState {
+    pub async fn new(compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
         let adapter = wgpu::Adapter::request(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::LowPower,
+                compatible_surface,
             },
             wgpu::BackendBit::PRIMARY,
         ).await.unwrap();

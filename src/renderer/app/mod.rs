@@ -42,9 +42,6 @@ pub struct App {
 impl App {
     pub fn new(event_loop: &EventLoop<()>, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> App {
         let input = WinitInputHelper::new();
-
-        let wgpu_state = futures::executor::block_on(WgpuState::new());
-
         let _window = Window::new(&event_loop).unwrap();
         let size = _window.inner_size();
 
@@ -57,6 +54,7 @@ impl App {
         };
 
         let surface = wgpu::Surface::create(&_window);
+        let wgpu_state = futures::executor::block_on(WgpuState::new(Some(&surface)));
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let subaction = &high_level_fighter.subactions[subaction_index];
