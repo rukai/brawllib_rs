@@ -1,4 +1,4 @@
-use cgmath::{Point3, Vector3, Matrix4, SquareMatrix, InnerSpace, Transform};
+use cgmath::{Point3, Vector3, Matrix4, SquareMatrix, InnerSpace, Transform, ElementWise, Matrix};
 use rayon::prelude::*;
 
 use crate::chr0::Chr0;
@@ -332,6 +332,7 @@ impl HighLevelFighter {
                                     right:  ecb.right + ledge_grab_box.x_padding,
                                     up:     ledge_grab_box.y + ledge_grab_box.height,
                                     down:   ledge_grab_box.y,
+                                    extents: vec!(),
                                 })
                             } else {
                                 None
@@ -634,6 +635,7 @@ impl HighLevelFrame {
                     down:  pos.y - size,
                     left:  pos.z - size,
                     right: pos.z + size,
+                    extents: vec!(),
                 };
                 extent.extend(&new_extent);
             }
@@ -645,6 +647,7 @@ impl HighLevelFrame {
                 down:  pos.y - size,
                 left:  pos.z - size,
                 right: pos.z + size,
+                extents: vec!(),
             };
             extent.extend(&new_extent);
         }
@@ -656,47 +659,51 @@ impl HighLevelFrame {
         let mut extent = Extent::new();
         for hurt_box in &self.hurt_boxes {
             let bone_matrix = hurt_box.bone_matrix.clone();
-            let bone_scale = Vector3::new(bone_matrix.x.magnitude(), bone_matrix.y.magnitude(), bone_matrix.z.magnitude());
-          //let bone_trousle = https://www.youtube.com/watch?v=64cvrwzrmhU
-            let radius = hurt_box.hurt_box.radius;
-            let stretch = hurt_box.hurt_box.stretch;
 
-            let stretch_face_temp = stretch / radius;
-            let stretch_face = Vector3::new(
-                stretch_face_temp.x / bone_scale.x,
-                stretch_face_temp.y / bone_scale.y,
-                stretch_face_temp.z / bone_scale.z
+            // extract the scale component from the bone_matrix
+            let bone_scale = Vector3::new(
+                bone_matrix.x.magnitude(),
+                bone_matrix.y.magnitude(),
+                bone_matrix.z.magnitude(),
             );
 
+            let radius = hurt_box.hurt_box.radius;
+            let stretch = hurt_box.hurt_box.stretch;
+            let offset = hurt_box.hurt_box.offset;
+
+            let stretch_face = (stretch / radius).div_element_wise(bone_scale);
+
+            let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
             let transform_scale = Matrix4::from_scale(radius);
-            let transform_translation = Matrix4::from_translation(Vector3::new(
-                hurt_box.hurt_box.offset.x / (bone_scale.x * radius),
-                hurt_box.hurt_box.offset.y / (bone_scale.y * radius),
-                hurt_box.hurt_box.offset.z / (bone_scale.z * radius),
-            ));
             let transform = bone_matrix * transform_scale * transform_translation;
 
             let sphere_8th_centers = [
-                Point3::new(0.0,            0.0,            0.0),
-                Point3::new(stretch_face.x, 0.0,            0.0),
-                Point3::new(0.0,            stretch_face.y, 0.0),
-                Point3::new(0.0,            0.0,            stretch_face.z),
-                Point3::new(stretch_face.x, stretch_face.y, 0.0),
-                Point3::new(0.0,            stretch_face.y, stretch_face.z),
-                Point3::new(stretch_face.x, 0.0,            stretch_face.z),
+                Vector3::new(0.0,            0.0,            0.0),
+                Vector3::new(stretch_face.x, 0.0,            0.0),
+                Vector3::new(0.0,            stretch_face.y, 0.0),
+                Vector3::new(0.0,            0.0,            stretch_face.z),
+                Vector3::new(stretch_face.x, stretch_face.y, 0.0),
+                Vector3::new(0.0,            stretch_face.y, stretch_face.z),
+                Vector3::new(stretch_face.x, 0.0,            stretch_face.z),
             ];
 
             for center in &sphere_8th_centers {
-                let transformed_center = transform.transform_point(*center);
+                // https://stackoverflow.com/questions/4368961/calculating-an-aabb-for-a-transformed-sphere
+                let transform = transform * Matrix4::from_translation(center.clone());
+                let mut s = Matrix4::from_scale(1.0);
+                s.w.w = -1.0;
+                if let Some(s_inverse) = s.invert() {
+                    let r = transform * s_inverse * transform.transpose();
 
-                // from the center of each sphere 8th we can apply the radius to get the maximum extent in all dimensions
-                let new_extent = Extent {
-                    up:    transformed_center.y + radius,
-                    down:  transformed_center.y - radius,
-                    left:  transformed_center.z - radius,
-                    right: transformed_center.z + radius,
-                };
-                extent.extend(&new_extent);
+                    let new_extent = Extent {
+                        up:    (r.y.w - (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                        down:  (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                        left:  (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
+                        right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
+                        extents: vec!(),
+                    };
+                    extent.extend(&new_extent);
+                }
             }
         }
         extent
@@ -711,47 +718,51 @@ impl HighLevelFrame {
             if let HurtBoxState::Normal = hurt_box.state {
                 some = true;
                 let bone_matrix = hurt_box.bone_matrix.clone();
-                let bone_scale = Vector3::new(bone_matrix.x.magnitude(), bone_matrix.y.magnitude(), bone_matrix.z.magnitude());
-              //let bone_trousle = https://www.youtube.com/watch?v=64cvrwzrmhU
-                let radius = hurt_box.hurt_box.radius;
-                let stretch = hurt_box.hurt_box.stretch;
 
-                let stretch_face_temp = stretch / radius;
-                let stretch_face = Vector3::new(
-                    stretch_face_temp.x / bone_scale.x,
-                    stretch_face_temp.y / bone_scale.y,
-                    stretch_face_temp.z / bone_scale.z
+                // extract the scale component from the bone_matrix
+                let bone_scale = Vector3::new(
+                    bone_matrix.x.magnitude(),
+                    bone_matrix.y.magnitude(),
+                    bone_matrix.z.magnitude(),
                 );
 
+                let radius = hurt_box.hurt_box.radius;
+                let stretch = hurt_box.hurt_box.stretch;
+                let offset = hurt_box.hurt_box.offset;
+
+                let stretch_face = (stretch / radius).div_element_wise(bone_scale);
+
+                let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
                 let transform_scale = Matrix4::from_scale(radius);
-                let transform_translation = Matrix4::from_translation(Vector3::new(
-                    hurt_box.hurt_box.offset.x / (bone_scale.x * radius),
-                    hurt_box.hurt_box.offset.y / (bone_scale.y * radius),
-                    hurt_box.hurt_box.offset.z / (bone_scale.z * radius),
-                ));
                 let transform = bone_matrix * transform_scale * transform_translation;
 
                 let sphere_8th_centers = [
-                    Point3::new(0.0,            0.0,            0.0),
-                    Point3::new(stretch_face.x, 0.0,            0.0),
-                    Point3::new(0.0,            stretch_face.y, 0.0),
-                    Point3::new(0.0,            0.0,            stretch_face.z),
-                    Point3::new(stretch_face.x, stretch_face.y, 0.0),
-                    Point3::new(0.0,            stretch_face.y, stretch_face.z),
-                    Point3::new(stretch_face.x, 0.0,            stretch_face.z),
+                    Vector3::new(0.0,            0.0,            0.0),
+                    Vector3::new(stretch_face.x, 0.0,            0.0),
+                    Vector3::new(0.0,            stretch_face.y, 0.0),
+                    Vector3::new(0.0,            0.0,            stretch_face.z),
+                    Vector3::new(stretch_face.x, stretch_face.y, 0.0),
+                    Vector3::new(0.0,            stretch_face.y, stretch_face.z),
+                    Vector3::new(stretch_face.x, 0.0,            stretch_face.z),
                 ];
 
                 for center in &sphere_8th_centers {
-                    let transformed_center = transform.transform_point(*center);
+                    // https://stackoverflow.com/questions/4368961/calculating-an-aabb-for-a-transformed-sphere
+                    let transform = transform * Matrix4::from_translation(center.clone());
+                    let mut s = Matrix4::from_scale(1.0);
+                    s.w.w = -1.0;
+                    if let Some(s_inverse) = s.invert() {
+                        let r = transform * s_inverse * transform.transpose();
 
-                    // from the center of each sphere 8th we can apply the radius to get the maximum extent in all dimensions
-                    let new_extent = Extent {
-                        up:    transformed_center.y + radius,
-                        down:  transformed_center.y - radius,
-                        left:  transformed_center.z - radius,
-                        right: transformed_center.z + radius,
-                    };
-                    extent.extend(&new_extent);
+                        let new_extent = Extent {
+                            up:    (r.y.w - (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                            down:  (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                            left:  (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
+                            right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
+                            extents: vec!(),
+                        };
+                        extent.extend(&new_extent);
+                    }
                 }
             }
         }
@@ -765,6 +776,8 @@ pub struct Extent {
     pub right: f32,
     pub up:    f32,
     pub down:  f32,
+
+    pub extents: Vec<Extent>,
 }
 
 impl Extent {
@@ -774,21 +787,28 @@ impl Extent {
             right: 0.0,
             up:    0.0,
             down:  0.0,
+            extents: vec!(),
         }
     }
 
     pub fn extend(&mut self, other: &Extent) {
-        if other.left < self.left {
+        if other.left < self.left && !self.left.is_nan() {
             self.left = other.left;
         }
-        if other.right > self.right {
+        if other.right > self.right && !self.right.is_nan() {
             self.right = other.right;
         }
-        if other.up > self.up {
+        if other.up > self.up && !self.up.is_nan() {
             self.up = other.up;
         }
-        if other.down < self.down {
+        if other.down < self.down && !self.down.is_nan() {
             self.down = other.down;
+        }
+        if other.extents.len() == 0 {
+            self.extents.push(other.clone())
+        }
+        else {
+            self.extents.extend(other.extents.clone())
         }
     }
 }
