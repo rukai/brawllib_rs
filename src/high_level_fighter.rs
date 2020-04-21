@@ -332,7 +332,6 @@ impl HighLevelFighter {
                                     right:  ecb.right + ledge_grab_box.x_padding,
                                     up:     ledge_grab_box.y + ledge_grab_box.height,
                                     down:   ledge_grab_box.y,
-                                    extents: vec!(),
                                 })
                             } else {
                                 None
@@ -635,7 +634,6 @@ impl HighLevelFrame {
                     down:  pos.y - size,
                     left:  pos.z - size,
                     right: pos.z + size,
-                    extents: vec!(),
                 };
                 extent.extend(&new_extent);
             }
@@ -647,7 +645,6 @@ impl HighLevelFrame {
                 down:  pos.y - size,
                 left:  pos.z - size,
                 right: pos.z + size,
-                extents: vec!(),
             };
             extent.extend(&new_extent);
         }
@@ -700,7 +697,6 @@ impl HighLevelFrame {
                         down:  (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
                         left:  (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
                         right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
-                        extents: vec!(),
                     };
                     extent.extend(&new_extent);
                 }
@@ -759,7 +755,6 @@ impl HighLevelFrame {
                             down:  (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
                             left:  (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
                             right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
-                            extents: vec!(),
                         };
                         extent.extend(&new_extent);
                     }
@@ -776,8 +771,6 @@ pub struct Extent {
     pub right: f32,
     pub up:    f32,
     pub down:  f32,
-
-    pub extents: Vec<Extent>,
 }
 
 impl Extent {
@@ -787,7 +780,6 @@ impl Extent {
             right: 0.0,
             up:    0.0,
             down:  0.0,
-            extents: vec!(),
         }
     }
 
@@ -803,12 +795,6 @@ impl Extent {
         }
         if other.down < self.down && !self.down.is_nan() {
             self.down = other.down;
-        }
-        if other.extents.len() == 0 {
-            self.extents.push(other.clone())
-        }
-        else {
-            self.extents.extend(other.extents.clone())
         }
     }
 }
