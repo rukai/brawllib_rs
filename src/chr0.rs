@@ -421,7 +421,7 @@ impl Interpolated4Entry {
     pub fn step       (&self) -> u16 { ((self.data & 0x00FF_F000) >> 12) as u16 }
     //     tangent                      (self.data & 0x0000_0FFF) -> refer implementation below
 
-    #[allow(exceeding_bitshifts)]
+    #[allow(arithmetic_overflow)]
     pub fn tangent    (&self) -> f32 {
         // We need to read the tangent value as a SIGNED integer so we bit shift to the left and then to the right, so that the +/- bit is correct
         let signed_int = ((self.data as i32) << 20) >> 20;
