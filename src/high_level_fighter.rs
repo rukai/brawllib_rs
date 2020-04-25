@@ -541,7 +541,12 @@ impl HighLevelSubaction {
         let mut extent = Extent::new();
         for frame in &self.frames {
             if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
-                extent.extend(ledge_grab_box);
+                let mut new_extent = ledge_grab_box.clone();
+                new_extent.up    += frame.y_pos;
+                new_extent.down  += frame.y_pos;
+                new_extent.left  += frame.x_pos;
+                new_extent.right += frame.x_pos;
+                extent.extend(&new_extent);
             }
         }
         extent
