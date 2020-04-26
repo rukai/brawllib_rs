@@ -4,7 +4,7 @@ use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
-use crate::renderer::wgpu_state::WgpuState;
+use crate::renderer::wgpu_state::{WgpuState, FORMAT};
 use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
 
@@ -73,7 +73,7 @@ impl App {
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             present_mode: wgpu::PresentMode::Fifo,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: FORMAT,
             width: size.width,
             height: size.height,
         };

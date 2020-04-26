@@ -1,11 +1,11 @@
-use brawllib_rs::renderer;
-
+#[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        println!("This example is only for wasm.");
-        return;
-    }
+    println!("Use the run_web_visualiser.sh script to run this example");
+}
+
+#[cfg(target_arch = "wasm32")]
+fn main() {
+    use brawllib_rs::renderer;
 
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init().expect("could not initialize logger");

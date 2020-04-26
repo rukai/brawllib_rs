@@ -6,7 +6,7 @@ use zerocopy::AsBytes;
 use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
 use crate::renderer::camera::Camera;
 use crate::renderer::app::state::InvulnerableType;
-use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, Vertex};
+use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, FORMAT, Vertex};
 
 struct Draw {
     bind_group:  wgpu::BindGroup,
@@ -17,7 +17,7 @@ struct Draw {
 
 pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-    let mut draws = vec!();
+    let mut draws: Vec<Draw> = vec!();
 
     let multisampled_texture_extent = wgpu::Extent3d {
         width: width as u32,
@@ -29,7 +29,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         mip_level_count: 1,
         sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Bgra8Unorm,
+        format: FORMAT,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
         label: None,
     };
@@ -40,8 +40,8 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let attachment = multisampled_framebuffer.create_default_view();
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                attachment: &attachment,
-                resolve_target: Some(framebuffer),
+                attachment: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },
+                resolve_target: if SAMPLE_COUNT == 1 { None } else { Some(framebuffer) },
                 load_op: wgpu::LoadOp::Clear,
                 store_op: wgpu::StoreOp::Store,
                 clear_color: wgpu::Color {

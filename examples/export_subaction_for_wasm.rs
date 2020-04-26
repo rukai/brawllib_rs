@@ -16,8 +16,6 @@ fn print_usage(program: &str, opts: Options) {
 fn main() {
     env_logger::init();
 
-    println!("startup println");
-
     let args: Vec<String> = env::args().collect();
     let program = &args[0];
 

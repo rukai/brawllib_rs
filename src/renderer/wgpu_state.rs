@@ -3,6 +3,7 @@ use std::mem;
 use zerocopy::AsBytes;
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
+pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes)]
@@ -75,7 +76,7 @@ impl WgpuState {
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
-                format: wgpu::TextureFormat::Bgra8Unorm,
+                format: FORMAT,
                 color_blend: wgpu::BlendDescriptor {
                     src_factor: wgpu::BlendFactor::SrcAlpha,
                     dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,

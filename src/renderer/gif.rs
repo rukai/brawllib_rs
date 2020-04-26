@@ -5,7 +5,7 @@ use std::thread;
 use crate::high_level_fighter::HighLevelFighter;
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::camera::Camera;
-use crate::renderer::wgpu_state::WgpuState;
+use crate::renderer::wgpu_state::{WgpuState, FORMAT};
 use crate::renderer::draw::draw_frame;
 
 
@@ -57,7 +57,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: FORMAT,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
             label: None,
         };
