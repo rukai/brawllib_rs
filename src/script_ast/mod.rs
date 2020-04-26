@@ -9,7 +9,7 @@ pub mod variable_ast;
 
 use variable_ast::VariableAst;
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScriptAst {
     pub block:  Block,
     pub offset: i32,
@@ -909,7 +909,7 @@ enum ProcessedBlock {
     EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>> },
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum EventAst {
     ///Pause the current flow of events until the set time is reached. Synchronous timers count down when they are reached in the code.
     SyncWait (f32),
@@ -1226,37 +1226,37 @@ pub enum EventAst {
     Unknown (Event)
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum FloatValue {
     Variable (VariableAst),
     Constant (f32),
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Block {
     pub events: Vec<EventAst>
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ForLoop {
     pub iterations: Iterations,
     pub block: Block,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Iterations {
     Finite (i32),
     Infinite
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct IfStatement {
     pub test: Expression,
     pub then_branch: Block,
     pub else_branch: Option<Box<Block>>
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Expression {
     Nullary  (Requirement),
     Unary    (UnaryExpression),
@@ -1267,20 +1267,20 @@ pub enum Expression {
     Scalar   (f32),
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BinaryExpression {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
     pub operator: ComparisonOperator
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnaryExpression {
     pub requirement: Requirement,
     pub value: Box<Expression>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ComparisonOperator {
     LessThan,
     LessThanOrEqual,
@@ -1307,7 +1307,7 @@ impl ComparisonOperator {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum EdgeSlide {
     SlideOff,
     StayOn,
@@ -1326,7 +1326,7 @@ impl EdgeSlide {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum HurtBoxState {
     Normal,
     Invincible,
@@ -1372,7 +1372,7 @@ impl HurtBoxState {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum AngleFlip {
     AwayFromAttacker,
     AttackerDir,
@@ -1393,7 +1393,7 @@ impl AngleFlip {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum HitBoxEffect {
     Normal,
     None,
@@ -1456,7 +1456,7 @@ impl HitBoxEffect {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum HitBoxSound {
     Unique,
     Punch,
@@ -1513,7 +1513,7 @@ impl HitBoxSound {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum HitBoxSseType {
     None,
     Head,
@@ -1577,7 +1577,7 @@ impl HitBoxSseType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HitBoxArguments {
     pub bone_index:         i16,
     pub hitbox_id:          u8,
@@ -1611,7 +1611,7 @@ pub struct HitBoxArguments {
     pub unk6:               u8,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SpecialHitBoxArguments {
     pub hitbox_args:       HitBoxArguments,
     pub rehit_rate:        i32,
@@ -1658,7 +1658,7 @@ pub struct SpecialHitBoxArguments {
     pub flinchless:           bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DefensiveCollisionType {
     Block,
     Reflect,
@@ -1675,7 +1675,7 @@ impl DefensiveCollisionType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DefensiveCollisionDirection {
     Front,
     FrontAndBack,
@@ -1692,7 +1692,7 @@ impl DefensiveCollisionDirection {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MoveHitBox {
     pub hitbox_id:    i32,
     pub new_bone:     i32,
@@ -1701,7 +1701,7 @@ pub struct MoveHitBox {
     pub new_z_offset: f32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GrabBoxArguments {
     pub hitbox_id:    i32,
     pub bone_index:   i32,
@@ -1714,7 +1714,7 @@ pub struct GrabBoxArguments {
     pub unk:          Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum GrabTarget {
     None,
     GroundedOnly,
@@ -1751,7 +1751,7 @@ impl GrabTarget {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SpecifyThrow {
     /// ID of throw data. Seemingly, a "0" indicates this is the throw data, while a "1" indicates this is used if the opponent escapes during the throw. "2" has also been seen (by Light Arrow)."
     pub throw_use:   ThrowUse,
@@ -1773,7 +1773,7 @@ pub struct SpecifyThrow {
     pub i_frames:    i32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ThrowUse {
     Throw,
     GrabInterrupt,
@@ -1790,7 +1790,7 @@ impl ThrowUse {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApplyThrow {
     pub unk0: i32,
     pub bone: i32,
@@ -1799,7 +1799,7 @@ pub struct ApplyThrow {
     pub unk3: VariableAst,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum LedgeGrabEnable {
     Disable,
     EnableInFront,
@@ -1827,7 +1827,7 @@ impl LedgeGrabEnable {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ArmorType {
     None,
     SuperArmor,
@@ -1848,7 +1848,7 @@ impl ArmorType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SetOrAddVelocity {
     pub x_vel: f32,
     pub y_vel: f32,
@@ -1856,7 +1856,7 @@ pub struct SetOrAddVelocity {
     pub y_set: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DisableMovement {
     Enable,
     DisableVertical,
@@ -1875,7 +1875,7 @@ impl DisableMovement {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GraphicEffect {
     pub graphic:                  i32,
     pub bone:                     i32,
@@ -1895,7 +1895,7 @@ pub struct GraphicEffect {
     pub terminate_with_animation: bool
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExternalGraphicEffect {
     pub file:                     i16,
     pub graphic:                  i16,
@@ -1911,7 +1911,7 @@ pub struct ExternalGraphicEffect {
     pub terminate_with_animation: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExternalGraphicEffectRandomize {
     pub random_x_offset:   f32,
     pub random_y_offset:   f32,
@@ -1921,7 +1921,7 @@ pub struct ExternalGraphicEffectRandomize {
     pub random_z_rotation: f32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct LimitedScreenTint {
     pub transition_in_time: i32,
     pub red: i32,
@@ -1932,7 +1932,7 @@ pub struct LimitedScreenTint {
     pub transition_out_time: i32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct UnlimitedScreenTint {
     pub tint_id: i32,
     pub transition_in_time: i32,
@@ -1942,7 +1942,7 @@ pub struct UnlimitedScreenTint {
     pub alpha: i32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwordGlow {
     pub color:                  i32,
     pub blur_length:            i32,
@@ -1969,7 +1969,7 @@ pub struct SwordGlow {
     pub glow_length:            f32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AestheticWindEffect {
     pub unk1:    i32,
     pub unk2:    f32,
@@ -1984,14 +1984,14 @@ pub struct AestheticWindEffect {
     pub unk8:    i32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Interrupt {
     pub interrupt_id: Option<i32>,
     pub action:       i32,
     pub test:         Expression
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum InterruptType {
     Main,
     GroundSpecial,
@@ -2045,7 +2045,7 @@ impl InterruptType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CameraCloseup {
     pub zoom_time: i32,
     pub unk:       i32,

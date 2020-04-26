@@ -492,7 +492,7 @@ pub struct HighLevelAction {
     pub script_exit_common: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelSubaction {
     pub name:            String,
     pub iasa:            Option<usize>,
@@ -574,7 +574,7 @@ impl HighLevelSubaction {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelScripts {
     pub script_main:  ScriptAst,
     pub script_gfx:   ScriptAst,
@@ -582,7 +582,7 @@ pub struct HighLevelScripts {
     pub script_other: ScriptAst,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelThrow {
     // TODO: I imagine the bone is used to determine the location the character is thrown from.
     // Transform the bone into an xy offset.
@@ -598,7 +598,7 @@ pub struct HighLevelThrow {
     pub weight_dependent_speed: bool,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelFrame {
     pub hurt_boxes:            Vec<HighLevelHurtBox>,
     pub hit_boxes:             Vec<HighLevelHitBox>,
@@ -770,7 +770,7 @@ impl HighLevelFrame {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Extent {
     pub left:  f32,
     pub right: f32,
@@ -804,14 +804,14 @@ impl Extent {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelHurtBox {
     pub bone_matrix: Matrix4<f32>,
     pub hurt_box: HurtBox,
     pub state: HurtBoxState,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum CollisionBoxValues {
     Hit (HitBoxValues),
     Grab (GrabBoxValues),
@@ -928,7 +928,7 @@ impl CollisionBoxValues {
     }
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GrabBoxValues {
     pub hitbox_id:  i32,
     pub size:       f32,
@@ -937,7 +937,7 @@ pub struct GrabBoxValues {
     pub unk:        Option<i32>,
 }
 
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HitBoxValues {
     pub hitbox_id:            u8,
     pub set_id:               u8,
@@ -1040,7 +1040,7 @@ struct PositionHitBox {
     pub values:      CollisionBoxValues,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelHitBox {
     pub hitbox_id: u8,
 
@@ -1054,7 +1054,7 @@ pub struct HighLevelHitBox {
     pub next_values: CollisionBoxValues,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ECB {
     pub left:     f32,
     pub right:    f32,

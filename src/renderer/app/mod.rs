@@ -3,7 +3,7 @@ use winit::window::Window;
 use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
-use crate::high_level_fighter::HighLevelFighter;
+use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
 use crate::renderer::wgpu_state::WgpuState;
 use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
@@ -16,7 +16,34 @@ use state::AppState;
 /// Blocks until user closes window
 pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
     let event_loop = EventLoop::new();
-    let mut app = App::new(&event_loop, high_level_fighter, subaction_index);
+    let window = Window::new(&event_loop).unwrap();
+    let high_level_fighter = high_level_fighter.clone();
+    let subaction = high_level_fighter.subactions[subaction_index].clone();
+    let mut app = futures::executor::block_on(App::new(window, subaction));
+
+    event_loop.run(move |event, _, control_flow| {
+        app.update(event, control_flow);
+    });
+}
+
+
+/// web time
+#[cfg(target_arch = "wasm32")]
+pub async fn render_window_wasm(subaction: HighLevelSubaction) {
+    let event_loop = EventLoop::new();
+    let window = Window::new(&event_loop).unwrap();
+
+    use winit::platform::web::WindowExtWebSys;
+    web_sys::window()
+        .and_then(|win| win.document())
+        .and_then(|doc| doc.body())
+        .and_then(|body| {
+            body.append_child(&web_sys::Element::from(window.canvas()))
+                .ok()
+        })
+        .expect("couldn't append canvas to document body");
+
+    let mut app = App::new(window, subaction).await;
 
     event_loop.run(move |event, _, control_flow| {
         app.update(event, control_flow);
@@ -35,14 +62,12 @@ pub struct App {
     surface: wgpu::Surface,
     swap_chain: wgpu::SwapChain,
     swap_chain_descriptor: wgpu::SwapChainDescriptor,
-    high_level_fighter: HighLevelFighter,
-    subaction_index: usize,
+    subaction: HighLevelSubaction,
 }
 
 impl App {
-    pub fn new(event_loop: &EventLoop<()>, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> App {
+    pub async fn new(_window: Window, subaction: HighLevelSubaction) -> App {
         let input = WinitInputHelper::new();
-        let _window = Window::new(&event_loop).unwrap();
         let size = _window.inner_size();
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
@@ -54,21 +79,17 @@ impl App {
         };
 
         let surface = wgpu::Surface::create(&_window);
-        let wgpu_state = futures::executor::block_on(WgpuState::new(Some(&surface)));
+        let wgpu_state = WgpuState::new(Some(&surface)).await;
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
-        let subaction = &high_level_fighter.subactions[subaction_index];
-
         let camera = Camera::new(
-            subaction,
+            &subaction,
             swap_chain_descriptor.width as u16,
             swap_chain_descriptor.height as u16,
         );
         let app_state = AppState::new(camera);
 
-        let high_level_fighter = high_level_fighter.clone();
-
-        App { wgpu_state, app_state, input, _window, surface, swap_chain, swap_chain_descriptor, high_level_fighter, subaction_index }
+        App { wgpu_state, app_state, input, _window, surface, swap_chain, swap_chain_descriptor, subaction  }
     }
 
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
@@ -77,8 +98,7 @@ impl App {
                 *control_flow = ControlFlow::Exit;
             }
 
-            let subaction = &self.high_level_fighter.subactions[self.subaction_index];
-            self.app_state.update(&self.input, subaction);
+            self.app_state.update(&self.input, &self.subaction);
 
             if let Some(size) = self.input.window_resized() {
                 self.swap_chain_descriptor.width = size.width;
@@ -97,8 +117,7 @@ impl App {
                     self.app_state.wireframe,
                     self.app_state.render_ecb,
                     &self.app_state.invulnerable_type,
-                    &self.high_level_fighter,
-                    self.subaction_index,
+                    &self.subaction,
                     self.app_state.frame_index,
                     &self.app_state.camera,
                 );

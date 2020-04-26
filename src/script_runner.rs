@@ -1661,7 +1661,7 @@ impl ExprResult {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VelModify {
     Set (f32),
     Add (f32),

@@ -3,7 +3,7 @@ use std::f32::consts;
 use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
 use zerocopy::AsBytes;
 
-use crate::high_level_fighter::{HighLevelFighter, CollisionBoxValues};
+use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
 use crate::renderer::camera::Camera;
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, Vertex};
@@ -15,7 +15,7 @@ struct Draw {
     indices_len: usize,
 }
 
-pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, high_level_fighter: &HighLevelFighter, subaction_index: usize, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut draws = vec!();
 
@@ -55,7 +55,6 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         });
         rpass.set_pipeline(&state.render_pipeline);
 
-        let subaction = &high_level_fighter.subactions[subaction_index];
         let frame = &subaction.frames[frame_index];
 
         // TODO: Should this stuff go in the camera? Lets not duplicate it...

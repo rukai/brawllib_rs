@@ -163,7 +163,7 @@ pub struct Script {
 
 // Events are like lines of code in a script
 const EVENT_SIZE: usize = 0x8;
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Event {
     pub namespace: u8,
     pub code: u8,
@@ -180,7 +180,7 @@ impl Event {
 }
 
 const ARGUMENT_SIZE: usize = 0x8;
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Argument {
     Value (i32),
     Scalar (f32),
@@ -192,14 +192,14 @@ pub enum Argument {
     Unknown (i32, i32)
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Variable {
     pub memory_type: VariableMemoryType,
     pub data_type: VariableDataType,
     pub address: u32,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Offset {
     pub offset: i32,
     pub origin: i32,
@@ -211,7 +211,7 @@ pub enum OffsetType {
     External (String, ),
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VariableMemoryType {
     /// Known as IC in existing tools
     InternalConstant,
@@ -233,7 +233,7 @@ impl VariableMemoryType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VariableDataType {
     /// Known as Basic in existing tools
     Int,
@@ -255,7 +255,7 @@ impl VariableDataType {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Requirement {
     CharacterExists,
     AnimationEnd,

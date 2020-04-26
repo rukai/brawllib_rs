@@ -1,6 +1,6 @@
 use crate::script::{Variable, VariableMemoryType, VariableDataType};
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VariableAst {
     /// Known as IC in existing tools
     InternalConstantInt (InternalConstantInt),
@@ -57,7 +57,7 @@ impl VariableAst {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum InternalConstantInt {
     CurrentFrame,
     Damage,
@@ -182,7 +182,7 @@ impl InternalConstantInt {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum LongtermAccessInt {
     JumpsUsed,
     WallJumpCount,
@@ -243,7 +243,7 @@ impl LongtermAccessInt {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum LongtermAccessFloat {
     SpecialLandingLag,
     SpecialFallMobilityMultiplier,
@@ -266,7 +266,7 @@ impl LongtermAccessFloat {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum LongtermAccessBool {
     IsDead,
     CannotDie,
@@ -309,7 +309,7 @@ impl LongtermAccessBool {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RandomAccessInt {
     ThrowDataParam1,
     ThrowDataParam2,
@@ -328,7 +328,7 @@ impl RandomAccessInt {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RandomAccessFloat {
     EnableTurnWhenBelowZero,
     Address (u32),
@@ -343,7 +343,7 @@ impl RandomAccessFloat {
     }
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum RandomAccessBool {
     CharacterFloat,
     EnableFastFall,

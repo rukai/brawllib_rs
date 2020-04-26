@@ -323,7 +323,7 @@ pub struct FighterAttributes {
 }
 
 bitflags! {
-    #[derive(Serialize)]
+    #[derive(Serialize, Deserialize)]
     pub struct AnimationFlags: u8 {
         const NONE                      = 0x0;
         const NO_OUT_TRANSITION         = 0x1;
