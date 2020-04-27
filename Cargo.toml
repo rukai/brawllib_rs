@@ -20,7 +20,7 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.7"
 gif = "0.10"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "0fb47262eaf8a7fe13c3175de599ec1014811381" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "9abff0f235114ac536647867d582621d4d2f8906" }
 fancy_slice = { version = "0.1", features = [] }
 winit = { version = "0.22.0", features = ["web-sys"] }
 winit_input_helper = "0.6.0"
@@ -43,9 +43,3 @@ bincode = "1"
 [profile.release]
 debug = true
 debug-assertions = true
-
-[patch.crates-io]
-wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen" }
-wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen" }
-web-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }
-js-sys = { git = "https://github.com/rustwasm/wasm-bindgen" }

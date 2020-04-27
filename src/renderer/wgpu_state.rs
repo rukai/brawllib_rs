@@ -20,20 +20,22 @@ pub struct WgpuState {
 }
 
 impl WgpuState {
-    pub async fn new(compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
-        let adapter = wgpu::Adapter::request(
+    pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
+        let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::LowPower,
                 compatible_surface,
             },
             wgpu::BackendBit::PRIMARY,
         ).await.unwrap();
-        let (device, queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+
+        let device_descriptor = wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions {
                 anisotropic_filtering: false,
             },
-        }).await;
+        };
+        let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
 
         // shaders
         let vs = include_bytes!("shaders/fighter.vert.spv");

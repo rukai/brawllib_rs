@@ -27,7 +27,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 }
 
 
-/// web time
+/// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: HighLevelSubaction) {
     let event_loop = EventLoop::new();
@@ -78,8 +78,9 @@ impl App {
             height: size.height,
         };
 
-        let surface = wgpu::Surface::create(&_window);
-        let wgpu_state = WgpuState::new(Some(&surface)).await;
+        let instance = wgpu::Instance::new();
+        let surface = unsafe { instance.create_surface(&_window) };
+        let wgpu_state = WgpuState::new(instance, Some(&surface)).await;
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let camera = Camera::new(
@@ -121,7 +122,7 @@ impl App {
                     self.app_state.frame_index,
                     &self.app_state.camera,
                 );
-                self.wgpu_state.queue.submit(&[command_encoder.finish()]);
+                self.wgpu_state.queue.submit(Some(command_encoder.finish()));
             }
         }
     }

@@ -75,7 +75,8 @@ fn main() {
             let hl_fighter = HighLevelFighter::new(&fighter);
             for (i, subaction) in hl_fighter.subactions.iter().enumerate() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
-                    let mut wgpu_state = futures::executor::block_on(WgpuState::new(None));
+                    let instance = wgpu::Instance::new();
+                    let mut wgpu_state = futures::executor::block_on(WgpuState::new(instance, None));
                     let data = renderer::render_gif_blocking(&mut wgpu_state, &hl_fighter, i);
                     let mut file = File::create(format!("output_{}_{}.gif", hl_fighter.name, subaction.name)).unwrap();
                     file.write(&data).unwrap();
