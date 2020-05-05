@@ -30,18 +30,30 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 /// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: HighLevelSubaction) {
+    use winit::platform::web::WindowExtWebSys;
+    use wasm_bindgen::prelude::*;
+    use wasm_bindgen::JsCast;
+    use web_sys::HtmlElement;
+
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
 
-    use winit::platform::web::WindowExtWebSys;
-    web_sys::window()
-        .and_then(|win| win.document())
-        .and_then(|doc| doc.body())
-        .and_then(|body| {
-            body.append_child(&web_sys::Element::from(window.canvas()))
-                .ok()
-        })
-        .expect("couldn't append canvas to document body");
+    let document = web_sys::window().unwrap().document().unwrap();
+
+    let visualiser_span = document.get_element_by_id("visualiser").unwrap();
+    visualiser_span.append_child(&web_sys::Element::from(window.canvas())).unwrap();
+
+    let button = document.get_element_by_id("foo").unwrap();
+    let button_move = button.clone();
+    let do_thing = Closure::wrap(
+        Box::new(move || {
+            button_move.set_inner_html("何も");
+        }) as Box<dyn FnMut()>
+    );
+    button
+        .dyn_ref::<HtmlElement>()
+        .unwrap()
+        .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
 
     let mut app = App::new(window, subaction).await;
 
