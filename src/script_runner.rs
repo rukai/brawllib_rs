@@ -627,7 +627,7 @@ impl<'a> ScriptRunner<'a> {
                             }
                             StepEventResult::IfStatementDisableExecution => {
                                 if self.call_stacks[i].calls.last().unwrap().if_statement {
-                                    self.call_stacks[i].calls.last_mut().unwrap().execute = true;
+                                    self.call_stacks[i].calls.last_mut().unwrap().execute = false;
                                 }
                             }
                             StepEventResult::Subroutine { block, external } => {
