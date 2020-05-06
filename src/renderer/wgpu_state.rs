@@ -20,6 +20,12 @@ pub struct WgpuState {
 }
 
 impl WgpuState {
+    /// Easy initialiser that doesnt handle rendering to a window
+    pub async fn new_for_gif() -> WgpuState {
+        let instance = wgpu::Instance::new();
+        WgpuState::new(instance, None).await
+    }
+
     pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
