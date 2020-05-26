@@ -20,7 +20,7 @@ rayon = "1"
 failure = "0.1"
 env_logger = "0.7"
 gif = "0.10"
-wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "89ee5bffd3c37279f733b76b05e5d030aba035db" }
+wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev = "4b16959e3e5e35178ba7b22cf0ad182344615da6" }
 fancy_slice = { version = "0.1", features = [] }
 winit = { version = "0.22.0", features = ["web-sys"] }
 winit_input_helper = "0.6"

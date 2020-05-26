@@ -249,10 +249,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..64,
-                        },
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..))
                     },
                 ],
                 label: None,
@@ -357,10 +354,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..64,
-                        },
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
                     },
                 ],
                 label: None,
@@ -400,10 +394,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..64,
-                        },
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
                     },
                 ],
                 label: None,
@@ -457,10 +448,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..64,
-                        },
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
                     },
                 ],
                 label: None,
@@ -500,10 +488,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buf,
-                            range: 0..64,
-                        },
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
                     },
                 ],
                 label: None,
@@ -515,8 +500,8 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
 
         for draw in &draws {
             rpass.set_bind_group(0, &draw.bind_group, &[]);
-            rpass.set_index_buffer(&draw.indices, 0, 0);
-            rpass.set_vertex_buffer(0, &draw.vertices, 0, 0);
+            rpass.set_index_buffer(draw.indices.slice(..));
+            rpass.set_vertex_buffer(0, draw.vertices.slice(..));
             rpass.draw_indexed(0..draw.indices_len as u32, 0, 0..1);
         }
     }

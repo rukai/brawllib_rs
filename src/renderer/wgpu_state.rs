@@ -29,7 +29,7 @@ impl WgpuState {
     pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::LowPower,
+                power_preference: wgpu::PowerPreference::Default,
                 compatible_surface,
             },
             wgpu::BackendBit::PRIMARY,
@@ -42,6 +42,7 @@ impl WgpuState {
             },
         };
         let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
+
 
         // shaders
         let vs = include_bytes!("shaders/fighter.vert.spv");
