@@ -66,7 +66,6 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         let framebuffer_copy_view = wgpu::TextureCopyView {
             texture: &framebuffer,
             mip_level: 0,
-            array_layer: 0,
             origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
         };
 
@@ -79,9 +78,11 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
         let framebuffer_out_copy_view = wgpu::BufferCopyView {
             buffer: &framebuffer_out,
-            offset: 0,
-            bytes_per_row: width as u32 * bytes_per_pixel,
-            rows_per_image: 0,
+            layout: wgpu::TextureDataLayout {
+                offset: 0,
+                bytes_per_row: width as u32 * bytes_per_pixel,
+                rows_per_image: 0
+            }
         };
 
         let camera = Camera::new(subaction, width, height);
