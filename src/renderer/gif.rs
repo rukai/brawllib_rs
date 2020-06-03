@@ -47,13 +47,13 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         // Create buffers
         // We recreate the buffers for each frame, reusing them would mean we need to wait for stuff to finish.
         // Maybe I can implement pooling later.
-        let texture_extent = wgpu::Extent3d {
+        let texture_real_extent = wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
             depth: 1
         };
-        let framebuffer_descriptor = &wgpu::TextureDescriptor {
-            size: texture_extent,
+        let framebuffer_real_descriptor = &wgpu::TextureDescriptor {
+            size: texture_real_extent,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -62,55 +62,90 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             label: None,
         };
 
-        let framebuffer = state.device.create_texture(framebuffer_descriptor);
-        let framebuffer_copy_view = wgpu::TextureCopyView {
-            texture: &framebuffer,
+        let framebuffer_real = state.device.create_texture(framebuffer_real_descriptor);
+        let framebuffer_real_copy_view = wgpu::TextureCopyView {
+            texture: &framebuffer_real,
+            mip_level: 0,
+            origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
+        };
+
+        let bytes_per_pixel = 4;
+        let real_bytes_per_row = width as u32 * bytes_per_pixel;
+        let padded_bytes_per_row_padding = 256 - (real_bytes_per_row) % 256;
+        let padded_bytes_per_row = real_bytes_per_row + padded_bytes_per_row_padding;
+        let padded_width = padded_bytes_per_row / bytes_per_pixel;
+
+        let texture_padded_extent = wgpu::Extent3d {
+            width: padded_width,
+            height: height as u32,
+            depth: 1
+        };
+        let framebuffer_padded_descriptor = &wgpu::TextureDescriptor {
+            size: texture_padded_extent,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: FORMAT,
+            usage: wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::COPY_SRC,
+            label: None,
+        };
+
+        let framebuffer_padded = state.device.create_texture(framebuffer_padded_descriptor);
+        let framebuffer_padded_copy_view = wgpu::TextureCopyView {
+            texture: &framebuffer_padded,
             mip_level: 0,
             origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
         };
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
-            size: width as u64 * height as u64 * 4,
+            size: padded_width as u64 * height as u64 * 4,
             usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
             label: None,
+            mapped_at_creation: false,
         };
-        let bytes_per_pixel = 4;
+
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
         let framebuffer_out_copy_view = wgpu::BufferCopyView {
             buffer: &framebuffer_out,
             layout: wgpu::TextureDataLayout {
                 offset: 0,
-                bytes_per_row: width as u32 * bytes_per_pixel,
+                bytes_per_row: padded_bytes_per_row,
                 rows_per_image: 0
             }
         };
 
         let camera = Camera::new(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
-        command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, texture_extent);
+        let mut command_encoder = draw_frame(state, &framebuffer_real.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
+        command_encoder.copy_texture_to_texture(framebuffer_real_copy_view, framebuffer_padded_copy_view.clone(), texture_real_extent);
+        command_encoder.copy_texture_to_buffer(framebuffer_padded_copy_view, framebuffer_out_copy_view, texture_padded_extent);
         state.queue.submit(Some(command_encoder.finish()));
 
         let frames_tx = frames_tx.clone();
-        let read = framebuffer_out.map_read(0, width as u64 * height as u64 * 4);
+        let read = framebuffer_out.map_async(wgpu::MapMode::Read, 0, wgpu::BufferSize::WHOLE);
 
         state.poll();
 
         match read.await {
-            Ok(data) => {
-                let pixel_count = width as usize * height as usize;
-                let mut result = data.as_slice().to_vec();
-                for i in 0..pixel_count {
-                      let b = result[i * 4 + 0];
-                    //let g = result[i * 4 + 1];
-                      let r = result[i * 4 + 2];
-                    //let a = result[i * 4 + 3];
+            Ok(()) => {
+                let mut real_buffer = vec!(0; width as usize * height as usize * bytes_per_pixel as usize);
+                let padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE);
+                for x in 0..width as usize {
+                    for y in 0..height as usize {
+                        let padded_offset = x + y * padded_width as usize;
+                        let real_offset = x + y * width as usize;
 
-                      result[i * 4 + 0] = r;
-                    //result[i * 4 + 1] = g;
-                      result[i * 4 + 2] = b;
-                    //result[i * 4 + 3] = a;
+                        let b = padded_buffer[padded_offset * 4 + 0];
+                        let g = padded_buffer[padded_offset * 4 + 1];
+                        let r = padded_buffer[padded_offset * 4 + 2];
+                        let a = padded_buffer[padded_offset * 4 + 3];
+
+                        real_buffer[real_offset * 4 + 0] = r;
+                        real_buffer[real_offset * 4 + 1] = g;
+                        real_buffer[real_offset * 4 + 2] = b;
+                        real_buffer[real_offset * 4 + 3] = a;
+                    }
                 }
-                frames_tx.send(result).unwrap();
+                frames_tx.send(real_buffer).unwrap();
             }
             Err(error) => {
                 panic!("map_read failed: {:?}", error); // We have to panic here to avoid an infinite loop :/

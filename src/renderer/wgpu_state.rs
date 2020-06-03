@@ -37,9 +37,7 @@ impl WgpuState {
 
         let device_descriptor = wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
-            extensions: wgpu::Extensions {
-                anisotropic_filtering: false,
-            },
+            extensions: wgpu::Extensions::empty(),
         };
         let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
 
