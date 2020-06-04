@@ -47,13 +47,13 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         // Create buffers
         // We recreate the buffers for each frame, reusing them would mean we need to wait for stuff to finish.
         // Maybe I can implement pooling later.
-        let texture_real_extent = wgpu::Extent3d {
+        let framebuffer_extent = wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
             depth: 1
         };
-        let framebuffer_real_descriptor = &wgpu::TextureDescriptor {
-            size: texture_real_extent,
+        let framebuffer_descriptor = &wgpu::TextureDescriptor {
+            size: framebuffer_extent,
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
@@ -62,40 +62,20 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             label: None,
         };
 
-        let framebuffer_real = state.device.create_texture(framebuffer_real_descriptor);
-        let framebuffer_real_copy_view = wgpu::TextureCopyView {
-            texture: &framebuffer_real,
+        let framebuffer = state.device.create_texture(framebuffer_descriptor);
+        let framebuffer_copy_view = wgpu::TextureCopyView {
+            texture: &framebuffer,
             mip_level: 0,
             origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
         };
 
+        // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % 256 == 0
+        // So we calculate an appropriate padded_width that fits that requirement
         let bytes_per_pixel = 4;
         let real_bytes_per_row = width as u32 * bytes_per_pixel;
         let padded_bytes_per_row_padding = 256 - (real_bytes_per_row) % 256;
         let padded_bytes_per_row = real_bytes_per_row + padded_bytes_per_row_padding;
         let padded_width = padded_bytes_per_row / bytes_per_pixel;
-
-        let texture_padded_extent = wgpu::Extent3d {
-            width: padded_width,
-            height: height as u32,
-            depth: 1
-        };
-        let framebuffer_padded_descriptor = &wgpu::TextureDescriptor {
-            size: texture_padded_extent,
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: FORMAT,
-            usage: wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::COPY_SRC,
-            label: None,
-        };
-
-        let framebuffer_padded = state.device.create_texture(framebuffer_padded_descriptor);
-        let framebuffer_padded_copy_view = wgpu::TextureCopyView {
-            texture: &framebuffer_padded,
-            mip_level: 0,
-            origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
-        };
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
             size: padded_width as u64 * height as u64 * 4,
@@ -115,9 +95,8 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         let camera = Camera::new(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer_real.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
-        command_encoder.copy_texture_to_texture(framebuffer_real_copy_view, framebuffer_padded_copy_view.clone(), texture_real_extent);
-        command_encoder.copy_texture_to_buffer(framebuffer_padded_copy_view, framebuffer_out_copy_view, texture_padded_extent);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
+        command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, framebuffer_extent);
         state.queue.submit(Some(command_encoder.finish()));
 
         let frames_tx = frames_tx.clone();
@@ -127,8 +106,11 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
 
         match read.await {
             Ok(()) => {
+                // There are two transforms occuring here:
+                // 1.   map bgra -> rgba
+                // 2.   remove padding from buffer
                 let mut real_buffer = vec!(0; width as usize * height as usize * bytes_per_pixel as usize);
-                let padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE);
+                let padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE).to_vec();
                 for x in 0..width as usize {
                     for y in 0..height as usize {
                         let padded_offset = x + y * padded_width as usize;
@@ -147,9 +129,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
                 }
                 frames_tx.send(real_buffer).unwrap();
             }
-            Err(error) => {
-                panic!("map_read failed: {:?}", error); // We have to panic here to avoid an infinite loop :/
-            }
+            Err(error) => panic!("map_read failed: {:?}", error),
         }
     }
 
