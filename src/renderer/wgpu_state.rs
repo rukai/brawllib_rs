@@ -3,7 +3,6 @@ use std::mem;
 use zerocopy::AsBytes;
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
-pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 #[repr(C)]
 #[derive(Clone, Copy, AsBytes)]
@@ -23,10 +22,10 @@ impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
         let instance = wgpu::Instance::new();
-        WgpuState::new(instance, None).await
+        WgpuState::new(instance, None, wgpu::TextureFormat::Rgba8Unorm).await
     }
 
-    pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>) -> WgpuState {
+    pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>, format: wgpu::TextureFormat) -> WgpuState {
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::Default,
@@ -83,7 +82,7 @@ impl WgpuState {
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
             color_states: &[wgpu::ColorStateDescriptor {
-                format: FORMAT,
+                format: format,
                 color_blend: wgpu::BlendDescriptor {
                     src_factor: wgpu::BlendFactor::SrcAlpha,
                     dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,

@@ -6,7 +6,7 @@ use zerocopy::AsBytes;
 use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
 use crate::renderer::camera::Camera;
 use crate::renderer::app::state::InvulnerableType;
-use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, FORMAT, Vertex};
+use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, Vertex};
 
 struct Draw {
     bind_group:  wgpu::BindGroup,
@@ -15,7 +15,7 @@ struct Draw {
     indices_len: usize,
 }
 
-pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, format: wgpu::TextureFormat, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut draws: Vec<Draw> = vec!();
 
@@ -29,7 +29,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         mip_level_count: 1,
         sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,
-        format: FORMAT,
+        format: format,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
         label: None,
     };

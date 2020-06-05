@@ -5,7 +5,7 @@ use std::thread;
 use crate::high_level_fighter::HighLevelFighter;
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::camera::Camera;
-use crate::renderer::wgpu_state::{WgpuState, FORMAT};
+use crate::renderer::wgpu_state::WgpuState;
 use crate::renderer::draw::draw_frame;
 
 
@@ -20,6 +20,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
     // restricted to u16 because of the gif library we are using
     let width: u16 = 400;
     let height: u16 = 300;
+    let format = wgpu::TextureFormat::Rgba8Unorm;
 
     let subaction = &high_level_fighter.subactions[subaction_index];
 
@@ -57,7 +58,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: FORMAT,
+            format,
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
             label: None,
         };
@@ -70,15 +71,14 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % 256 == 0
-        // So we calculate an appropriate padded_width that fits that requirement
+        // So we calculate an appropriate padded_bytes_per_row that fits that requirement
         let bytes_per_pixel = 4;
         let real_bytes_per_row = width as u32 * bytes_per_pixel;
-        let padded_bytes_per_row_padding = 256 - (real_bytes_per_row) % 256;
+        let padded_bytes_per_row_padding = (256 - (real_bytes_per_row) % 256) % 256;
         let padded_bytes_per_row = real_bytes_per_row + padded_bytes_per_row_padding;
-        let padded_width = padded_bytes_per_row / bytes_per_pixel;
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
-            size: padded_width as u64 * height as u64 * 4,
+            size: padded_bytes_per_row as u64 * height as u64,
             usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
             label: None,
             mapped_at_creation: false,
@@ -95,7 +95,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         let camera = Camera::new(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
+        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), format, width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera);
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, framebuffer_extent);
         state.queue.submit(Some(command_encoder.finish()));
 
@@ -106,27 +106,16 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
 
         match read.await {
             Ok(()) => {
-                // There are two transforms occuring here:
-                // 1.   map bgra -> rgba
-                // 2.   remove padding from buffer
-                let mut real_buffer = vec!(0; width as usize * height as usize * bytes_per_pixel as usize);
-                let padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE).to_vec();
-                for x in 0..width as usize {
-                    for y in 0..height as usize {
-                        let padded_offset = x + y * padded_width as usize;
-                        let real_offset = x + y * width as usize;
-
-                        let b = padded_buffer[padded_offset * 4 + 0];
-                        let g = padded_buffer[padded_offset * 4 + 1];
-                        let r = padded_buffer[padded_offset * 4 + 2];
-                        let a = padded_buffer[padded_offset * 4 + 3];
-
-                        real_buffer[real_offset * 4 + 0] = r;
-                        real_buffer[real_offset * 4 + 1] = g;
-                        real_buffer[real_offset * 4 + 2] = b;
-                        real_buffer[real_offset * 4 + 3] = a;
-                    }
+                // move the padding to the end of the buffer
+                let mut padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE).to_vec();
+                for y in 1..height as usize {
+                    let padded_offset = y * padded_bytes_per_row as usize;
+                    let real_offset = y * real_bytes_per_row as usize;
+                    padded_buffer.copy_within(padded_offset..padded_offset+real_bytes_per_row as usize, real_offset)
                 }
+
+                // send just the image data ignoring the padding at the end
+                let real_buffer = padded_buffer[0..real_bytes_per_row as usize * height as usize].to_vec();
                 frames_tx.send(real_buffer).unwrap();
             }
             Err(error) => panic!("map_read failed: {:?}", error),

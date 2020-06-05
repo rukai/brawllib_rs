@@ -4,13 +4,15 @@ use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
-use crate::renderer::wgpu_state::{WgpuState, FORMAT};
+use crate::renderer::wgpu_state::WgpuState;
 use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
 
 pub(crate) mod state;
 
 use state::AppState;
+
+pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
@@ -92,7 +94,7 @@ impl App {
 
         let instance = wgpu::Instance::new();
         let surface = unsafe { instance.create_surface(&_window) };
-        let wgpu_state = WgpuState::new(instance, Some(&surface)).await;
+        let wgpu_state = WgpuState::new(instance, Some(&surface), FORMAT).await;
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
 
         let camera = Camera::new(
@@ -124,6 +126,7 @@ impl App {
                 let command_encoder = draw_frame(
                     &mut self.wgpu_state,
                     &framebuffer.view,
+                    FORMAT,
                     self.swap_chain_descriptor.width,
                     self.swap_chain_descriptor.height,
                     self.app_state.perspective,
