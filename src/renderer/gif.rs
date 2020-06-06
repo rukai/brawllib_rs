@@ -70,11 +70,14 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
         };
 
-        // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % 256 == 0
-        // So we calculate an appropriate padded_bytes_per_row that fits that requirement
-        let bytes_per_pixel = 4;
+        // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % wgpu::COPY_BYTES_PER_ROW_ALIGNMENT == 0
+        // So we calculate padded_bytes_per_row by rounding real_bytes_per_row
+        // up to the next multiple of wgpu::COPY_BYTES_PER_ROW_ALIGNMENT.
+        // https://en.wikipedia.org/wiki/Data_structure_alignment#Computing_padding
+        let bytes_per_pixel = std::mem::size_of::<u32>() as u32;
         let real_bytes_per_row = width as u32 * bytes_per_pixel;
-        let padded_bytes_per_row_padding = (256 - (real_bytes_per_row) % 256) % 256;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
+        let padded_bytes_per_row_padding = (align - real_bytes_per_row % align) % align;
         let padded_bytes_per_row = real_bytes_per_row + padded_bytes_per_row_padding;
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {

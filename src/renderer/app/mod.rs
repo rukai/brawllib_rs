@@ -108,7 +108,7 @@ impl App {
     }
 
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
-        if self.input.update(event) {
+        if self.input.update(&event) {
             if self.input.quit() {
                 *control_flow = ControlFlow::Exit;
             }
