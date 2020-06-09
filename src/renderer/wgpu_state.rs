@@ -31,12 +31,14 @@ impl WgpuState {
                 power_preference: wgpu::PowerPreference::Default,
                 compatible_surface,
             },
+            wgpu::UnsafeExtensions::disallow(),
             wgpu::BackendBit::PRIMARY,
         ).await.unwrap();
 
         let device_descriptor = wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             extensions: wgpu::Extensions::empty(),
+            shader_validation: false,
         };
         let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
 
