@@ -15,7 +15,7 @@ struct Draw {
     indices_len: usize,
 }
 
-pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, format: wgpu::TextureFormat, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+pub (crate) fn draw_frame(state: &WgpuState, framebuffer: &wgpu::TextureView, format: wgpu::TextureFormat, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
     let mut draws: Vec<Draw> = vec!();
 
@@ -260,7 +260,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         }
 
         for hurt_box in &frame.hurt_boxes {
-            let _color = if hurt_box.state.is_intangible() {
+            let color = if hurt_box.state.is_intangible() {
                 [0.0, 0.0, 1.0, 0.3]
             } else if hurt_box.state.is_invincible() {
                 [0.0, 1.0, 0.0, 0.3]
@@ -281,93 +281,14 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 }
             };
 
-            let prev = Some(hurt_box.hurt_box.offset);
+            // Ah ... so its less of an offset + stretch and more like two seperate independent offsets.
+            let prev = hurt_box.hurt_box.offset;
             let next = hurt_box.hurt_box.stretch;
+            let radius = hurt_box.hurt_box.radius;
 
-            let prev_distance = prev.map(|prev| prev.distance(next)).unwrap_or(0.0);
-
-            let width_segments = 23;
-            let height_segments = 17;
-
-            let mut vertices_vec = vec!();
-            let mut indices_vec: Vec<u16> = vec!();
-            let mut index_count = 0;
-
-            let mut grid = vec!();
-            for iy in 0..height_segments+1 {
-                let mut vertices_row = vec!();
-                let v = iy as f32 / height_segments as f32;
-
-                for ix in 0..width_segments+1 {
-                    let u = ix as f32 / width_segments as f32;
-                    let mut y_offset = 0.0;
-                    if v >= 0.0 && v <= 0.5 {
-                        y_offset += prev_distance;
-                    }
-
-                    let sin_v_pi = (v * consts::PI).sin();
-                    let _pos = [
-                        hurt_box.hurt_box.radius * (u * consts::PI * 2.0).cos() * sin_v_pi,
-                        hurt_box.hurt_box.radius * (v * consts::PI      ).cos() + y_offset,
-                        hurt_box.hurt_box.radius * (u * consts::PI * 2.0).sin() * sin_v_pi,
-                        1.0
-                    ];
-                    vertices_vec.push(Vertex { _pos, _color });
-
-                    vertices_row.push(index_count);
-                    index_count += 1;
-                }
-                grid.push(vertices_row);
-            }
-
-            for iy in 0..height_segments {
-                for ix in 0..width_segments {
-                    let a = grid[iy][ix + 1];
-                    let b = grid[iy][ix];
-                    let c = grid[iy + 1][ix];
-                    let d = grid[iy + 1][ix + 1];
-
-                    indices_vec.extend(&[a, b, d]);
-                    indices_vec.extend(&[b, c, d]);
-                }
-            }
-
-            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
-            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
-
-            let rotation = if let Some(prev) = prev {
-                let diff = (prev - next).normalize();
-                if diff.x.is_nan() {
-                    // This occurs when prev == next
-                    Matrix4::identity()
-                } else {
-                    let source_angle = Vector3::new(0.0, 1.0, 0.0);
-                    Quaternion::from_arc(source_angle, diff, None).into()
-                }
-            } else {
-                Matrix4::identity()
-            };
-            let model = transform_translation_frame * hurt_box.bone_matrix * Matrix4::from_translation(next) * rotation;
+            let model = transform_translation_frame * hurt_box.bone_matrix;
             let transform = projection.clone() * view.clone() * model;
-            let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device.create_buffer_with_data(
-                transform.as_bytes(),
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            );
-
-            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &state.bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
-                    },
-                ],
-                label: None,
-            });
-
-            let indices_len = indices_vec.len();
-            draws.push(Draw { bind_group, vertices, indices, indices_len });
+            draws.push(draw_cylinder(state, prev, next, radius, transform, color, wireframe));
         }
 
         for hitbox in frame.hit_boxes.iter() {
@@ -378,7 +299,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 }
             }
 
-            let _color = match hitbox.hitbox_id {
+            let color = match hitbox.hitbox_id {
                 0 => [0.93725, 0.39216, 0.00000, 0.3], // orange
                 1 => [1.00000, 0.00000, 0.00000, 0.3], // red
                 2 => [1.00000, 0.00000, 1.00000, 0.3], // purple
@@ -387,92 +308,11 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 _ => [1.00000, 1.00000, 1.00000, 0.3], // white
             };
 
-            let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y + frame.y_pos, prev.z + frame.x_pos));
             let next = Vector3::new(hitbox.next_pos.x, hitbox.next_pos.y + frame.y_pos, hitbox.next_pos.z + frame.x_pos);
-            let prev_distance = prev.map(|prev| prev.distance(next)).unwrap_or(0.0);
-
-            let width_segments = 23;
-            let height_segments = 17;
-
-            let mut vertices_vec = vec!();
-            let mut indices_vec: Vec<u16> = vec!();
-            let mut index_count = 0;
-
-            let mut grid = vec!();
-            for iy in 0..height_segments+1 {
-                let mut vertices_row = vec!();
-                let v = iy as f32 / height_segments as f32;
-
-                for ix in 0..width_segments+1 {
-                    let u = ix as f32 / width_segments as f32;
-                    let mut y_offset = 0.0;
-                    if v >= 0.0 && v <= 0.5 {
-                        y_offset += prev_distance;
-                    }
-
-                    let sin_v_pi = (v * consts::PI).sin();
-                    let _pos = [
-                        hitbox.next_size * (u * consts::PI * 2.0).cos() * sin_v_pi,
-                        hitbox.next_size * (v * consts::PI      ).cos() + y_offset,
-                        hitbox.next_size * (u * consts::PI * 2.0).sin() * sin_v_pi,
-                        1.0
-                    ];
-                    vertices_vec.push(Vertex { _pos, _color });
-
-                    vertices_row.push(index_count);
-                    index_count += 1;
-                }
-                grid.push(vertices_row);
-            }
-
-            for iy in 0..height_segments {
-                for ix in 0..width_segments {
-                    let a = grid[iy][ix + 1];
-                    let b = grid[iy][ix];
-                    let c = grid[iy + 1][ix];
-                    let d = grid[iy + 1][ix + 1];
-
-                    indices_vec.extend(&[a, b, d]);
-                    indices_vec.extend(&[b, c, d]);
-                }
-            }
-
-            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
-            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
-
-            let rotation = if let Some(prev) = prev {
-                let diff = (prev - next).normalize();
-                if diff.x.is_nan() {
-                    // This occurs when prev == next
-                    Matrix4::identity()
-                } else {
-                    let source_angle = Vector3::new(0.0, 1.0, 0.0);
-                    Quaternion::from_arc(source_angle, diff, None).into()
-                }
-            } else {
-                Matrix4::identity()
-            };
-            let model = Matrix4::from_translation(next) * rotation;
-            let transform = projection.clone() * view.clone() * model;
-            let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device.create_buffer_with_data(
-                transform.as_bytes(),
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            );
-
-            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &state.bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
-                    },
-                ],
-                label: None,
-            });
-
-            let indices_len = indices_vec.len();
-            draws.push(Draw { bind_group, vertices, indices, indices_len });
+            let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y + frame.y_pos, prev.z + frame.x_pos)).unwrap_or(next.clone());
+            let radius = hitbox.next_size;
+            let transform = projection.clone() * view.clone();
+            draws.push(draw_cylinder(state, prev, next, radius, transform, color, wireframe));
         }
 
         if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
@@ -618,4 +458,90 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     }
 
     command_encoder
+}
+
+fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radius: f32, external_transform: Matrix4<f32>, _color: [f32; 4], wireframe: bool) -> Draw {
+    let prev_distance = prev.distance(next);
+
+    // Make the wireframes less busy in wireframe mode
+    let (width_segments, height_segments) = if wireframe {
+        (11, 7)
+    } else {
+        (23, 17)
+    };
+
+    let mut vertices_vec = vec!();
+    let mut indices_vec: Vec<u16> = vec!();
+    let mut index_count = 0;
+
+    let mut grid = vec!();
+    for iy in 0..height_segments+1 {
+        let mut vertices_row = vec!();
+        let v = iy as f32 / height_segments as f32;
+
+        for ix in 0..width_segments+1 {
+            let u = ix as f32 / width_segments as f32;
+            let mut y_offset = 0.0;
+            if v >= 0.0 && v <= 0.5 {
+                y_offset += prev_distance;
+            }
+
+            let sin_v_pi = (v * consts::PI).sin();
+            let _pos = [
+                radius * (u * consts::PI * 2.0).cos() * sin_v_pi,
+                radius * (v * consts::PI      ).cos() + y_offset,
+                radius * (u * consts::PI * 2.0).sin() * sin_v_pi,
+                1.0
+            ];
+            vertices_vec.push(Vertex { _pos, _color });
+
+            vertices_row.push(index_count);
+            index_count += 1;
+        }
+        grid.push(vertices_row);
+    }
+
+    for iy in 0..height_segments {
+        for ix in 0..width_segments {
+            let a = grid[iy][ix + 1];
+            let b = grid[iy][ix];
+            let c = grid[iy + 1][ix];
+            let d = grid[iy + 1][ix + 1];
+
+            indices_vec.extend(&[a, b, d]);
+            indices_vec.extend(&[b, c, d]);
+        }
+    }
+
+    let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
+    let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
+
+    let diff = (prev - next).normalize();
+    let rotation = if diff.x.is_nan() {
+        // This occurs when prev == next
+        Matrix4::identity()
+    } else {
+        let source_angle = Vector3::new(0.0, 1.0, 0.0);
+        Quaternion::from_arc(source_angle, diff, None).into()
+    };
+    let transform = external_transform * Matrix4::from_translation(next) * rotation;
+    let transform: &[f32; 16] = transform.as_ref();
+    let uniform_buf = state.device.create_buffer_with_data(
+        transform.as_bytes(),
+        wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+    );
+
+    let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &state.bind_group_layout,
+        bindings: &[
+            wgpu::Binding {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
+            },
+        ],
+        label: None,
+    });
+
+    let indices_len = indices_vec.len();
+    Draw { bind_group, vertices, indices, indices_len }
 }
