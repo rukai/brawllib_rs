@@ -1,6 +1,6 @@
 use std::f32::consts;
 
-use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace, ElementWise};
+use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
 use zerocopy::AsBytes;
 
 use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
@@ -113,161 +113,13 @@ pub (crate) fn draw_frame(state: &WgpuState, framebuffer: &wgpu::TextureView, fo
         ));
 
         for hurt_box in &frame.hurt_boxes {
-            let bone_matrix = hurt_box.bone_matrix.clone();
-
-            // extract the scale component from the bone_matrix
-            let bone_scale = Vector3::new(
-                bone_matrix.x.magnitude(),
-                bone_matrix.y.magnitude(),
-                bone_matrix.z.magnitude(),
-            );
-
-            let radius = hurt_box.hurt_box.radius;
-            let stretch = hurt_box.hurt_box.stretch;
-            let offset = hurt_box.hurt_box.offset;
-
-            let stretch_face = (stretch / radius).div_element_wise(bone_scale);
-
-            let mut vertices_vec = vec!();
-            let mut indices_vec: Vec<u16> = vec!();
-            let mut index_count = 0;
-
-            let mut width_segments = 23; // needs to be odd, so we have a middle segment
-            let mut height_segments = 17; // needs to be odd, so we have a middle segment
-
-            // Make the wireframes less busy in wireframe mode
-            if wireframe {
-                width_segments = 11;
-                height_segments = 7;
-            }
-
-            let _color = if hurt_box.state.is_intangible() {
-                [0.0, 0.0, 1.0, 0.3]
-            } else if hurt_box.state.is_invincible() {
-                [0.0, 1.0, 0.0, 0.3]
-            } else {
-                match invulnerable_type {
-                    InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
-                    InvulnerableType::Grab => if hurt_box.hurt_box.grabbable {
-                        [1.0, 1.0, 0.0, 0.3]
-                    } else {
-                        [0.0, 0.0, 1.0, 0.3]
-                    }
-                    InvulnerableType::TrapItem => if hurt_box.hurt_box.trap_item_hittable {
-                        [1.0, 1.0, 0.0, 0.3]
-                    } else {
-                        [0.0, 0.0, 1.0, 0.3]
-                    }
-                }
-            };
-
-            let mut grid = vec!();
-            // modified UV sphere generation from:
-            // https://github.com/mrdoob/THREE.js/blob/4ca3860851d0cd33535afe801a1aa856da277f3a/src/geometries/SphereGeometry.js
-            for iy in 0..height_segments+1 {
-                let mut vertices_row = vec!();
-                let v = iy as f32 / height_segments as f32;
-
-                for ix in 0..width_segments+1 {
-                    let u = ix as f32 / width_segments as f32;
-
-                    // The x, y and z stretch values, split the sphere in half, across its dimension.
-                    // This can result in 8 individual sphere corners.
-                    let mut corner_offset = Vector3::new(0.0, 0.0, 0.0);
-                    if u >= 0.25 && u <= 0.75 { // X
-                        if stretch.x > 0.0 {
-                            corner_offset.x = stretch_face.x;
-                        }
-                    }
-                    else if stretch.x < 0.0 {
-                        corner_offset.x = stretch_face.x;
-                    }
-
-                    if v >= 0.0 && v <= 0.5 { // Y
-                        if stretch.y > 0.0 {
-                            corner_offset.y = stretch_face.y;
-                        }
-                    }
-                    else if stretch.y < 0.0 {
-                        corner_offset.y = stretch_face.y;
-                    }
-
-                    if u >= 0.0 && u <= 0.5 { // Z
-                        if stretch.z > 0.0 {
-                            corner_offset.z = stretch_face.z;
-                        }
-                    }
-                    else if stretch.z < 0.0 {
-                        corner_offset.z = stretch_face.z;
-                    }
-
-                    // vertex generation is supposed have the 8 sphere corners take up exactly 1/8th of the unit sphere.
-                    // However that is difficult because we would need to double up the middle segments.
-                    // So instead we just make it look like this is the case by having large width_segments and height_segments.
-                    let sin_v_pi = (v * consts::PI).sin();
-                    let _pos = [
-                        corner_offset.x - (u * consts::PI * 2.0).cos() * sin_v_pi,
-                        corner_offset.y + (v * consts::PI).cos(),
-                        corner_offset.z + (u * consts::PI * 2.0).sin() * sin_v_pi,
-                        1.0
-                    ];
-                    vertices_vec.push(Vertex { _pos, _color });
-                    vertices_row.push(index_count);
-                    index_count += 1;
-                }
-                grid.push(vertices_row);
-            }
-
-            for iy in 0..height_segments {
-                for ix in 0..width_segments {
-                    let a = grid[iy][(ix + 1) % width_segments];
-                    let b = grid[iy][ix];
-                    let c = grid[iy + 1][ix];
-                    let d = grid[iy + 1][(ix + 1) % width_segments];
-
-                    indices_vec.extend(&[a, b, d]);
-                    indices_vec.extend(&[b, c, d]);
-                }
-            }
-
-            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
-            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
-
-            let transform_translation = Matrix4::from_translation(offset.div_element_wise(bone_scale * radius));
-            let transform_scale = Matrix4::from_scale(radius);
-            let model = transform_translation_frame * bone_matrix * transform_scale * transform_translation;
-
-            let transform = projection.clone() * view.clone() * model;
-            let transform: &[f32; 16] = transform.as_ref();
-            let uniform_buf = state.device.create_buffer_with_data(
-                transform.as_bytes(),
-                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-            );
-
-            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &state.bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..))
-                    },
-                ],
-                label: None,
-            });
-
-            let indices_len = indices_vec.len();
-            draws.push(Draw { bind_group, vertices, indices, indices_len });
-        }
-
-        for hurt_box in &frame.hurt_boxes {
             let color = if hurt_box.state.is_intangible() {
                 [0.0, 0.0, 1.0, 0.3]
             } else if hurt_box.state.is_invincible() {
                 [0.0, 1.0, 0.0, 0.3]
             } else {
                 match invulnerable_type {
-                    //InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
-                    InvulnerableType::Hit => [1.0, 0.0, 0.0, 0.3],
+                    InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
                     InvulnerableType::Grab => if hurt_box.hurt_box.grabbable {
                         [1.0, 1.0, 0.0, 0.3]
                     } else {
