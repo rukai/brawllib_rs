@@ -259,6 +259,117 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
             draws.push(Draw { bind_group, vertices, indices, indices_len });
         }
 
+        for hurt_box in &frame.hurt_boxes {
+            let _color = if hurt_box.state.is_intangible() {
+                [0.0, 0.0, 1.0, 0.3]
+            } else if hurt_box.state.is_invincible() {
+                [0.0, 1.0, 0.0, 0.3]
+            } else {
+                match invulnerable_type {
+                    //InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
+                    InvulnerableType::Hit => [1.0, 0.0, 0.0, 0.3],
+                    InvulnerableType::Grab => if hurt_box.hurt_box.grabbable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
+                    InvulnerableType::TrapItem => if hurt_box.hurt_box.trap_item_hittable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
+                }
+            };
+
+            let prev = Some(hurt_box.hurt_box.offset);
+            let next = hurt_box.hurt_box.stretch;
+
+            let prev_distance = prev.map(|prev| prev.distance(next)).unwrap_or(0.0);
+
+            let width_segments = 23;
+            let height_segments = 17;
+
+            let mut vertices_vec = vec!();
+            let mut indices_vec: Vec<u16> = vec!();
+            let mut index_count = 0;
+
+            let mut grid = vec!();
+            for iy in 0..height_segments+1 {
+                let mut vertices_row = vec!();
+                let v = iy as f32 / height_segments as f32;
+
+                for ix in 0..width_segments+1 {
+                    let u = ix as f32 / width_segments as f32;
+                    let mut y_offset = 0.0;
+                    if v >= 0.0 && v <= 0.5 {
+                        y_offset += prev_distance;
+                    }
+
+                    let sin_v_pi = (v * consts::PI).sin();
+                    let _pos = [
+                        hurt_box.hurt_box.radius * (u * consts::PI * 2.0).cos() * sin_v_pi,
+                        hurt_box.hurt_box.radius * (v * consts::PI      ).cos() + y_offset,
+                        hurt_box.hurt_box.radius * (u * consts::PI * 2.0).sin() * sin_v_pi,
+                        1.0
+                    ];
+                    vertices_vec.push(Vertex { _pos, _color });
+
+                    vertices_row.push(index_count);
+                    index_count += 1;
+                }
+                grid.push(vertices_row);
+            }
+
+            for iy in 0..height_segments {
+                for ix in 0..width_segments {
+                    let a = grid[iy][ix + 1];
+                    let b = grid[iy][ix];
+                    let c = grid[iy + 1][ix];
+                    let d = grid[iy + 1][ix + 1];
+
+                    indices_vec.extend(&[a, b, d]);
+                    indices_vec.extend(&[b, c, d]);
+                }
+            }
+
+            let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
+            let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
+
+            let rotation = if let Some(prev) = prev {
+                let diff = (prev - next).normalize();
+                if diff.x.is_nan() {
+                    // This occurs when prev == next
+                    Matrix4::identity()
+                } else {
+                    let source_angle = Vector3::new(0.0, 1.0, 0.0);
+                    Quaternion::from_arc(source_angle, diff, None).into()
+                }
+            } else {
+                Matrix4::identity()
+            };
+            let model = transform_translation_frame * hurt_box.bone_matrix * Matrix4::from_translation(next) * rotation;
+            let transform = projection.clone() * view.clone() * model;
+            let transform: &[f32; 16] = transform.as_ref();
+            let uniform_buf = state.device.create_buffer_with_data(
+                transform.as_bytes(),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
+
+            let bind_group = state.device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &state.bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(uniform_buf.slice(..)),
+                    },
+                ],
+                label: None,
+            });
+
+            let indices_len = indices_vec.len();
+            draws.push(Draw { bind_group, vertices, indices, indices_len });
+        }
+
         for hitbox in frame.hit_boxes.iter() {
             // only display hitboxes that are used in regular matches
             if let CollisionBoxValues::Hit(hit_values) = &hitbox.next_values {
