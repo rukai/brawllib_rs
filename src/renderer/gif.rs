@@ -103,14 +103,15 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         state.queue.submit(Some(command_encoder.finish()));
 
         let frames_tx = frames_tx.clone();
-        let read = framebuffer_out.map_async(wgpu::MapMode::Read, 0, wgpu::BufferSize::WHOLE);
+        let framebuffer_out_slice = framebuffer_out.slice(..);
+        let read = framebuffer_out_slice.map_async(wgpu::MapMode::Read);
 
         state.poll();
 
         match read.await {
             Ok(()) => {
                 // move the padding to the end of the buffer
-                let mut padded_buffer = framebuffer_out.get_mapped_range(0, wgpu::BufferSize::WHOLE).to_vec();
+                let mut padded_buffer = framebuffer_out_slice.get_mapped_range().to_vec();
                 for y in 1..height as usize {
                     let padded_offset = y * padded_bytes_per_row as usize;
                     let real_offset = y * real_bytes_per_row as usize;
