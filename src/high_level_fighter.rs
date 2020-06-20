@@ -222,7 +222,7 @@ impl HighLevelFighter {
 
                         let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner, fighter_data.attributes.size);
                         let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
-                        let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes);
+                        let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes, fighter_data.attributes.size);
                         let mut hl_hit_boxes = vec!();
                         for next in &hit_boxes {
                             let mut prev_pos = None;
@@ -233,13 +233,21 @@ impl HighLevelFighter {
                                     for prev_hit_box in prev_hit_boxes {
                                         if prev_hit_box.hitbox_id == next.hitbox_id {
                                             // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                            prev_pos = Some(prev_hit_box.position - Vector3::new(0.0, y_vel, x_vel));
+                                            prev_pos = Some(prev_hit_box.hitbox_position - Vector3::new(0.0, y_vel, x_vel));
                                             prev_size = Some(prev_hit_box.size);
                                             prev_values = Some(prev_hit_box.values.clone());
                                         }
                                     }
                                 }
                             }
+
+                            // abuse the hitbox interpolation fields to create stretch hitboxes
+                            if next.values.stretches_to_bone() {
+                                prev_pos = Some(next.bone_position);
+                                prev_size = Some(next.size);
+                                prev_values = Some(next.values.clone());
+                            }
+
                             hl_hit_boxes.push(HighLevelHitBox {
                                 hitbox_id: next.hitbox_id,
 
@@ -247,7 +255,7 @@ impl HighLevelFighter {
                                 prev_size,
                                 prev_values,
 
-                                next_pos:    next.position,
+                                next_pos:    next.hitbox_position,
                                 next_size:   next.size,
                                 next_values: next.values.clone(),
                             });
@@ -656,6 +664,7 @@ impl HighLevelFrame {
         extent
     }
 
+    /// TODO: UH OH THESE STILL USE THE OLD HURTBOX GENERATION METHOD!!!
     /// Furthest point of a hurtbox, starting from the bps
     pub fn hurt_box_extent(&self) -> Extent {
         let mut extent = Extent::new();
@@ -926,6 +935,13 @@ impl CollisionBoxValues {
             unk:        args.unk.clone(),
         })
     }
+
+    pub(crate) fn stretches_to_bone(&self) -> bool {
+        match self {
+            CollisionBoxValues::Hit(values) => values.stretches_to_bone,
+            CollisionBoxValues::Grab(_)     => false,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -1033,11 +1049,12 @@ impl HitBoxValues {
 
 #[derive(Clone, Debug)]
 struct PositionHitBox {
-    pub hitbox_id:   u8,
-    pub position:    Point3<f32>,
-    pub size:        f32,
-    pub interpolate: bool,
-    pub values:      CollisionBoxValues,
+    pub values:          CollisionBoxValues,
+    pub hitbox_id:       u8,
+    pub size:            f32,
+    pub interpolate:     bool,
+    pub hitbox_position: Point3<f32>,
+    pub bone_position:   Point3<f32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1095,7 +1112,7 @@ fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], bone_refs: &BoneRefs, mut e
     ecb
 }
 
-fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner, size: f32) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner, fighter_size: f32) -> Vec<HighLevelHurtBox> {
     let hurtbox_state_all = &script_runner.hurtbox_state_all;
     let hurtbox_states    = &script_runner.hurtbox_states;
     let invisible_bones   = &script_runner.invisible_bones;
@@ -1111,8 +1128,8 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: 
 
             if invisible_bones.iter().all(|x| get_bone_index(*x) != bone.index) {
                 let mut hurt_box = hurt_box.clone();
-                hurt_box.offset *= size;
-                hurt_box.stretch *= size;
+                hurt_box.offset *= fighter_size;
+                hurt_box.stretch *= fighter_size;
                 // dont multiply radius as that will be multiplied by the bone_matrix
 
                 hl_hurt_boxes.push(HighLevelHurtBox {
@@ -1125,36 +1142,50 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: 
     }
 
     for child in bone.children.iter() {
-        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner, size));
+        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner, fighter_size));
     }
 
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox]) -> Vec<PositionHitBox> {
+fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox], fighter_size: f32) -> Vec<PositionHitBox> {
     let mut pos_hit_boxes = vec!();
     for hit_box in hit_boxes.iter() {
         if bone.index == get_bone_index(hit_box.bone_index as i32) {
             let offset = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
             let offset = bone.transform_hitbox.transform_point(offset);
-            let position = Point3::new(
-                offset.x + bone.transform_normal.w.x,
-                offset.y + bone.transform_normal.w.y,
-                offset.z + bone.transform_normal.w.z,
+
+            let bone_position = Point3::new(
+                bone.transform_normal.w.x,
+                bone.transform_normal.w.y,
+                bone.transform_normal.w.z,
             );
 
+            let hitbox_position = Point3::new(
+                bone_position.x + offset.x,
+                bone_position.y + offset.y,
+                bone_position.z + offset.z,
+            );
+
+            let size = if hit_box.values.stretches_to_bone() {
+                hit_box.size * fighter_size
+            } else {
+                hit_box.size
+            };
+
             pos_hit_boxes.push(PositionHitBox {
-                hitbox_id:   hit_box.hitbox_id,
-                size:        hit_box.size,
                 values:      hit_box.values.clone(),
+                hitbox_id:   hit_box.hitbox_id,
                 interpolate: hit_box.interpolate,
-                position,
+                size,
+                hitbox_position,
+                bone_position,
             });
         }
     }
 
     for child in bone.children.iter() {
-        pos_hit_boxes.extend(gen_hit_boxes(child, hit_boxes));
+        pos_hit_boxes.extend(gen_hit_boxes(child, hit_boxes, fighter_size));
     }
 
     pos_hit_boxes
