@@ -21,7 +21,7 @@ pub struct WgpuState {
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
-        let instance = wgpu::Instance::new();
+        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         WgpuState::new(instance, None, wgpu::TextureFormat::Rgba8Unorm).await
     }
 
@@ -32,7 +32,6 @@ impl WgpuState {
                 compatible_surface,
             },
             wgpu::UnsafeExtensions::disallow(),
-            wgpu::BackendBit::PRIMARY,
         ).await.unwrap();
 
         let device_descriptor = wgpu::DeviceDescriptor {
@@ -44,19 +43,20 @@ impl WgpuState {
 
 
         // shaders
-        let vs = include_bytes!("shaders/fighter.vert.spv");
-        let vs_module = device.create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&vs[..])).unwrap());
-        let fs = include_bytes!("shaders/fighter.frag.spv");
-        let fs_module = device.create_shader_module(&wgpu::read_spirv(std::io::Cursor::new(&fs[..])).unwrap());
+        let vs_module = device.create_shader_module(wgpu::include_spirv!("shaders/fighter.vert.spv"));
+        let fs_module = device.create_shader_module(wgpu::include_spirv!("shaders/fighter.frag.spv"));
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             bindings: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                },
+                wgpu::BindGroupLayoutEntry::new(
+                    0,
+                    wgpu::ShaderStage::VERTEX,
+                    wgpu::BindingType::UniformBuffer {
+                        dynamic: false,
+                        min_binding_size: None
+                    },
+                ),
             ],
             label: None,
         });

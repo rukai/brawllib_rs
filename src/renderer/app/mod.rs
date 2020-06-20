@@ -92,7 +92,7 @@ impl App {
             height: size.height,
         };
 
-        let instance = wgpu::Instance::new();
+        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
         let surface = unsafe { instance.create_surface(&_window) };
         let wgpu_state = WgpuState::new(instance, Some(&surface), FORMAT).await;
         let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
