@@ -1,5 +1,6 @@
 use std::mem;
 
+use cgmath::Matrix4;
 use zerocopy::AsBytes;
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
@@ -14,8 +15,10 @@ pub(crate) struct Vertex {
 pub struct WgpuState {
     pub(crate) device:            wgpu::Device,
     pub(crate) queue:             wgpu::Queue,
-    pub(crate) bind_group_layout: wgpu::BindGroupLayout,
+    pub(crate) _bind_group_layout: wgpu::BindGroupLayout,
     pub(crate) render_pipeline:   wgpu::RenderPipeline,
+    pub(crate) uniforms_buffer:   wgpu::Buffer,
+    pub(crate) bind_groups:       Vec<wgpu::BindGroup>,
 }
 
 impl WgpuState {
@@ -121,12 +124,36 @@ impl WgpuState {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
+        let uniform_count = 1000;
+        let uniform_size = mem::size_of::<Matrix4<f32>>();
+        let uniform_size_padded = 256;
+        // TODO: I can probably do this without the vec.
+        let initial_data = vec!(0; uniform_size_padded * uniform_count);
+        let uniforms_buffer = device.create_buffer_with_data(&initial_data, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
+
+        let mut bind_groups = vec!();
+        for i in 0..uniform_count {
+            let uniforms_offset = (i * uniform_size_padded) as u64;
+            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &bind_group_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(uniforms_offset..uniforms_offset+uniform_size as u64)),
+                    },
+                ],
+                label: None,
+            });
+            bind_groups.push(bind_group);
+        }
 
         WgpuState {
             device,
             queue,
-            bind_group_layout,
+            _bind_group_layout: bind_group_layout,
             render_pipeline,
+            uniforms_buffer,
+            bind_groups,
         }
     }
 
