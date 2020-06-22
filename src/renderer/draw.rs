@@ -55,13 +55,14 @@ pub (crate) fn draw_frame(state: &WgpuState, framebuffer: &wgpu::TextureView, fo
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },
                 resolve_target: if SAMPLE_COUNT == 1 { None } else { Some(framebuffer) },
-                load_op: wgpu::LoadOp::Clear,
-                store_op: wgpu::StoreOp::Store,
-                clear_color: wgpu::Color {
-                    r: 0.0,
-                    g: 0.0,
-                    b: 0.0,
-                    a: 1.0,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.0,
+                        g: 0.0,
+                        b: 0.0,
+                        a: 1.0,
+                    }),
+                    store: true,
                 },
             }],
             depth_stencil_attachment: None,
