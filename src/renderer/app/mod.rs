@@ -126,7 +126,6 @@ impl App {
                 let command_encoder = draw_frame(
                     &mut self.wgpu_state,
                     &framebuffer.view,
-                    FORMAT,
                     self.swap_chain_descriptor.width,
                     self.swap_chain_descriptor.height,
                     self.app_state.perspective,

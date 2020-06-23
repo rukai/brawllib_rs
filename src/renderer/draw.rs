@@ -16,27 +16,17 @@ struct Draw {
     indices_len: usize,
 }
 
-pub (crate) fn draw_frame(state: &WgpuState, framebuffer: &wgpu::TextureView, format: wgpu::TextureFormat, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
+pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
     let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
-    let multisampled_texture_extent = wgpu::Extent3d {
-        width: width as u32,
-        height: height as u32,
-        depth: 1
-    };
-    let multisampled_framebuffer_descriptor = &wgpu::TextureDescriptor {
-        size: multisampled_texture_extent,
-        mip_level_count: 1,
-        sample_count: SAMPLE_COUNT,
-        dimension: wgpu::TextureDimension::D2,
-        format: format,
-        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
-        label: None,
-    };
+    let size = &mut state.multisampled_framebuffer_descriptor.size;
+    if size.width  != width || size.height != height {
+        size.width = width;
+        size.height = height;
+        state.multisampled_framebuffer = state.device.create_texture(&state.multisampled_framebuffer_descriptor);
+    }
 
-    let multisampled_framebuffer = state.device.create_texture(multisampled_framebuffer_descriptor);
-
-    let draws = create_draws(state, width, height, perspective, wireframe, render_ecb, invulnerable_type, subaction, frame_index, camera);
+    let draws = create_draws(state, width, height, perspective, wireframe, render_ecb, invulnerable_type, subaction, frame_index, camera); // 2.5ms
 
     let uniform_size = mem::size_of::<Matrix4<f32>>();
     let size_padded = 256;
@@ -50,7 +40,7 @@ pub (crate) fn draw_frame(state: &WgpuState, framebuffer: &wgpu::TextureView, fo
     state.queue.write_buffer(&state.uniforms_buffer, 0, &uniforms_bytes);
 
     {
-        let attachment = multisampled_framebuffer.create_default_view();
+        let attachment = state.multisampled_framebuffer.create_default_view();
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },

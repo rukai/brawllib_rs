@@ -41,5 +41,4 @@ mint = "0.5"
 bincode = "1"
 
 [profile.release]
-debug = true
 debug-assertions = true

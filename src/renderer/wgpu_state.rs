@@ -13,12 +13,14 @@ pub(crate) struct Vertex {
 }
 
 pub struct WgpuState {
-    pub(crate) device:            wgpu::Device,
-    pub(crate) queue:             wgpu::Queue,
-    pub(crate) _bind_group_layout: wgpu::BindGroupLayout,
-    pub(crate) render_pipeline:   wgpu::RenderPipeline,
-    pub(crate) uniforms_buffer:   wgpu::Buffer,
-    pub(crate) bind_groups:       Vec<wgpu::BindGroup>,
+    pub(crate) device:                              wgpu::Device,
+    pub(crate) queue:                               wgpu::Queue,
+    pub(crate) _bind_group_layout:                  wgpu::BindGroupLayout,
+    pub(crate) render_pipeline:                     wgpu::RenderPipeline,
+    pub(crate) uniforms_buffer:                     wgpu::Buffer,
+    pub(crate) bind_groups:                         Vec<wgpu::BindGroup>,
+    pub(crate) multisampled_framebuffer_descriptor: wgpu::TextureDescriptor<'static>,
+    pub(crate) multisampled_framebuffer:            wgpu::Texture,
 }
 
 impl WgpuState {
@@ -147,6 +149,21 @@ impl WgpuState {
             bind_groups.push(bind_group);
         }
 
+        let multisampled_framebuffer_descriptor = wgpu::TextureDescriptor {
+            size: wgpu::Extent3d {
+                width:  100,
+                height: 100,
+                depth:  1
+            },
+            mip_level_count: 1,
+            sample_count: SAMPLE_COUNT,
+            dimension: wgpu::TextureDimension::D2,
+            format: format,
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+            label: None,
+        };
+        let multisampled_framebuffer = device.create_texture(&multisampled_framebuffer_descriptor);
+
         WgpuState {
             device,
             queue,
@@ -154,6 +171,8 @@ impl WgpuState {
             render_pipeline,
             uniforms_buffer,
             bind_groups,
+            multisampled_framebuffer_descriptor,
+            multisampled_framebuffer,
         }
     }
 
