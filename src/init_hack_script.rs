@@ -7,7 +7,8 @@ use crate::script_ast::variable_ast::{VariableAst, LongtermAccessInt, LongtermAc
 pub fn init_hack_script(fighter_name: &str, subaction_name: &str) -> Block {
     let events = match (fighter_name, subaction_name) {
         ("Wolf", "LandingAirN") => vec!(
-            EventAst::IntVariableSet { value: 1, variable: VariableAst::LongtermAccessInt(LongtermAccessInt::Address(0x43)) },
+            EventAst::IntVariableSet { value: 1, variable: VariableAst::LongtermAccessInt(LongtermAccessInt::Address(0x43)) }, // PM3.6
+            EventAst::BoolVariableSetTrue { variable: VariableAst::LongtermAccessBool(LongtermAccessBool::Address(0x43)) }, // P+
         ),
         ("PokeFushigisou", "LandingAirN") => vec!(
             EventAst::BoolVariableSetTrue { variable: VariableAst::LongtermAccessBool(LongtermAccessBool::Address(0x73)) },
