@@ -122,7 +122,7 @@ impl App {
             }
 
             {
-                let framebuffer = self.swap_chain.get_next_frame().unwrap().output;
+                let framebuffer = self.swap_chain.get_current_frame().unwrap().output;
                 let command_encoder = draw_frame(
                     &mut self.wgpu_state,
                     &framebuffer.view,

@@ -1,6 +1,8 @@
 use std::mem;
+use std::borrow::Cow::Borrowed;
 
 use cgmath::Matrix4;
+use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
@@ -36,7 +38,6 @@ impl WgpuState {
                 power_preference: wgpu::PowerPreference::Default,
                 compatible_surface,
             },
-            wgpu::UnsafeFeatures::disallow(),
         ).await.unwrap();
 
         let device_descriptor = wgpu::DeviceDescriptor {
@@ -53,7 +54,7 @@ impl WgpuState {
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            bindings: &[
+            entries: Borrowed(&[
                 wgpu::BindGroupLayoutEntry::new(
                     0,
                     wgpu::ShaderStage::VERTEX,
@@ -62,33 +63,32 @@ impl WgpuState {
                         min_binding_size: None
                     },
                 ),
-            ],
+            ]),
             label: None,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: Borrowed(&[&bind_group_layout]),
+            push_constant_ranges: Borrowed(&[]),
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
-                entry_point: "main",
+                entry_point: Borrowed("main"),
             },
             fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &fs_module,
-                entry_point: "main",
+                entry_point: Borrowed("main"),
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
                 cull_mode: wgpu::CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
+                ..Default::default()
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
+            color_states: Borrowed(&[wgpu::ColorStateDescriptor {
                 format: format,
                 color_blend: wgpu::BlendDescriptor {
                     src_factor: wgpu::BlendFactor::SrcAlpha,
@@ -101,14 +101,14 @@ impl WgpuState {
                     operation: wgpu::BlendOperation::Add,
                 },
                 write_mask: wgpu::ColorWrite::ALL,
-            }],
+            }]),
             depth_stencil_state: None,
             vertex_state: wgpu::VertexStateDescriptor {
                 index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                vertex_buffers: Borrowed(&[wgpu::VertexBufferDescriptor {
                     stride: mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: &[
+                    attributes: Borrowed(&[
                         wgpu::VertexAttributeDescriptor {
                             shader_location: 0,
                             format: wgpu::VertexFormat::Float4,
@@ -119,8 +119,8 @@ impl WgpuState {
                             format: wgpu::VertexFormat::Float4,
                             offset: 4 * 4,
                         },
-                    ],
-                }],
+                    ]),
+                }]),
             },
             sample_count: SAMPLE_COUNT,
             sample_mask: !0,
@@ -131,19 +131,23 @@ impl WgpuState {
         let uniform_size_padded = 256;
         // TODO: I can probably do this without the vec.
         let initial_data = vec!(0; uniform_size_padded * uniform_count);
-        let uniforms_buffer = device.create_buffer_with_data(&initial_data, wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST);
+        let uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &initial_data,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
+        });
 
         let mut bind_groups = vec!();
         for i in 0..uniform_count {
             let uniforms_offset = (i * uniform_size_padded) as u64;
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
-                bindings: &[
-                    wgpu::Binding {
+                entries: Borrowed(&[
+                    wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(uniforms_offset..uniforms_offset+uniform_size as u64)),
                     },
-                ],
+                ]),
                 label: None,
             });
             bind_groups.push(bind_group);

@@ -1,7 +1,9 @@
 use std::f32::consts;
 use std::mem;
+use std::borrow::Cow::Borrowed;
 
 use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
+use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
 use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
@@ -42,7 +44,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     {
         let attachment = state.multisampled_framebuffer.create_default_view();
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+            color_attachments: Borrowed(&[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },
                 resolve_target: if SAMPLE_COUNT == 1 { None } else { Some(framebuffer) },
                 ops: wgpu::Operations {
@@ -54,7 +56,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                     }),
                     store: true,
                 },
-            }],
+            }]),
             depth_stencil_attachment: None,
         });
         rpass.set_pipeline(&state.render_pipeline);
@@ -199,8 +201,16 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
             1, 2, 3,
         ];
 
-        let vertices = state.device.create_buffer_with_data(vertices_array.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let indices = state.device.create_buffer_with_data(indices_array.as_bytes(), wgpu::BufferUsage::INDEX);
+        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &vertices_array.as_bytes(),
+            usage: wgpu::BufferUsage::VERTEX
+        });
+        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &indices_array.as_bytes(),
+            usage: wgpu::BufferUsage::INDEX
+        });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
         let uniform = projection.clone() * view.clone() * model;
@@ -233,8 +243,16 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
             indices_vec.push((i + 1) % iterations + 1);
         }
 
-        let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
+        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &vertices_vec.as_bytes(),
+            usage: wgpu::BufferUsage::VERTEX
+        });
+        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &indices_vec.as_bytes(),
+            usage: wgpu::BufferUsage::INDEX
+        });
 
         let model = Matrix4::from_translation(Vector3::new(
             0.0,
@@ -261,8 +279,16 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
             1, 2, 3,
         ];
 
-        let vertices = state.device.create_buffer_with_data(vertices_array.as_bytes(), wgpu::BufferUsage::VERTEX);
-        let indices = state.device.create_buffer_with_data(indices_array.as_bytes(), wgpu::BufferUsage::INDEX);
+        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &vertices_array.as_bytes(),
+            usage: wgpu::BufferUsage::VERTEX
+        });
+        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: &indices_array.as_bytes(),
+            usage: wgpu::BufferUsage::INDEX
+        });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
         let uniform = projection.clone() * view.clone() * model;
@@ -327,8 +353,16 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
         }
     }
 
-    let vertices = state.device.create_buffer_with_data(vertices_vec.as_bytes(), wgpu::BufferUsage::VERTEX);
-    let indices = state.device.create_buffer_with_data(indices_vec.as_bytes(), wgpu::BufferUsage::INDEX);
+    let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        contents: &vertices_vec.as_bytes(),
+        usage: wgpu::BufferUsage::VERTEX
+    });
+    let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        contents: &indices_vec.as_bytes(),
+        usage: wgpu::BufferUsage::INDEX
+    });
 
     let diff = (prev - next).normalize();
     let rotation = if diff.x.is_nan() {
