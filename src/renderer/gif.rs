@@ -98,7 +98,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         let camera = Camera::new(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_default_view(), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera); // 3.0ms
+        let mut command_encoder = draw_frame(state, &framebuffer.create_view(&wgpu::TextureViewDescriptor::default()), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera); // 3.0ms
         command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, framebuffer_extent);
         state.queue.submit(Some(command_encoder.finish()));
 

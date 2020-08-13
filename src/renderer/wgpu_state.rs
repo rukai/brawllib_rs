@@ -1,5 +1,4 @@
 use std::mem;
-use std::borrow::Cow::Borrowed;
 
 use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
@@ -54,33 +53,35 @@ impl WgpuState {
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            entries: Borrowed(&[
-                wgpu::BindGroupLayoutEntry::new(
-                    0,
-                    wgpu::ShaderStage::VERTEX,
-                    wgpu::BindingType::UniformBuffer {
+            entries: &[
+                wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStage::VERTEX,
+                    ty: wgpu::BindingType::UniformBuffer {
                         dynamic: false,
                         min_binding_size: None
                     },
-                ),
-            ]),
+                    count: None,
+                },
+            ],
             label: None,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: Borrowed(&[&bind_group_layout]),
-            push_constant_ranges: Borrowed(&[]),
+            label: None,
+            bind_group_layouts: &[&bind_group_layout],
+            push_constant_ranges: &[],
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
+            layout: Some(&pipeline_layout),
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: &vs_module,
-                entry_point: Borrowed("main"),
+                entry_point: "main",
             },
             fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
                 module: &fs_module,
-                entry_point: Borrowed("main"),
+                entry_point: "main",
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
                 front_face: wgpu::FrontFace::Ccw,
@@ -88,7 +89,7 @@ impl WgpuState {
                 ..Default::default()
             }),
             primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: Borrowed(&[wgpu::ColorStateDescriptor {
+            color_states: &[wgpu::ColorStateDescriptor {
                 format: format,
                 color_blend: wgpu::BlendDescriptor {
                     src_factor: wgpu::BlendFactor::SrcAlpha,
@@ -101,14 +102,14 @@ impl WgpuState {
                     operation: wgpu::BlendOperation::Add,
                 },
                 write_mask: wgpu::ColorWrite::ALL,
-            }]),
+            }],
             depth_stencil_state: None,
             vertex_state: wgpu::VertexStateDescriptor {
                 index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: Borrowed(&[wgpu::VertexBufferDescriptor {
+                vertex_buffers: &[wgpu::VertexBufferDescriptor {
                     stride: mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
-                    attributes: Borrowed(&[
+                    attributes: &[
                         wgpu::VertexAttributeDescriptor {
                             shader_location: 0,
                             format: wgpu::VertexFormat::Float4,
@@ -119,8 +120,8 @@ impl WgpuState {
                             format: wgpu::VertexFormat::Float4,
                             offset: 4 * 4,
                         },
-                    ]),
-                }]),
+                    ],
+                }],
             },
             sample_count: SAMPLE_COUNT,
             sample_mask: !0,
@@ -142,12 +143,12 @@ impl WgpuState {
             let uniforms_offset = (i * uniform_size_padded) as u64;
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
-                entries: Borrowed(&[
+                entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
                         resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(uniforms_offset..uniforms_offset+uniform_size as u64)),
                     },
-                ]),
+                ],
                 label: None,
             });
             bind_groups.push(bind_group);

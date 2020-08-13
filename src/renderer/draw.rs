@@ -1,6 +1,5 @@
 use std::f32::consts;
 use std::mem;
-use std::borrow::Cow::Borrowed;
 
 use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
 use wgpu::util::DeviceExt;
@@ -42,9 +41,9 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     state.queue.write_buffer(&state.uniforms_buffer, 0, &uniforms_bytes);
 
     {
-        let attachment = state.multisampled_framebuffer.create_default_view();
+        let attachment = state.multisampled_framebuffer.create_view(&wgpu::TextureViewDescriptor::default());
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: Borrowed(&[wgpu::RenderPassColorAttachmentDescriptor {
+            color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                 attachment: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },
                 resolve_target: if SAMPLE_COUNT == 1 { None } else { Some(framebuffer) },
                 ops: wgpu::Operations {
@@ -56,7 +55,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                     }),
                     store: true,
                 },
-            }]),
+            }],
             depth_stencil_attachment: None,
         });
         rpass.set_pipeline(&state.render_pipeline);
