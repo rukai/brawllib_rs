@@ -127,7 +127,7 @@ impl WgpuState {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
-        let uniform_count = 1000;
+        let uniform_count = 10000;
         let uniform_size = mem::size_of::<Matrix4<f32>>();
         let uniform_size_padded = 256;
         // TODO: I can probably do this without the vec.
