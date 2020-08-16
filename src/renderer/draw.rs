@@ -295,63 +295,6 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let indices_len = indices_array.len();
         draws.push(Draw { uniform, vertices, indices, indices_len });
     }
-    else {
-        for extent in &subaction_extent.extents {
-            let small = 0.01;
-            let _color = [1.0, 1.0, 1.0, 1.0];
-            let vertices_array = [
-                Vertex { _pos: [0.0, extent.up + small, extent.left,  1.0], _color },
-                Vertex { _pos: [0.0, extent.up - small, extent.left,  1.0], _color },
-                Vertex { _pos: [0.0, extent.up + small, extent.right, 1.0], _color },
-                Vertex { _pos: [0.0, extent.up - small, extent.right, 1.0], _color },
-
-                Vertex { _pos: [0.0, extent.down + small, extent.left,  1.0], _color },
-                Vertex { _pos: [0.0, extent.down - small, extent.left,  1.0], _color },
-                Vertex { _pos: [0.0, extent.down + small, extent.right, 1.0], _color },
-                Vertex { _pos: [0.0, extent.down - small, extent.right, 1.0], _color },
-
-                Vertex { _pos: [0.0, extent.up,   extent.right + small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.up,   extent.right - small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.down, extent.right + small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.down, extent.right - small, 1.0], _color },
-
-                Vertex { _pos: [0.0, extent.up,   extent.left + small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.up,   extent.left - small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.down, extent.left + small, 1.0], _color },
-                Vertex { _pos: [0.0, extent.down, extent.left - small, 1.0], _color },
-            ];
-            let indices_array: [u16; 24] = [
-                0, 1, 2,
-                1, 2, 3,
-
-                4, 5, 6,
-                5, 6, 7,
-
-                8, 9, 10,
-                9, 10, 11,
-
-                12, 13, 14,
-                13, 14, 15,
-            ];
-
-            let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: &vertices_array.as_bytes(),
-                usage: wgpu::BufferUsage::VERTEX
-            });
-            let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: None,
-                contents: &indices_array.as_bytes(),
-                usage: wgpu::BufferUsage::INDEX
-            });
-            let indices_len = indices_array.len();
-
-            let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
-            let uniform = projection.clone() * view.clone() * model;
-            draws.push(Draw { uniform, vertices, indices, indices_len });
-        }
-    }
-
 
     draws
 }
