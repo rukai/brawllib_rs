@@ -646,22 +646,14 @@ impl HighLevelFrame {
     /// Furthest point of a hurtbox, starting from the bps
     pub fn hurt_box_extent(&self) -> Extent {
         let mut extent = Extent::new();
-        let transform_translation = Matrix4::from_translation(Vector3::new(
-            0.0,
-            self.y_pos,
-            self.x_pos,
-        ));
         for hurt_box in &self.hurt_boxes {
             let bone_matrix = hurt_box.bone_matrix.clone();
-
             let prev = hurt_box.hurt_box.offset;
             let next = hurt_box.hurt_box.stretch;
             let radius = hurt_box.hurt_box.radius;
 
-            let transform = transform_translation * bone_matrix;
-
-            extent.extend(&HighLevelFrame::sphere_extent(prev, radius, transform));
-            extent.extend(&HighLevelFrame::sphere_extent(next, radius, transform));
+            extent.extend(&HighLevelFrame::sphere_extent(prev, radius, bone_matrix));
+            extent.extend(&HighLevelFrame::sphere_extent(next, radius, bone_matrix));
         }
         extent
     }
@@ -694,6 +686,7 @@ pub struct Extent {
     pub right: f32,
     pub up:    f32,
     pub down:  f32,
+    //pub extents: Vec<Extent>,
 }
 
 impl Extent {
@@ -719,6 +712,13 @@ impl Extent {
         if other.down < self.down && !self.down.is_nan() {
             self.down = other.down;
         }
+        // Enable for debugging extents
+        //if other.extents.len() == 0 {
+        //    self.extents.push(other.clone());
+        //}
+        //else {
+        //    self.extents.extend(other.extents.clone());
+        //}
     }
 }
 

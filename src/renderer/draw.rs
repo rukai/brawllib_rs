@@ -5,7 +5,7 @@ use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, Inner
 use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
 
-use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues};
+use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues, Extent};
 use crate::renderer::camera::Camera;
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, Vertex};
@@ -297,6 +297,67 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     }
 
     draws
+}
+
+/// Keep this around, handy for debugging extent generation
+/// Generating the full debug extent generation must be disabled during normal use as it would be too expensive.
+/// Use like:
+/// let transform = projection.clone() * view.clone();
+/// for extent in &subaction_extent.extents {
+///     draws.push(_draw_extent(state, extent, &transform));
+/// }
+fn _draw_extent(state: &WgpuState, extent: &Extent, external_transform: &Matrix4<f32>) -> Draw {
+    let small = 0.01;
+    let _color = [1.0, 1.0, 1.0, 1.0];
+    let vertices_array = [
+        Vertex { _pos: [0.0, extent.up + small, extent.left,  1.0], _color },
+        Vertex { _pos: [0.0, extent.up - small, extent.left,  1.0], _color },
+        Vertex { _pos: [0.0, extent.up + small, extent.right, 1.0], _color },
+        Vertex { _pos: [0.0, extent.up - small, extent.right, 1.0], _color },
+
+        Vertex { _pos: [0.0, extent.down + small, extent.left,  1.0], _color },
+        Vertex { _pos: [0.0, extent.down - small, extent.left,  1.0], _color },
+        Vertex { _pos: [0.0, extent.down + small, extent.right, 1.0], _color },
+        Vertex { _pos: [0.0, extent.down - small, extent.right, 1.0], _color },
+
+        Vertex { _pos: [0.0, extent.up,   extent.right + small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.up,   extent.right - small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.down, extent.right + small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.down, extent.right - small, 1.0], _color },
+
+        Vertex { _pos: [0.0, extent.up,   extent.left + small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.up,   extent.left - small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.down, extent.left + small, 1.0], _color },
+        Vertex { _pos: [0.0, extent.down, extent.left - small, 1.0], _color },
+    ];
+    let indices_array: [u16; 24] = [
+        0, 1, 2,
+        1, 2, 3,
+
+        4, 5, 6,
+        5, 6, 7,
+
+        8, 9, 10,
+        9, 10, 11,
+
+        12, 13, 14,
+        13, 14, 15,
+    ];
+
+    let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        contents: &vertices_array.as_bytes(),
+        usage: wgpu::BufferUsage::VERTEX
+    });
+    let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: None,
+        contents: &indices_array.as_bytes(),
+        usage: wgpu::BufferUsage::INDEX
+    });
+    let indices_len = indices_array.len();
+
+    let uniform = external_transform.clone();
+    Draw { uniform, vertices, indices, indices_len }
 }
 
 fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radius: f32, external_transform: Matrix4<f32>, _color: [f32; 4], wireframe: bool) -> Draw {
