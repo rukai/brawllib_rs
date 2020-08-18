@@ -1,4 +1,4 @@
-# brawllib\_rs [![Build Status](https://travis-ci.org/rukai/brawllib_rs.svg?branch=master)](https://travis-ci.org/rukai/brawllib_rs) [![dependency status](https://deps.rs/repo/github/rukai/brawllib_rs/status.svg)](https://deps.rs/repo/github/rukai/brawllib_rs) [![Crates.io](https://img.shields.io/crates/v/brawllib_rs.svg)](https://crates.io/crates/brawllib_rs)
+# brawllib\_rs [![Build Status](https://travis-ci.org/rukai/brawllib_rs.svg?branch=master)](https://travis-ci.org/rukai/brawllib_rs) [![Crates.io](https://img.shields.io/crates/v/brawllib_rs.svg)](https://crates.io/crates/brawllib_rs)
 
 A brawl file parser, based on brawlbox/brawllib, written in rust.
 
