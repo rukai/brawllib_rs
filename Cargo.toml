@@ -19,11 +19,11 @@ serde_derive = "1"
 rayon = "1"
 failure = "0.1"
 env_logger = "0.7"
-gif = "0.10"
+gif = "0.11"
 wgpu = "0.6"
 fancy_slice = { version = "0.1", features = [] }
-winit = { version = "0.22.0", features = ["web-sys"] }
-winit_input_helper = "0.7"
+winit = { version = "0.23.0", features = ["web-sys"] }
+winit_input_helper = "0.8"
 raw-window-handle = "0.3"
 futures = "0.3"
 zerocopy = "0.3"
