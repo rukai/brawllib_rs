@@ -158,4 +158,10 @@ impl BrawlMod {
         }
         Ok(result)
     }
+
+    /// returns true if modded files are used.
+    /// Otherwise is just vanilla brawl and false is returned.
+    pub fn is_mod(&self) -> bool {
+        self.mod_path.is_some()
+    }
 }
