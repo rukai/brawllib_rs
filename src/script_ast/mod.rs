@@ -1372,11 +1372,32 @@ impl HurtBoxState {
     }
 }
 
+/// The angle specified in the hitbox specifies the angle used when the fighter faces to the right.
+/// Then one of these modifiers is applied to it to determine when the angle should be flipped across the Y axis
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum AngleFlip {
-    AwayFromAttacker,
+    /// The direction from the attacker to the defender.
+    /// flip = attacker_x < defender_x
+    AttackerPosition,
+    /// The direction the attacker is moving.
+    /// flip = if attacker_speed_x == 0.0 {
+    ///     attacker_x < defender_x
+    /// } else {
+    ///     attacker_speed_x < 0.0
+    /// }
+    MovementDir,
+    /// Direction is always to the left.
+    /// flip = true
+    LeftDir,
+    /// The direction the attacker is currently facing.
+    /// flip = attacker_direction == left
     AttackerDir,
+    /// The opposite direction to where the attacker is currently facing.
+    /// flip = attacker_direction == right
     AttackerDirReverse,
+    /// The direction from the hitbox to the defender.
+    /// flip = hitbox_x < defender_x
+    HitboxPosition,
     FaceZaxis,
     Unknown (i32)
 }
@@ -1384,11 +1405,14 @@ pub enum AngleFlip {
 impl AngleFlip {
     fn new(value: i32) -> AngleFlip {
         match value {
-            0 | 2 | 5 => AngleFlip::AwayFromAttacker,
-            1 | 3     => AngleFlip::AttackerDir,
-            4         => AngleFlip::AttackerDirReverse,
-            6 | 7     => AngleFlip::FaceZaxis,
-            v         => AngleFlip::Unknown (v),
+            0     => AngleFlip::AttackerPosition,
+            1     => AngleFlip::MovementDir,
+            2     => AngleFlip::LeftDir,
+            3     => AngleFlip::AttackerDir,
+            4     => AngleFlip::AttackerDirReverse,
+            5     => AngleFlip::HitboxPosition,
+            6 | 7 => AngleFlip::FaceZaxis,
+            v     => AngleFlip::Unknown (v),
         }
     }
 }

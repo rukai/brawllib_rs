@@ -759,7 +759,7 @@ impl CollisionBoxValues {
             clang:                args.clang,
             direct:               args.direct,
             rehit_rate:           0, // TODO: ?
-            angle_flipping:       AngleFlip::AwayFromAttacker, // TODO: ?
+            angle_flipping:       AngleFlip::AttackerPosition,
             stretches_to_bone:    false,
             can_hit1:             true,
             can_hit2:             true,
