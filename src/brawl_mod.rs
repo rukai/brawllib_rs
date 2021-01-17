@@ -8,8 +8,7 @@ use crate::wii_memory::WiiMemory;
 use crate::wiird_runner;
 use crate::arc;
 
-use failure::Error;
-use failure::bail;
+use anyhow::{Error, bail};
 
 use fancy_slice::FancySlice;
 
