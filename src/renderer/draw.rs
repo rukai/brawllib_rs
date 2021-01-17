@@ -95,7 +95,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         camera.radius * camera.phi.sin() * camera.theta.cos(),
     );
     let camera_location = camera.target + camera_offset;
-    let view = Matrix4::look_at(camera_location, camera.target, Vector3::new(0.0, 1.0, 0.0));
+    let view = Matrix4::look_at_rh(camera_location, camera.target, Vector3::new(0.0, 1.0, 0.0));
 
     let projection = if perspective {
         cgmath::perspective(
