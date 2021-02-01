@@ -3,6 +3,7 @@ use std::mem;
 use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
 use zerocopy::AsBytes;
+use std::num::NonZeroU64;
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
 
@@ -34,7 +35,7 @@ impl WgpuState {
     pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>, format: wgpu::TextureFormat) -> WgpuState {
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
+                power_preference: wgpu::PowerPreference::default(),
                 compatible_surface,
             },
         ).await.unwrap();
@@ -42,14 +43,14 @@ impl WgpuState {
         let device_descriptor = wgpu::DeviceDescriptor {
             limits: wgpu::Limits::default(),
             features: wgpu::Features::empty(),
-            shader_validation: false,
+            label: None,
         };
         let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
 
 
         // shaders
-        let vs_module = device.create_shader_module(wgpu::include_spirv!("shaders/fighter.vert.spv"));
-        let fs_module = device.create_shader_module(wgpu::include_spirv!("shaders/fighter.frag.spv"));
+        let vs_module = device.create_shader_module(&wgpu::include_spirv!("shaders/fighter.vert.spv"));
+        let fs_module = device.create_shader_module(&wgpu::include_spirv!("shaders/fighter.frag.spv"));
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -57,8 +58,9 @@ impl WgpuState {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer {
-                        dynamic: false,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
                         min_binding_size: None
                     },
                     count: None,
@@ -76,47 +78,19 @@ impl WgpuState {
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: None,
             layout: Some(&pipeline_layout),
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
+            vertex: wgpu::VertexState {
                 module: &vs_module,
                 entry_point: "main",
-            },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &fs_module,
-                entry_point: "main",
-            }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
-                ..Default::default()
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: format,
-                color_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            depth_stencil_state: None,
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[wgpu::VertexBufferDescriptor {
-                    stride: mem::size_of::<Vertex>() as u64,
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
                     attributes: &[
-                        wgpu::VertexAttributeDescriptor {
+                        wgpu::VertexAttribute {
                             shader_location: 0,
                             format: wgpu::VertexFormat::Float4,
                             offset: 0,
                         },
-                        wgpu::VertexAttributeDescriptor {
+                        wgpu::VertexAttribute {
                             shader_location: 1,
                             format: wgpu::VertexFormat::Float4,
                             offset: 4 * 4,
@@ -124,9 +98,36 @@ impl WgpuState {
                     ],
                 }],
             },
-            sample_count: SAMPLE_COUNT,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
+            fragment: Some(wgpu::FragmentState {
+                module: &fs_module,
+                entry_point: "main",
+                targets: &[wgpu::ColorTargetState {
+                    format: format,
+                    color_blend: wgpu::BlendState {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    alpha_blend: wgpu::BlendState {
+                        src_factor: wgpu::BlendFactor::SrcAlpha,
+                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        operation: wgpu::BlendOperation::Add,
+                    },
+                    write_mask: wgpu::ColorWrite::ALL,
+                }],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::None,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: SAMPLE_COUNT,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            }
         });
         let uniform_count = 1000;
         let uniform_size = mem::size_of::<Matrix4<f32>>();
@@ -147,7 +148,11 @@ impl WgpuState {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer(uniforms_buffer.slice(uniforms_offset..uniforms_offset+uniform_size as u64)),
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniforms_buffer,
+                            offset: uniforms_offset,
+                            size: NonZeroU64::new(uniform_size as u64),
+                        },
                     },
                 ],
                 label: None,
@@ -165,7 +170,7 @@ impl WgpuState {
             sample_count: SAMPLE_COUNT,
             dimension: wgpu::TextureDimension::D2,
             format: format,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
             label: None,
         };
         let multisampled_framebuffer = device.create_texture(&multisampled_framebuffer_descriptor);

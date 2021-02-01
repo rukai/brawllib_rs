@@ -57,12 +57,13 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
                 },
             }],
             depth_stencil_attachment: None,
+            label: None,
         });
         rpass.set_pipeline(&state.render_pipeline);
 
         for (i, draw) in draws.iter().enumerate() {
             rpass.set_bind_group(0, &state.bind_groups[i], &[]);
-            rpass.set_index_buffer(draw.indices.slice(..));
+            rpass.set_index_buffer(draw.indices.slice(..), wgpu::IndexFormat::Uint16);
             rpass.set_vertex_buffer(0, draw.vertices.slice(..));
             rpass.draw_indexed(0..draw.indices_len as u32, 0, 0..1);
         }

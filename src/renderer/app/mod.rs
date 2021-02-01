@@ -86,7 +86,7 @@ impl App {
 
         let swap_chain_descriptor = wgpu::SwapChainDescriptor {
             present_mode: wgpu::PresentMode::Fifo,
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
             format: FORMAT,
             width: size.width,
             height: size.height,
