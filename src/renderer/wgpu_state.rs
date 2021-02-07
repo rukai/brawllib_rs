@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::mem;
 
 use cgmath::Matrix4;
@@ -49,8 +50,11 @@ impl WgpuState {
 
 
         // shaders
-        let vs_module = device.create_shader_module(&wgpu::include_spirv!("shaders/fighter.vert.spv"));
-        let fs_module = device.create_shader_module(&wgpu::include_spirv!("shaders/fighter.frag.spv"));
+        let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: None,
+            source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/shader.wgsl"))),
+            flags: wgpu::ShaderFlags::all(),
+        });
 
         // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -79,8 +83,8 @@ impl WgpuState {
             label: None,
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &vs_module,
-                entry_point: "main",
+                module: &shader_module,
+                entry_point: "vs_main",
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: mem::size_of::<Vertex>() as u64,
                     step_mode: wgpu::InputStepMode::Vertex,
@@ -99,8 +103,8 @@ impl WgpuState {
                 }],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &fs_module,
-                entry_point: "main",
+                module: &shader_module,
+                entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: format,
                     color_blend: wgpu::BlendState {
