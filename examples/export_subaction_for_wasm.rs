@@ -4,8 +4,6 @@ use brawllib_rs::brawl_mod::BrawlMod;
 use getopts::Options;
 
 use std::env;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 
 fn print_usage(program: &str, opts: Options) {
@@ -76,8 +74,7 @@ fn main() {
                     // this example only exports a single subaction_data.bin file
                     // rukaidata project will be responsible for mass exporting subactions for all characters for all mods
                     let data = bincode::serialize(&subaction).unwrap();
-                    let mut file = File::create("subaction_data.bin").unwrap();
-                    file.write(&data).unwrap();
+                    std::fs::write("subaction_data.bin", &data).unwrap();
                     return;
                 }
             }

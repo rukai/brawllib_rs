@@ -6,8 +6,6 @@ use brawllib_rs::renderer::WgpuState;
 use getopts::Options;
 
 use std::env;
-use std::fs::File;
-use std::io::Write;
 use std::path::PathBuf;
 
 fn print_usage(program: &str, opts: Options) {
@@ -77,8 +75,7 @@ fn main() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
                     let mut wgpu_state = futures::executor::block_on(WgpuState::new_for_gif());
                     let data = renderer::render_gif_blocking(&mut wgpu_state, &hl_fighter, i);
-                    let mut file = File::create(format!("output_{}_{}.gif", hl_fighter.name, subaction.name)).unwrap();
-                    file.write(&data).unwrap();
+                    std::fs::write(format!("output_{}_{}.gif", hl_fighter.name, subaction.name), &data).unwrap();
                     return;
                 }
             }

@@ -1,6 +1,4 @@
-use std::fs::File;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use crate::fighter::Fighter;
@@ -66,12 +64,7 @@ impl BrawlMod {
         }
 
         let common_fighter_path = brawl_fighter_path.join("Fighter.pac");
-        let (common_fighter, wii_memory) = if let Ok(mut fighter_file) = File::open(common_fighter_path) {
-            let mut file_data: Vec<u8> = vec!();
-            if let Err(err) = fighter_file.read_to_end(&mut file_data) {
-                bail!("Cannot read Fighter.pac in the brawl dump: {}", err);
-            }
-
+        let (common_fighter, wii_memory) = if let Ok(mut file_data) = std::fs::read(common_fighter_path) {
             let wii_memory = if self.mod_path.is_some() {
                 let codeset = self.load_wiird_codeset_raw()?;
                 let sakurai_ram_offset = 0x80F9FC20;
@@ -117,25 +110,20 @@ impl BrawlMod {
                                 if name.ends_with(".gct") || name.ends_with(".GCT") {
                                     let codeset_path = entry.path();
                                     if codeset_path.exists() {
-                                        let mut data: Vec<u8> = vec!();
-                                        match File::open(&codeset_path) {
-                                            Ok(mut file) => {
-                                                if let Err(err) = file.read_to_end(&mut data) {
-                                                    bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err);
+                                        match std::fs::read(&codeset_path) {
+                                            Ok(data) => {
+                                                if data.len() < 8 {
+                                                    bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+                                                }
+                                                if let Some(matching_file) = gct_files.iter().find(|x| x.name == name) {
+                                                    assert_eq!(matching_file.data, data);
+                                                }
+                                                else {
+                                                    gct_files.push(GCTFile { name, data });
                                                 }
                                             }
                                             Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
-                                        }
-
-                                        if data.len() < 8 {
-                                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
-                                        }
-                                        if let Some(matching_file) = gct_files.iter().find(|x| x.name == name) {
-                                            assert_eq!(matching_file.data, data);
-                                        }
-                                        else {
-                                            gct_files.push(GCTFile { name, data });
-                                        }
+                                        };
                                     }
                                 }
                             }

@@ -1,7 +1,6 @@
 use std::collections::HashMap;
-use std::fs::{File, ReadDir};
+use std::fs::ReadDir;
 use std::fs;
-use std::io::Read;
 use std::path::Path;
 
 use rayon::prelude::*;
@@ -384,8 +383,7 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
                     // fighter data already exists, overwrite and insert new files
                     for data_path in fs::read_dir(&fighter_path).unwrap() {
                         let data_path = data_path.unwrap().path();
-                        let mut file_data: Vec<u8> = vec!();
-                        File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
+                        let file_data = std::fs::read(&data_path).unwrap();
                         fighter_data.data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
                         fighter_data.read_from_mod = true;
                     }
@@ -438,8 +436,7 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
             let mut data = HashMap::new();
             for data_path in fs::read_dir(&fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
-                let mut file_data: Vec<u8> = vec!();
-                File::open(&data_path).unwrap().read_to_end(&mut file_data).unwrap();
+                let file_data = std::fs::read(&data_path).unwrap();
                 data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
             }
             Some(FighterData {

@@ -4,8 +4,6 @@ use getopts::Options;
 
 use std::path::PathBuf;
 use std::env;
-use std::fs::File;
-use std::io::Write;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -61,8 +59,7 @@ fn main() {
     for fighter in fighters {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
             let model = fighter.models.get(0).unwrap().compile();
-            let mut file = File::create("modifier_output.pac").unwrap();
-            file.write_all(&model).unwrap();
+            std::fs::write("modifier_output.pac", &model).unwrap();
 
             return;
         }
