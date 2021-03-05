@@ -3,7 +3,6 @@ use std::mem;
 
 use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
 use wgpu::util::DeviceExt;
-use zerocopy::AsBytes;
 
 use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues, Extent};
 use crate::renderer::camera::Camera;
@@ -35,7 +34,7 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     let mut uniforms_offset = 0;
     for draw in &draws {
         let transform: &[f32; 16] = draw.uniform.as_ref();
-        uniforms_bytes[uniforms_offset..uniforms_offset+uniform_size].copy_from_slice(transform.as_bytes());
+        uniforms_bytes[uniforms_offset..uniforms_offset+uniform_size].copy_from_slice(bytemuck::bytes_of(transform));
         uniforms_offset += size_padded;
     }
     state.queue.write_buffer(&state.uniforms_buffer, 0, &uniforms_bytes);
@@ -203,12 +202,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
 
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &vertices_array.as_bytes(),
+            contents: bytemuck::bytes_of(&vertices_array),
             usage: wgpu::BufferUsage::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &indices_array.as_bytes(),
+            contents: bytemuck::bytes_of(&indices_array),
             usage: wgpu::BufferUsage::INDEX
         });
 
@@ -245,12 +244,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
 
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &vertices_vec.as_bytes(),
+            contents: bytemuck::cast_slice(&vertices_vec),
             usage: wgpu::BufferUsage::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &indices_vec.as_bytes(),
+            contents: bytemuck::cast_slice(&indices_vec),
             usage: wgpu::BufferUsage::INDEX
         });
 
@@ -281,12 +280,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
 
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &vertices_array.as_bytes(),
+            contents: bytemuck::bytes_of(&vertices_array),
             usage: wgpu::BufferUsage::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
-            contents: &indices_array.as_bytes(),
+            contents: bytemuck::bytes_of(&indices_array),
             usage: wgpu::BufferUsage::INDEX
         });
 
@@ -347,12 +346,12 @@ fn _draw_extent(state: &WgpuState, extent: &Extent, external_transform: &Matrix4
 
     let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: &vertices_array.as_bytes(),
+        contents: bytemuck::bytes_of(&vertices_array),
         usage: wgpu::BufferUsage::VERTEX
     });
     let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: &indices_array.as_bytes(),
+        contents: bytemuck::bytes_of(&indices_array),
         usage: wgpu::BufferUsage::INDEX
     });
     let indices_len = indices_array.len();
@@ -416,12 +415,12 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
 
     let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: &vertices_vec.as_bytes(),
+        contents: bytemuck::cast_slice(&vertices_vec),
         usage: wgpu::BufferUsage::VERTEX
     });
     let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
-        contents: &indices_vec.as_bytes(),
+        contents: bytemuck::cast_slice(&indices_vec),
         usage: wgpu::BufferUsage::INDEX
     });
 

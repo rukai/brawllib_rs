@@ -1,15 +1,15 @@
 use std::borrow::Cow;
 use std::mem;
+use std::num::NonZeroU64;
 
 use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
-use zerocopy::AsBytes;
-use std::num::NonZeroU64;
+use bytemuck::{Pod, Zeroable};
 
 pub(crate) const SAMPLE_COUNT: u32 = 8;
 
 #[repr(C)]
-#[derive(Clone, Copy, AsBytes)]
+#[derive(Clone, Copy, Pod, Zeroable)]
 pub(crate) struct Vertex {
     pub _pos:   [f32; 4],
     pub _color: [f32; 4],
