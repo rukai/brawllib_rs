@@ -1,8 +1,11 @@
-# brawllib\_rs [![Build Status](https://travis-ci.org/rukai/brawllib_rs.svg?branch=master)](https://travis-ci.org/rukai/brawllib_rs) [![Crates.io](https://img.shields.io/crates/v/brawllib_rs.svg)](https://crates.io/crates/brawllib_rs)
+# brawllib\_rs
+[![dependency status](https://deps.rs/repo/github/rukai/brawllib_rs/status.svg)](https://deps.rs/repo/github/rukai/brawllib_rs)
+[![Crates.io](https://img.shields.io/crates/v/brawllib_rs.svg)](https://crates.io/crates/brawllib_rs)
+[![Released API docs](https://docs.rs/brawllib_rs/badge.svg)](https://docs.rs/brawllib_rs)
 
 A brawl file parser, based on brawlbox/brawllib, written in rust.
 
-Doesn't support modifying files, only reading them.
+Doesn't support modifying files, only reading, processing and rendering them.
 
 ## Example
 
@@ -30,7 +33,3 @@ for fighter in brawl_mod.load_fighters(false).unwrap() {
     println!("Hurtboxes on the 4th frame of 'Run' action {:#?}", hl_fighter.subactions.iter().find(|x| x.name == "Run").unwrap().frames[4].hurt_boxes);
 }
 ```
-
-## Documentation
-
-Refer to [docs.rs](https://docs.rs/brawllib_rs) for the full API.
