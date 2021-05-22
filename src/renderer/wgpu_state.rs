@@ -91,12 +91,12 @@ impl WgpuState {
                     attributes: &[
                         wgpu::VertexAttribute {
                             shader_location: 0,
-                            format: wgpu::VertexFormat::Float4,
+                            format: wgpu::VertexFormat::Float32x4,
                             offset: 0,
                         },
                         wgpu::VertexAttribute {
                             shader_location: 1,
-                            format: wgpu::VertexFormat::Float4,
+                            format: wgpu::VertexFormat::Float32x4,
                             offset: 4 * 4,
                         },
                     ],
@@ -107,23 +107,21 @@ impl WgpuState {
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: format,
-                    color_blend: wgpu::BlendState {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
-                    alpha_blend: wgpu::BlendState {
-                        src_factor: wgpu::BlendFactor::SrcAlpha,
-                        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        operation: wgpu::BlendOperation::Add,
-                    },
+                    blend: Some(wgpu::BlendState {
+                        color: wgpu::BlendComponent {
+                            operation: wgpu::BlendOperation::Add,
+                            src_factor: wgpu::BlendFactor::SrcAlpha,
+                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                        },
+                        alpha: wgpu::BlendComponent::REPLACE,
+                    }),
                     write_mask: wgpu::ColorWrite::ALL,
                 }],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
+                cull_mode: None,
                 ..Default::default()
             },
             depth_stencil: None,
@@ -152,11 +150,11 @@ impl WgpuState {
                 entries: &[
                     wgpu::BindGroupEntry {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
+                        resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                             buffer: &uniforms_buffer,
                             offset: uniforms_offset,
                             size: NonZeroU64::new(uniform_size as u64),
-                        },
+                        }),
                     },
                 ],
                 label: None,
@@ -166,9 +164,9 @@ impl WgpuState {
 
         let multisampled_framebuffer_descriptor = wgpu::TextureDescriptor {
             size: wgpu::Extent3d {
-                width:  100,
+                width: 100,
                 height: 100,
-                depth:  1
+                depth_or_array_layers: 1
             },
             mip_level_count: 1,
             sample_count: SAMPLE_COUNT,

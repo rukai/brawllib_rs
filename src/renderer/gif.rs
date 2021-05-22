@@ -1,6 +1,7 @@
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
+use std::num::NonZeroU32;
 
 use crate::high_level_fighter::HighLevelFighter;
 use crate::renderer::app::state::InvulnerableType;
@@ -51,7 +52,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         let framebuffer_extent = wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
-            depth: 1
+            depth_or_array_layers: 1
         };
         let framebuffer_descriptor = &wgpu::TextureDescriptor {
             size: framebuffer_extent,
@@ -64,10 +65,10 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
-        let framebuffer_copy_view = wgpu::TextureCopyView {
+        let framebuffer_copy_view = wgpu::ImageCopyTexture {
             texture: &framebuffer,
             mip_level: 0,
-            origin: wgpu::Origin3d { x: 0, y: 0, z: 0 },
+            origin: wgpu::Origin3d::ZERO,
         };
 
         // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % wgpu::COPY_BYTES_PER_ROW_ALIGNMENT == 0
@@ -88,12 +89,12 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         };
 
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
-        let framebuffer_out_copy_view = wgpu::BufferCopyView {
+        let framebuffer_out_copy_view = wgpu::ImageCopyBuffer {
             buffer: &framebuffer_out,
-            layout: wgpu::TextureDataLayout {
+            layout: wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: padded_bytes_per_row,
-                rows_per_image: 0
+                bytes_per_row: Some(NonZeroU32::new(padded_bytes_per_row).unwrap()),
+                rows_per_image: None,
             }
         };
 

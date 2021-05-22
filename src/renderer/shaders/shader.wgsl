@@ -1,7 +1,7 @@
-[[location(0)]]
-var<in> a_position: vec4<f32>;
-[[location(1)]]
-var<in> a_color: vec4<f32>;
+struct VertexOutput {
+    [[location(0)]] color: vec4<f32>;
+    [[builtin(position)]] position: vec4<f32>;
+};
 
 [[block]]
 struct Locals {
@@ -10,25 +10,19 @@ struct Locals {
 [[group(0), binding(0)]]
 var u_locals: Locals;
 
-[[location(0)]]
-var<out> v_color: vec4<f32>;
-[[builtin(position)]]
-var<out> v_position: vec4<f32>;
-
 [[stage(vertex)]]
-fn vs_main() {
-    v_position = u_locals.transform * a_position;
-    v_color = a_color;
+fn vs_main(
+    [[location(0)]] position: vec4<f32>,
+    [[location(1)]] color: vec4<f32>,
+) -> VertexOutput {
+    var out: VertexOutput;
+    out.color = color;
+    out.position = u_locals.transform * position;
+    return out;
 }
 
 
-[[location(0)]]
-var<in> v_color: vec4<f32>;
-
-[[location(0)]]
-var<out> f_color: vec4<f32>;
-
 [[stage(fragment)]]
-fn fs_main() {
-    f_color = v_color;
+fn fs_main(in: VertexOutput) -> [[location(0)]] vec4<f32> {
+    return in.color;
 }
