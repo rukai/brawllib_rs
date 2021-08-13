@@ -7,6 +7,7 @@ description = "Brawl character file parser, based on brawlbox/brawllib"
 license = "MIT"
 repository = "https://github.com/rukai/brawllib_rs"
 keywords = ["super", "smash", "bros", "brawl", "lib"]
+resolver = "2"
 categories = ["games", "game-engines"]
 
 [dependencies]
@@ -20,7 +21,7 @@ rayon = "1"
 anyhow = "1"
 env_logger = "0.9"
 gif = "0.11"
-wgpu = "0.9"
+wgpu = "0.10"
 fancy_slice = { version = "0.1", features = [] }
 winit = { version = "0.25.0", features = ["web-sys"] }
 winit_input_helper = "0.10"

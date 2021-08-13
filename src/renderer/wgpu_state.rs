@@ -6,7 +6,7 @@ use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
 
-pub(crate) const SAMPLE_COUNT: u32 = 8;
+pub(crate) const SAMPLE_COUNT: u32 = 4;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -29,7 +29,7 @@ pub struct WgpuState {
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
         WgpuState::new(instance, None, wgpu::TextureFormat::Rgba8Unorm).await
     }
 
@@ -42,26 +42,23 @@ impl WgpuState {
         ).await.unwrap();
 
         let device_descriptor = wgpu::DeviceDescriptor {
-            limits: wgpu::Limits::default(),
+            limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
             features: wgpu::Features::empty(),
             label: None,
         };
         let (device, queue) = adapter.request_device(&device_descriptor, None).await.unwrap();
 
 
-        // shaders
         let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/shader.wgsl"))),
-            flags: wgpu::ShaderFlags::all(),
         });
 
-        // layout
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -87,7 +84,7 @@ impl WgpuState {
                 entry_point: "vs_main",
                 buffers: &[wgpu::VertexBufferLayout {
                     array_stride: mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::InputStepMode::Vertex,
+                    step_mode: wgpu::VertexStepMode::Vertex,
                     attributes: &[
                         wgpu::VertexAttribute {
                             shader_location: 0,
@@ -115,7 +112,7 @@ impl WgpuState {
                         },
                         alpha: wgpu::BlendComponent::REPLACE,
                     }),
-                    write_mask: wgpu::ColorWrite::ALL,
+                    write_mask: wgpu::ColorWrites::ALL,
                 }],
             }),
             primitive: wgpu::PrimitiveState {
@@ -131,20 +128,19 @@ impl WgpuState {
                 alpha_to_coverage_enabled: false,
             }
         });
-        let uniform_count = 1000;
-        let uniform_size = mem::size_of::<Matrix4<f32>>();
-        let uniform_size_padded = 256;
-        // TODO: I can probably do this without the vec.
-        let initial_data = vec!(0; uniform_size_padded * uniform_count);
+        const UNIFORM_SIZE: usize = mem::size_of::<Matrix4<f32>>();
+        const UNIFORM_COUNT: usize = 1000;
+        const UNIFORM_SIZE_PADDED: usize = 256;
+        let initial_data = [0; UNIFORM_SIZE_PADDED * UNIFORM_COUNT];
         let uniforms_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: &initial_data,
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST
         });
 
         let mut bind_groups = vec!();
-        for i in 0..uniform_count {
-            let uniforms_offset = (i * uniform_size_padded) as u64;
+        for i in 0..UNIFORM_COUNT {
+            let uniforms_offset = (i * UNIFORM_SIZE_PADDED) as u64;
             let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
                 layout: &bind_group_layout,
                 entries: &[
@@ -153,7 +149,7 @@ impl WgpuState {
                         resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                             buffer: &uniforms_buffer,
                             offset: uniforms_offset,
-                            size: NonZeroU64::new(uniform_size as u64),
+                            size: NonZeroU64::new(UNIFORM_SIZE as u64),
                         }),
                     },
                 ],
@@ -172,7 +168,7 @@ impl WgpuState {
             sample_count: SAMPLE_COUNT,
             dimension: wgpu::TextureDimension::D2,
             format: format,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             label: None,
         };
         let multisampled_framebuffer = device.create_texture(&multisampled_framebuffer_descriptor);

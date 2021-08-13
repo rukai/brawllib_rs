@@ -203,12 +203,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::bytes_of(&vertices_array),
-            usage: wgpu::BufferUsage::VERTEX
+            usage: wgpu::BufferUsages::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::bytes_of(&indices_array),
-            usage: wgpu::BufferUsage::INDEX
+            usage: wgpu::BufferUsages::INDEX
         });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
@@ -245,12 +245,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&vertices_vec),
-            usage: wgpu::BufferUsage::VERTEX
+            usage: wgpu::BufferUsages::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::cast_slice(&indices_vec),
-            usage: wgpu::BufferUsage::INDEX
+            usage: wgpu::BufferUsages::INDEX
         });
 
         let model = Matrix4::from_translation(Vector3::new(
@@ -281,12 +281,12 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::bytes_of(&vertices_array),
-            usage: wgpu::BufferUsage::VERTEX
+            usage: wgpu::BufferUsages::VERTEX
         });
         let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: None,
             contents: bytemuck::bytes_of(&indices_array),
-            usage: wgpu::BufferUsage::INDEX
+            usage: wgpu::BufferUsages::INDEX
         });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
@@ -347,12 +347,12 @@ fn _draw_extent(state: &WgpuState, extent: &Extent, external_transform: &Matrix4
     let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: bytemuck::bytes_of(&vertices_array),
-        usage: wgpu::BufferUsage::VERTEX
+        usage: wgpu::BufferUsages::VERTEX
     });
     let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: bytemuck::bytes_of(&indices_array),
-        usage: wgpu::BufferUsage::INDEX
+        usage: wgpu::BufferUsages::INDEX
     });
     let indices_len = indices_array.len();
 
@@ -416,12 +416,12 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
     let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: bytemuck::cast_slice(&vertices_vec),
-        usage: wgpu::BufferUsage::VERTEX
+        usage: wgpu::BufferUsages::VERTEX
     });
     let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
         label: None,
         contents: bytemuck::cast_slice(&indices_vec),
-        usage: wgpu::BufferUsage::INDEX
+        usage: wgpu::BufferUsages::INDEX
     });
 
     let diff = (prev - next).normalize();

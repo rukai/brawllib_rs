@@ -74,8 +74,7 @@ pub struct App {
     input: WinitInputHelper,
     _window: Window,
     surface: wgpu::Surface,
-    swap_chain: wgpu::SwapChain,
-    swap_chain_descriptor: wgpu::SwapChainDescriptor,
+    surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
 }
 
@@ -84,27 +83,27 @@ impl App {
         let input = WinitInputHelper::new();
         let size = _window.inner_size();
 
-        let swap_chain_descriptor = wgpu::SwapChainDescriptor {
+        let surface_configuration = wgpu::SurfaceConfiguration {
             present_mode: wgpu::PresentMode::Fifo,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: FORMAT,
             width: size.width,
             height: size.height,
         };
 
-        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
         let surface = unsafe { instance.create_surface(&_window) };
         let wgpu_state = WgpuState::new(instance, Some(&surface), FORMAT).await;
-        let swap_chain = wgpu_state.device.create_swap_chain(&surface, &swap_chain_descriptor);
+        surface.configure(&wgpu_state.device, &surface_configuration);
 
         let camera = Camera::new(
             &subaction,
-            swap_chain_descriptor.width as u16,
-            swap_chain_descriptor.height as u16,
+            surface_configuration.width as u16,
+            surface_configuration.height as u16,
         );
         let app_state = AppState::new(camera);
 
-        App { wgpu_state, app_state, input, _window, surface, swap_chain, swap_chain_descriptor, subaction  }
+        App { wgpu_state, app_state, input, _window, surface, surface_configuration, subaction  }
     }
 
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
@@ -116,18 +115,18 @@ impl App {
             self.app_state.update(&self.input, &self.subaction);
 
             if let Some(size) = self.input.window_resized() {
-                self.swap_chain_descriptor.width = size.width;
-                self.swap_chain_descriptor.height = size.height;
-                self.swap_chain = self.wgpu_state.device.create_swap_chain(&self.surface, &self.swap_chain_descriptor);
+                self.surface_configuration.width = size.width;
+                self.surface_configuration.height = size.height;
+                self.surface.configure(&self.wgpu_state.device, &self.surface_configuration);
             }
 
             {
-                let framebuffer = self.swap_chain.get_current_frame().unwrap().output;
+                let frame = self.surface.get_current_frame().unwrap();
                 let command_encoder = draw_frame(
                     &mut self.wgpu_state,
-                    &framebuffer.view,
-                    self.swap_chain_descriptor.width,
-                    self.swap_chain_descriptor.height,
+                    &frame.output.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                    self.surface_configuration.width,
+                    self.surface_configuration.height,
                     self.app_state.perspective,
                     self.app_state.wireframe,
                     self.app_state.render_ecb,

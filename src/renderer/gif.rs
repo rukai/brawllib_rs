@@ -60,7 +60,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            usage: wgpu::TextureUsage::RENDER_ATTACHMENT | wgpu::TextureUsage::COPY_SRC,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             label: None,
         };
 
@@ -69,6 +69,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             texture: &framebuffer,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
+            aspect: wgpu::TextureAspect::All,
         };
 
         // It is a webgpu requirement that BufferCopyView.layout.bytes_per_row % wgpu::COPY_BYTES_PER_ROW_ALIGNMENT == 0
@@ -83,7 +84,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
 
         let framebuffer_out_descriptor = &wgpu::BufferDescriptor {
             size: padded_bytes_per_row as u64 * height as u64,
-            usage: wgpu::BufferUsage::MAP_READ | wgpu::BufferUsage::COPY_DST,
+            usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
             label: None,
             mapped_at_creation: false,
         };
