@@ -38,6 +38,7 @@ impl WgpuState {
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface,
+                force_fallback_adapter: false,
             },
         ).await.unwrap();
 

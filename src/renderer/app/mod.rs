@@ -120,23 +120,22 @@ impl App {
                 self.surface.configure(&self.wgpu_state.device, &self.surface_configuration);
             }
 
-            {
-                let frame = self.surface.get_current_frame().unwrap();
-                let command_encoder = draw_frame(
-                    &mut self.wgpu_state,
-                    &frame.output.texture.create_view(&wgpu::TextureViewDescriptor::default()),
-                    self.surface_configuration.width,
-                    self.surface_configuration.height,
-                    self.app_state.perspective,
-                    self.app_state.wireframe,
-                    self.app_state.render_ecb,
-                    &self.app_state.invulnerable_type,
-                    &self.subaction,
-                    self.app_state.frame_index,
-                    &self.app_state.camera,
-                );
-                self.wgpu_state.queue.submit(Some(command_encoder.finish()));
-            }
+            let frame = self.surface.get_current_texture().unwrap();
+            let command_encoder = draw_frame(
+                &mut self.wgpu_state,
+                &frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                self.surface_configuration.width,
+                self.surface_configuration.height,
+                self.app_state.perspective,
+                self.app_state.wireframe,
+                self.app_state.render_ecb,
+                &self.app_state.invulnerable_type,
+                &self.subaction,
+                self.app_state.frame_index,
+                &self.app_state.camera,
+            );
+            self.wgpu_state.queue.submit(Some(command_encoder.finish()));
+            frame.present();
         }
     }
 }
