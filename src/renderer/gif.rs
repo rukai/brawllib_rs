@@ -21,7 +21,6 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
     // restricted to u16 because of the gif library we are using
     let width: u16 = 400;
     let height: u16 = 300;
-    let format = wgpu::TextureFormat::Rgba8Unorm;
 
     let subaction = &high_level_fighter.subactions[subaction_index];
 
@@ -59,7 +58,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format,
+            format: state.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             label: None,
         };

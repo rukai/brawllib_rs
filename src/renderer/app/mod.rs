@@ -4,15 +4,13 @@ use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
-use crate::renderer::wgpu_state::WgpuState;
+use crate::renderer::wgpu_state::{WgpuState, CompatibleSurface};
 use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
 
 pub(crate) mod state;
 
 use state::AppState;
-
-pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
@@ -49,7 +47,7 @@ pub async fn render_window_wasm(subaction: HighLevelSubaction) {
     let button_move = button.clone();
     let do_thing = Closure::wrap(
         Box::new(move || {
-            button_move.set_inner_html("何も");
+            button_move.set_inner_html("pressed");
         }) as Box<dyn FnMut()>
     );
     button
@@ -83,17 +81,17 @@ impl App {
         let input = WinitInputHelper::new();
         let size = _window.inner_size();
 
+        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let surface = unsafe { instance.create_surface(&_window) };
+        let wgpu_state = WgpuState::new(instance, CompatibleSurface::Surface(&surface)).await;
+
         let surface_configuration = wgpu::SurfaceConfiguration {
+            format: wgpu_state.format,
             present_mode: wgpu::PresentMode::Fifo,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: FORMAT,
             width: size.width,
             height: size.height,
         };
-
-        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
-        let surface = unsafe { instance.create_surface(&_window) };
-        let wgpu_state = WgpuState::new(instance, Some(&surface), FORMAT).await;
         surface.configure(&wgpu_state.device, &surface_configuration);
 
         let camera = Camera::new(

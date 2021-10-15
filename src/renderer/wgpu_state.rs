@@ -6,7 +6,11 @@ use cgmath::Matrix4;
 use wgpu::util::DeviceExt;
 use bytemuck::{Pod, Zeroable};
 
+// TODO: Detect by capability or something
+#[cfg(not(target_arch = "wasm32"))]
 pub(crate) const SAMPLE_COUNT: u32 = 4;
+#[cfg(target_arch = "wasm32")]
+pub(crate) const SAMPLE_COUNT: u32 = 1;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -24,26 +28,42 @@ pub struct WgpuState {
     pub(crate) bind_groups:                         Vec<wgpu::BindGroup>,
     pub(crate) multisampled_framebuffer_descriptor: wgpu::TextureDescriptor<'static>,
     pub(crate) multisampled_framebuffer:            wgpu::Texture,
+    pub(crate) format:                              wgpu::TextureFormat,
+}
+
+pub enum CompatibleSurface<'a> {
+    Surface(&'a wgpu::Surface),
+    Headless(wgpu::TextureFormat)
 }
 
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
         let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
-        WgpuState::new(instance, None, wgpu::TextureFormat::Rgba8Unorm).await
+        WgpuState::new(instance, CompatibleSurface::Headless(wgpu::TextureFormat::Rgba8UnormSrgb)).await
     }
 
-    pub async fn new(instance: wgpu::Instance, compatible_surface: Option<&wgpu::Surface>, format: wgpu::TextureFormat) -> WgpuState {
+    pub async fn new<'a>(instance: wgpu::Instance, compatible_surface: CompatibleSurface<'a>) -> WgpuState {
+        let surface = match compatible_surface {
+            CompatibleSurface::Surface (surface) => Some(surface),
+            CompatibleSurface::Headless (_) => None,
+        };
+
         let adapter = instance.request_adapter(
             &wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
-                compatible_surface,
+                compatible_surface: surface,
                 force_fallback_adapter: false,
             },
         ).await.unwrap();
 
+        let format = match compatible_surface {
+            CompatibleSurface::Surface (surface) => surface.get_preferred_format(&adapter).unwrap(),
+            CompatibleSurface::Headless (format) => format,
+        };
+
         let device_descriptor = wgpu::DeviceDescriptor {
-            limits: wgpu::Limits::downlevel_defaults().using_resolution(adapter.limits()),
+            limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
             features: wgpu::Features::empty(),
             label: None,
         };
@@ -105,14 +125,7 @@ impl WgpuState {
                 entry_point: "fs_main",
                 targets: &[wgpu::ColorTargetState {
                     format: format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            operation: wgpu::BlendOperation::Add,
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                        },
-                        alpha: wgpu::BlendComponent::REPLACE,
-                    }),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 }],
             }),
@@ -183,6 +196,7 @@ impl WgpuState {
             bind_groups,
             multisampled_framebuffer_descriptor,
             multisampled_framebuffer,
+            format,
         }
     }
 
