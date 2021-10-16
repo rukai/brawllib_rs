@@ -31,7 +31,7 @@ impl BrawlMod {
 
     /// Returns Err(..) on failure to read required files from disk.
     /// Fighter specific missing files and errors encountered when parsing data is reported via the `error!()` macro from the log crate.
-    /// You will need to use one of these crates to view the logged errors https://github.com/rust-lang-nursery/log#in-executables
+    /// You will need to use one of these crates to view the logged errors <https://github.com/rust-lang-nursery/log#in-executables>
     pub fn load_fighters(&self, single_model: bool) -> Result<Vec<Fighter>, Error> {
         let brawl_fighter_path = self.brawl_path.join("fighter");
         let brawl_fighter_dir = match fs::read_dir(&brawl_fighter_path) {

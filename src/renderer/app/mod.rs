@@ -1,3 +1,5 @@
+use std::sync::mpsc::{channel, Sender};
+
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 use winit::event::Event;
@@ -8,9 +10,9 @@ use crate::renderer::wgpu_state::{WgpuState, CompatibleSurface};
 use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
 
-pub(crate) mod state;
+pub mod state;
 
-use state::AppState;
+use state::{AppEvent, AppState, State};
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
@@ -26,7 +28,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
     });
 }
 
-
+// TODO: move this into an example
 /// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: HighLevelSubaction) {
@@ -43,11 +45,22 @@ pub async fn render_window_wasm(subaction: HighLevelSubaction) {
     let visualiser_span = document.get_element_by_id("visualiser").unwrap();
     visualiser_span.append_child(&web_sys::Element::from(window.canvas())).unwrap();
 
-    let button = document.get_element_by_id("foo").unwrap();
+    let mut app = App::new(window, subaction).await;
+    let event_tx = app.get_event_tx();
+
+    let button = document.get_element_by_id("run").unwrap();
     let button_move = button.clone();
+    button_move.set_inner_html("Run");
     let do_thing = Closure::wrap(
         Box::new(move || {
-            button_move.set_inner_html("pressed");
+            if button_move.inner_html() == "Stop" {
+                event_tx.send(AppEvent::SetState(State::Pause)).unwrap();
+                button_move.set_inner_html("Run");
+            }
+            else {
+                event_tx.send(AppEvent::SetState(State::Play)).unwrap();
+                button_move.set_inner_html("Stop");
+            }
         }) as Box<dyn FnMut()>
     );
     button
@@ -55,8 +68,8 @@ pub async fn render_window_wasm(subaction: HighLevelSubaction) {
         .unwrap()
         .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
 
-    let mut app = App::new(window, subaction).await;
 
+    app.get_event_tx().send(AppEvent::SetState(State::Pause)).unwrap();
     event_loop.run(move |event, _, control_flow| {
         app.update(event, control_flow);
     });
@@ -74,6 +87,7 @@ pub struct App {
     surface: wgpu::Surface,
     surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
+    event_tx: Sender<AppEvent>,
 }
 
 impl App {
@@ -99,9 +113,15 @@ impl App {
             surface_configuration.width as u16,
             surface_configuration.height as u16,
         );
-        let app_state = AppState::new(camera);
 
-        App { wgpu_state, app_state, input, _window, surface, surface_configuration, subaction  }
+        let (event_tx, event_rx) = channel();
+        let app_state = AppState::new(camera, event_rx);
+
+        App { wgpu_state, app_state, input, _window, surface, surface_configuration, subaction, event_tx }
+    }
+
+    pub fn get_event_tx(&self) -> Sender<AppEvent> {
+        self.event_tx.clone()
     }
 
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {

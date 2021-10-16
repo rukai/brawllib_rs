@@ -1,9 +1,17 @@
+use std::sync::mpsc::Receiver;
+
 use winit_input_helper::WinitInputHelper;
 use winit::event::VirtualKeyCode;
+
 use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::Camera;
 
-pub(crate) enum State {
+pub enum AppEvent {
+    SetState(State),
+    SetFrame(usize),
+}
+
+pub enum State {
     Play,
     StepForward,
     StepBackward,
@@ -24,10 +32,11 @@ pub(crate) struct AppState {
     pub invulnerable_type: InvulnerableType,
     pub camera:            Camera,
     state:                 State,
+    event_rx: Receiver<AppEvent>
 }
 
 impl AppState {
-    pub fn new(camera: Camera) -> AppState {
+    pub fn new(camera: Camera, event_rx: Receiver<AppEvent>) -> AppState {
         AppState {
             frame_index: 0,
             wireframe: false,
@@ -36,10 +45,18 @@ impl AppState {
             invulnerable_type: InvulnerableType::Hit,
             camera,
             state: State::Play,
+            event_rx,
         }
     }
 
     pub fn update(&mut self, input: &WinitInputHelper, subaction: &HighLevelSubaction) {
+        for event in self.event_rx.try_iter() {
+            match event {
+                AppEvent::SetState(state) => self.state = state,
+                AppEvent::SetFrame(frame) => self.frame_index = frame,
+            }   
+        }
+
         if input.key_pressed(VirtualKeyCode::Key1) {
             self.wireframe = !self.wireframe;
         }

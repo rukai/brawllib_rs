@@ -1,4 +1,4 @@
-mod app;
+pub mod app;
 mod gif;
 mod camera;
 mod wgpu_state;
