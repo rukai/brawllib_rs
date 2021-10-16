@@ -1,15 +1,21 @@
-use cgmath::{Vector3, Matrix4};
+use cgmath::{Matrix4, Vector3};
 use fancy_slice::FancySlice;
 
-use crate::mbox::MBox;
-use crate::mbox;
-use crate::resources::Resource;
 use crate::math;
+use crate::mbox;
+use crate::mbox::MBox;
+use crate::resources::Resource;
 
 pub(crate) fn bones(data: FancySlice, resources: Vec<Resource>) -> Bone {
-    bone_siblings(data.relative_fancy_slice(resources[0].data_offset as usize ..), 0).pop().unwrap()
+    bone_siblings(
+        data.relative_fancy_slice(resources[0].data_offset as usize..),
+        0,
+    )
+    .pop()
+    .unwrap()
 }
 
+#[rustfmt::skip]
 fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
     let data = data_root.relative_fancy_slice(offset as usize..);
 
@@ -198,11 +204,16 @@ impl Bone {
     }
 
     pub(crate) fn gen_transform_rot_only(&self) -> Matrix4<f32> {
-        math::gen_transform(Vector3::new(1.0, 1.0, 1.0), self.rot, Vector3::new(0.0, 0.0, 0.0))
+        math::gen_transform(
+            Vector3::new(1.0, 1.0, 1.0),
+            self.rot,
+            Vector3::new(0.0, 0.0, 0.0),
+        )
     }
 }
 
 bitflags! {
+    #[rustfmt::skip]
     pub struct BoneFlags: u32 {
         /// Needs to match what this bones transformation does. Identity matrix.
         const NO_TRANSFORM          = 0x1;

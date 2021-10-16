@@ -1,50 +1,90 @@
 use std::f32::consts;
 use std::mem;
 
-use cgmath::{Matrix4, Vector3, MetricSpace, Rad, Quaternion, SquareMatrix, InnerSpace};
+use cgmath::{InnerSpace, Matrix4, MetricSpace, Quaternion, Rad, SquareMatrix, Vector3};
 use wgpu::util::DeviceExt;
 
-use crate::high_level_fighter::{HighLevelSubaction, CollisionBoxValues, Extent};
-use crate::renderer::camera::Camera;
+use crate::high_level_fighter::{CollisionBoxValues, Extent, HighLevelSubaction};
 use crate::renderer::app::state::InvulnerableType;
-use crate::renderer::wgpu_state::{WgpuState, SAMPLE_COUNT, Vertex};
+use crate::renderer::camera::Camera;
+use crate::renderer::wgpu_state::{Vertex, WgpuState, SAMPLE_COUNT};
 
 struct Draw {
-    uniform:     Matrix4<f32>,
-    vertices:    wgpu::Buffer,
-    indices:     wgpu::Buffer,
+    uniform: Matrix4<f32>,
+    vertices: wgpu::Buffer,
+    indices: wgpu::Buffer,
     indices_len: usize,
 }
 
-pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> wgpu::CommandEncoder {
-    let mut command_encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
+pub(crate) fn draw_frame(
+    state: &mut WgpuState,
+    framebuffer: &wgpu::TextureView,
+    width: u32,
+    height: u32,
+    perspective: bool,
+    wireframe: bool,
+    render_ecb: bool,
+    invulnerable_type: &InvulnerableType,
+    subaction: &HighLevelSubaction,
+    frame_index: usize,
+    camera: &Camera,
+) -> wgpu::CommandEncoder {
+    let mut command_encoder = state
+        .device
+        .create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
     let size = &mut state.multisampled_framebuffer_descriptor.size;
-    if size.width  != width || size.height != height {
+    if size.width != width || size.height != height {
         size.width = width;
         size.height = height;
-        state.multisampled_framebuffer = state.device.create_texture(&state.multisampled_framebuffer_descriptor);
+        state.multisampled_framebuffer = state
+            .device
+            .create_texture(&state.multisampled_framebuffer_descriptor);
     }
 
-    let draws = create_draws(state, width, height, perspective, wireframe, render_ecb, invulnerable_type, subaction, frame_index, camera); // 2.5ms
+    let draws = create_draws(
+        state,
+        width,
+        height,
+        perspective,
+        wireframe,
+        render_ecb,
+        invulnerable_type,
+        subaction,
+        frame_index,
+        camera,
+    ); // 2.5ms
 
     let uniform_size = mem::size_of::<Matrix4<f32>>();
     let size_padded = 256;
-    let mut uniforms_bytes = vec!(0; draws.len() * size_padded);
+    let mut uniforms_bytes = vec![0; draws.len() * size_padded];
     let mut uniforms_offset = 0;
     for draw in &draws {
         let transform: &[f32; 16] = draw.uniform.as_ref();
-        uniforms_bytes[uniforms_offset..uniforms_offset+uniform_size].copy_from_slice(bytemuck::bytes_of(transform));
+        uniforms_bytes[uniforms_offset..uniforms_offset + uniform_size]
+            .copy_from_slice(bytemuck::bytes_of(transform));
         uniforms_offset += size_padded;
     }
-    state.queue.write_buffer(&state.uniforms_buffer, 0, &uniforms_bytes);
+    state
+        .queue
+        .write_buffer(&state.uniforms_buffer, 0, &uniforms_bytes);
 
     {
-        let attachment = state.multisampled_framebuffer.create_view(&wgpu::TextureViewDescriptor::default());
+        let attachment = state
+            .multisampled_framebuffer
+            .create_view(&wgpu::TextureViewDescriptor::default());
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             color_attachments: &[wgpu::RenderPassColorAttachment {
-                view: if SAMPLE_COUNT == 1 { framebuffer } else { &attachment },
-                resolve_target: if SAMPLE_COUNT == 1 { None } else { Some(framebuffer) },
+                view: if SAMPLE_COUNT == 1 {
+                    framebuffer
+                } else {
+                    &attachment
+                },
+                resolve_target: if SAMPLE_COUNT == 1 {
+                    None
+                } else {
+                    Some(framebuffer)
+                },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(wgpu::Color {
                         r: 0.0,
@@ -71,8 +111,19 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     command_encoder
 }
 
- fn create_draws(state: &WgpuState, width: u32, height: u32, perspective: bool, wireframe: bool, render_ecb: bool, invulnerable_type: &InvulnerableType, subaction: &HighLevelSubaction, frame_index: usize, camera: &Camera) -> Vec<Draw> {
-    let mut draws: Vec<Draw> = vec!();
+fn create_draws(
+    state: &WgpuState,
+    width: u32,
+    height: u32,
+    perspective: bool,
+    wireframe: bool,
+    render_ecb: bool,
+    invulnerable_type: &InvulnerableType,
+    subaction: &HighLevelSubaction,
+    frame_index: usize,
+    camera: &Camera,
+) -> Vec<Draw> {
+    let mut draws: Vec<Draw> = vec![];
 
     let frame = &subaction.frames[frame_index];
 
@@ -81,8 +132,8 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     subaction_extent.extend(&subaction.hit_box_extent());
     subaction_extent.extend(&subaction.ledge_grab_box_extent());
 
-    let extent_height = subaction_extent.up    - subaction_extent.down;
-    let extent_width  = subaction_extent.right - subaction_extent.left;
+    let extent_height = subaction_extent.up - subaction_extent.down;
+    let extent_width = subaction_extent.right - subaction_extent.left;
     let extent_aspect = extent_width / extent_height;
     let aspect = width as f32 / height as f32;
     let fov = 40.0;
@@ -98,38 +149,29 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
     let view = Matrix4::look_at_rh(camera_location, camera.target, Vector3::new(0.0, 1.0, 0.0));
 
     let projection = if perspective {
-        cgmath::perspective(
-            Rad(fov_rad),
-            aspect,
-            1.0,
-            1000.0,
-        )
+        cgmath::perspective(Rad(fov_rad), aspect, 1.0, 1000.0)
     } else {
         let mut height = extent_height;
         let mut width = extent_width;
 
         if extent_aspect > aspect {
             height = width / aspect;
-        }
-        else {
+        } else {
             width = height * aspect;
         }
 
         cgmath::ortho(
-            -width  / 2.0,
-            width   / 2.0,
+            -width / 2.0,
+            width / 2.0,
             -height / 2.0,
-            height  / 2.0,
+            height / 2.0,
             -1000.0,
             1000.0,
         )
     };
 
-    let transform_translation_frame = Matrix4::from_translation(Vector3::new(
-        0.0,
-        frame.y_pos,
-        frame.x_pos,
-    ));
+    let transform_translation_frame =
+        Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
 
     for hurt_box in &frame.hurt_boxes {
         let color = if hurt_box.state.is_intangible() {
@@ -139,15 +181,19 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         } else {
             match invulnerable_type {
                 InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
-                InvulnerableType::Grab => if hurt_box.hurt_box.grabbable {
-                    [1.0, 1.0, 0.0, 0.3]
-                } else {
-                    [0.0, 0.0, 1.0, 0.3]
+                InvulnerableType::Grab => {
+                    if hurt_box.hurt_box.grabbable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
                 }
-                InvulnerableType::TrapItem => if hurt_box.hurt_box.trap_item_hittable {
-                    [1.0, 1.0, 0.0, 0.3]
-                } else {
-                    [0.0, 0.0, 1.0, 0.3]
+                InvulnerableType::TrapItem => {
+                    if hurt_box.hurt_box.trap_item_hittable {
+                        [1.0, 1.0, 0.0, 0.3]
+                    } else {
+                        [0.0, 0.0, 1.0, 0.3]
+                    }
                 }
             }
         };
@@ -159,7 +205,9 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
 
         let model = transform_translation_frame * hurt_box.bone_matrix;
         let transform = projection.clone() * view.clone() * model;
-        draws.push(draw_cylinder(state, prev, next, radius, transform, color, wireframe));
+        draws.push(draw_cylinder(
+            state, prev, next, radius, transform, color, wireframe,
+        ));
     }
 
     for hitbox in frame.hit_boxes.iter() {
@@ -180,42 +228,65 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         };
 
         let next = Vector3::new(hitbox.next_pos.x, hitbox.next_pos.y, hitbox.next_pos.z);
-        let prev = hitbox.prev_pos.map(|prev| Vector3::new(prev.x, prev.y, prev.z)).unwrap_or(next.clone());
+        let prev = hitbox
+            .prev_pos
+            .map(|prev| Vector3::new(prev.x, prev.y, prev.z))
+            .unwrap_or(next.clone());
         let radius = hitbox.next_size;
         let transform = projection.clone() * view.clone() * transform_translation_frame;
-        draws.push(draw_cylinder(state, prev, next, radius, transform, color, wireframe));
+        draws.push(draw_cylinder(
+            state, prev, next, radius, transform, color, wireframe,
+        ));
     }
 
     if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
         let _color = [1.0, 1.0, 1.0, 0.5];
         let vertices_array = [
-            Vertex { _pos: [0.0, ledge_grab_box.up,   ledge_grab_box.left,  1.0], _color },
-            Vertex { _pos: [0.0, ledge_grab_box.up,   ledge_grab_box.right, 1.0], _color },
-            Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.left,  1.0], _color },
-            Vertex { _pos: [0.0, ledge_grab_box.down, ledge_grab_box.right, 1.0], _color },
+            Vertex {
+                _pos: [0.0, ledge_grab_box.up, ledge_grab_box.left, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, ledge_grab_box.up, ledge_grab_box.right, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, ledge_grab_box.down, ledge_grab_box.left, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, ledge_grab_box.down, ledge_grab_box.right, 1.0],
+                _color,
+            },
         ];
 
-        let indices_array: [u16; 6] = [
-            0, 1, 2,
-            1, 2, 3,
-        ];
+        let indices_array: [u16; 6] = [0, 1, 2, 1, 2, 3];
 
-        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::bytes_of(&vertices_array),
-            usage: wgpu::BufferUsages::VERTEX
-        });
-        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::bytes_of(&indices_array),
-            usage: wgpu::BufferUsages::INDEX
-        });
+        let vertices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&vertices_array),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let indices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&indices_array),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
         let uniform = projection.clone() * view.clone() * model;
 
         let indices_len = indices_array.len();
-        draws.push(Draw { uniform, vertices, indices, indices_len });
+        draws.push(Draw {
+            uniform,
+            vertices,
+            indices,
+            indices_len,
+        });
     }
 
     if render_ecb {
@@ -226,32 +297,42 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
             [1.0, 1.0, 1.0, 1.0]
         };
 
-        let mut vertices_vec: Vec<Vertex> = vec!();
-        let mut indices_vec: Vec<u16> = vec!();
+        let mut vertices_vec: Vec<Vertex> = vec![];
+        let mut indices_vec: Vec<u16> = vec![];
 
         let iterations = 40;
-        vertices_vec.push(Vertex { _pos: [0.0, 0.0, 0.0, 1.0], _color });
+        vertices_vec.push(Vertex {
+            _pos: [0.0, 0.0, 0.0, 1.0],
+            _color,
+        });
         for i in 0..iterations {
             let angle = i as f32 * 2.0 * consts::PI / (iterations as f32);
             let (sin, cos) = angle.sin_cos();
             let x = cos * 0.3;
             let y = sin * 0.3;
-            vertices_vec.push(Vertex { _pos: [0.0, y, x, 1.0], _color });
+            vertices_vec.push(Vertex {
+                _pos: [0.0, y, x, 1.0],
+                _color,
+            });
             indices_vec.push(0);
             indices_vec.push(i + 1);
             indices_vec.push((i + 1) % iterations + 1);
         }
 
-        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&vertices_vec),
-            usage: wgpu::BufferUsages::VERTEX
-        });
-        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::cast_slice(&indices_vec),
-            usage: wgpu::BufferUsages::INDEX
-        });
+        let vertices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&vertices_vec),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let indices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::cast_slice(&indices_vec),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
         let model = Matrix4::from_translation(Vector3::new(
             0.0,
@@ -261,39 +342,62 @@ pub (crate) fn draw_frame(state: &mut WgpuState, framebuffer: &wgpu::TextureView
         let uniform = projection.clone() * view.clone() * model;
 
         let indices_len = indices_vec.len();
-        draws.push(Draw { uniform, vertices, indices, indices_len });
+        draws.push(Draw {
+            uniform,
+            vertices,
+            indices,
+            indices_len,
+        });
 
         // ECB
         let _color = [0.945, 0.361, 0.0392, 1.0];
         let mid_y = (frame.ecb.top + frame.ecb.bottom) / 2.0;
         let vertices_array = [
-            Vertex { _pos: [0.0, frame.ecb.top,    0.0,             1.0], _color },
-            Vertex { _pos: [0.0, mid_y,            frame.ecb.left,  1.0], _color },
-            Vertex { _pos: [0.0, mid_y,            frame.ecb.right, 1.0], _color },
-            Vertex { _pos: [0.0, frame.ecb.bottom, 0.0,             1.0], _color },
+            Vertex {
+                _pos: [0.0, frame.ecb.top, 0.0, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, mid_y, frame.ecb.left, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, mid_y, frame.ecb.right, 1.0],
+                _color,
+            },
+            Vertex {
+                _pos: [0.0, frame.ecb.bottom, 0.0, 1.0],
+                _color,
+            },
         ];
 
-        let indices_array: [u16; 6] = [
-            0, 1, 2,
-            1, 2, 3,
-        ];
+        let indices_array: [u16; 6] = [0, 1, 2, 1, 2, 3];
 
-        let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::bytes_of(&vertices_array),
-            usage: wgpu::BufferUsages::VERTEX
-        });
-        let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: None,
-            contents: bytemuck::bytes_of(&indices_array),
-            usage: wgpu::BufferUsages::INDEX
-        });
+        let vertices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&vertices_array),
+                usage: wgpu::BufferUsages::VERTEX,
+            });
+        let indices = state
+            .device
+            .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                label: None,
+                contents: bytemuck::bytes_of(&indices_array),
+                usage: wgpu::BufferUsages::INDEX,
+            });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
         let uniform = projection.clone() * view.clone() * model;
 
         let indices_len = indices_array.len();
-        draws.push(Draw { uniform, vertices, indices, indices_len });
+        draws.push(Draw {
+            uniform,
+            vertices,
+            indices,
+            indices_len,
+        });
     }
 
     draws
@@ -310,76 +414,124 @@ fn _draw_extent(state: &WgpuState, extent: &Extent, external_transform: &Matrix4
     let small = 0.01;
     let _color = [1.0, 1.0, 1.0, 1.0];
     let vertices_array = [
-        Vertex { _pos: [0.0, extent.up + small, extent.left,  1.0], _color },
-        Vertex { _pos: [0.0, extent.up - small, extent.left,  1.0], _color },
-        Vertex { _pos: [0.0, extent.up + small, extent.right, 1.0], _color },
-        Vertex { _pos: [0.0, extent.up - small, extent.right, 1.0], _color },
-
-        Vertex { _pos: [0.0, extent.down + small, extent.left,  1.0], _color },
-        Vertex { _pos: [0.0, extent.down - small, extent.left,  1.0], _color },
-        Vertex { _pos: [0.0, extent.down + small, extent.right, 1.0], _color },
-        Vertex { _pos: [0.0, extent.down - small, extent.right, 1.0], _color },
-
-        Vertex { _pos: [0.0, extent.up,   extent.right + small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.up,   extent.right - small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.down, extent.right + small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.down, extent.right - small, 1.0], _color },
-
-        Vertex { _pos: [0.0, extent.up,   extent.left + small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.up,   extent.left - small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.down, extent.left + small, 1.0], _color },
-        Vertex { _pos: [0.0, extent.down, extent.left - small, 1.0], _color },
+        Vertex {
+            _pos: [0.0, extent.up + small, extent.left, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up - small, extent.left, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up + small, extent.right, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up - small, extent.right, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down + small, extent.left, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down - small, extent.left, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down + small, extent.right, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down - small, extent.right, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up, extent.right + small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up, extent.right - small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down, extent.right + small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down, extent.right - small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up, extent.left + small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.up, extent.left - small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down, extent.left + small, 1.0],
+            _color,
+        },
+        Vertex {
+            _pos: [0.0, extent.down, extent.left - small, 1.0],
+            _color,
+        },
     ];
     let indices_array: [u16; 24] = [
-        0, 1, 2,
-        1, 2, 3,
-
-        4, 5, 6,
-        5, 6, 7,
-
-        8, 9, 10,
-        9, 10, 11,
-
-        12, 13, 14,
-        13, 14, 15,
+        0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7, 8, 9, 10, 9, 10, 11, 12, 13, 14, 13, 14, 15,
     ];
 
-    let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::bytes_of(&vertices_array),
-        usage: wgpu::BufferUsages::VERTEX
-    });
-    let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::bytes_of(&indices_array),
-        usage: wgpu::BufferUsages::INDEX
-    });
+    let vertices = state
+        .device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::bytes_of(&vertices_array),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+    let indices = state
+        .device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::bytes_of(&indices_array),
+            usage: wgpu::BufferUsages::INDEX,
+        });
     let indices_len = indices_array.len();
 
     let uniform = external_transform.clone();
-    Draw { uniform, vertices, indices, indices_len }
+    Draw {
+        uniform,
+        vertices,
+        indices,
+        indices_len,
+    }
 }
 
-fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radius: f32, external_transform: Matrix4<f32>, _color: [f32; 4], wireframe: bool) -> Draw {
+fn draw_cylinder(
+    state: &WgpuState,
+    prev: Vector3<f32>,
+    next: Vector3<f32>,
+    radius: f32,
+    external_transform: Matrix4<f32>,
+    _color: [f32; 4],
+    wireframe: bool,
+) -> Draw {
     let prev_distance = prev.distance(next);
 
     // Make the wireframes less busy in wireframe mode
-    let (width_segments, height_segments) = if wireframe {
-        (11, 7)
-    } else {
-        (23, 17)
-    };
+    let (width_segments, height_segments) = if wireframe { (11, 7) } else { (23, 17) };
 
-    let mut vertices_vec = vec!();
-    let mut indices_vec: Vec<u16> = vec!();
+    let mut vertices_vec = vec![];
+    let mut indices_vec: Vec<u16> = vec![];
     let mut index_count = 0;
 
-    let mut grid = vec!();
-    for iy in 0..height_segments+1 {
-        let mut vertices_row = vec!();
+    let mut grid = vec![];
+    for iy in 0..height_segments + 1 {
+        let mut vertices_row = vec![];
         let v = iy as f32 / height_segments as f32;
 
-        for ix in 0..width_segments+1 {
+        for ix in 0..width_segments + 1 {
             let u = ix as f32 / width_segments as f32;
             let mut y_offset = 0.0;
             if v >= 0.0 && v <= 0.5 {
@@ -389,9 +541,9 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
             let sin_v_pi = (v * consts::PI).sin();
             let _pos = [
                 radius * (u * consts::PI * 2.0).cos() * sin_v_pi,
-                radius * (v * consts::PI      ).cos() + y_offset,
+                radius * (v * consts::PI).cos() + y_offset,
                 radius * (u * consts::PI * 2.0).sin() * sin_v_pi,
-                1.0
+                1.0,
             ];
             vertices_vec.push(Vertex { _pos, _color });
 
@@ -413,16 +565,20 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
         }
     }
 
-    let vertices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::cast_slice(&vertices_vec),
-        usage: wgpu::BufferUsages::VERTEX
-    });
-    let indices = state.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-        label: None,
-        contents: bytemuck::cast_slice(&indices_vec),
-        usage: wgpu::BufferUsages::INDEX
-    });
+    let vertices = state
+        .device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&vertices_vec),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+    let indices = state
+        .device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: None,
+            contents: bytemuck::cast_slice(&indices_vec),
+            usage: wgpu::BufferUsages::INDEX,
+        });
 
     let diff = (prev - next).normalize();
     let rotation = if diff.x.is_nan() {
@@ -435,5 +591,10 @@ fn draw_cylinder(state: &WgpuState, prev: Vector3<f32>, next: Vector3<f32>, radi
     let uniform = external_transform * Matrix4::from_translation(next) * rotation;
     let indices_len = indices_vec.len();
 
-    Draw { uniform, vertices, indices, indices_len }
+    Draw {
+        uniform,
+        vertices,
+        indices,
+        indices_len,
+    }
 }

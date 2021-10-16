@@ -1,8 +1,9 @@
-use fancy_slice::FancySlice;
 use cgmath::Vector3;
+use fancy_slice::FancySlice;
 
 use crate::resources::Resource;
 
+#[rustfmt::skip]
 pub(crate) fn vertices(data: FancySlice, resources: Vec<Resource>) -> Vec<Vertices> {
     let mut vertices = vec!();
     for resource in resources {
@@ -73,7 +74,7 @@ pub enum VertexComponentType {
     U16,
     I16,
     F32,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl VertexComponentType {
@@ -84,7 +85,7 @@ impl VertexComponentType {
             2 => VertexComponentType::U16,
             3 => VertexComponentType::I16,
             4 => VertexComponentType::F32,
-            _ => VertexComponentType::Unknown (value),
+            _ => VertexComponentType::Unknown(value),
         }
     }
 }

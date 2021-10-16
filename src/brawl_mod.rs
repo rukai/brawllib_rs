@@ -1,12 +1,12 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::arc;
 use crate::fighter::Fighter;
 use crate::wii_memory::WiiMemory;
 use crate::wiird_runner;
-use crate::arc;
 
-use anyhow::{Error, bail};
+use anyhow::{bail, Error};
 
 use fancy_slice::FancySlice;
 
@@ -36,14 +36,14 @@ impl BrawlMod {
         let brawl_fighter_path = self.brawl_path.join("fighter");
         let brawl_fighter_dir = match fs::read_dir(&brawl_fighter_path) {
             Ok(dir) => dir,
-            Err(err) => bail!("Cannot read fighter directory in the brawl dump: {}", err)
+            Err(err) => bail!("Cannot read fighter directory in the brawl dump: {}", err),
         };
 
         let mut mod_fighter_dir = None;
         if let Some(mod_path) = &self.mod_path {
             let dir_reader = match fs::read_dir(mod_path) {
                 Ok(dir) => dir,
-                Err(err) => bail!("Cannot read brawl mod directory: {}", err)
+                Err(err) => bail!("Cannot read brawl mod directory: {}", err),
             };
 
             for dir in dir_reader {
@@ -52,7 +52,9 @@ impl BrawlMod {
                     if path.exists() {
                         mod_fighter_dir = Some(match fs::read_dir(path) {
                             Ok(dir) => dir,
-                            Err(err) => bail!("Cannot read fighter directory in the brawl mod: {}", err),
+                            Err(err) => {
+                                bail!("Cannot read fighter directory in the brawl mod: {}", err)
+                            }
                         });
                         break;
                     }
@@ -64,26 +66,33 @@ impl BrawlMod {
         }
 
         let common_fighter_path = brawl_fighter_path.join("Fighter.pac");
-        let (common_fighter, wii_memory) = if let Ok(mut file_data) = std::fs::read(common_fighter_path) {
-            let wii_memory = if self.mod_path.is_some() {
-                let codeset = self.load_wiird_codeset_raw()?;
-                let sakurai_ram_offset = 0x80F9FC20;
-                let sakurai_fighter_pac_offset = 0x80;
-                let fighter_pac_offset = sakurai_ram_offset - sakurai_fighter_pac_offset;
+        let (common_fighter, wii_memory) =
+            if let Ok(mut file_data) = std::fs::read(common_fighter_path) {
+                let wii_memory = if self.mod_path.is_some() {
+                    let codeset = self.load_wiird_codeset_raw()?;
+                    let sakurai_ram_offset = 0x80F9FC20;
+                    let sakurai_fighter_pac_offset = 0x80;
+                    let fighter_pac_offset = sakurai_ram_offset - sakurai_fighter_pac_offset;
 
-                wiird_runner::process(&codeset, &mut file_data, fighter_pac_offset)
+                    wiird_runner::process(&codeset, &mut file_data, fighter_pac_offset)
+                } else {
+                    WiiMemory::new()
+                };
+
+                let data = FancySlice::new(&file_data);
+
+                (arc::arc(data, &wii_memory, false), wii_memory)
             } else {
-                WiiMemory::new()
+                bail!("Missing Fighter.pac");
             };
 
-            let data = FancySlice::new(&file_data);
-
-            (arc::arc(data, &wii_memory, false), wii_memory)
-        } else {
-            bail!("Missing Fighter.pac");
-        };
-
-        Ok(Fighter::load(brawl_fighter_dir, mod_fighter_dir, &common_fighter, &wii_memory, single_model))
+        Ok(Fighter::load(
+            brawl_fighter_dir,
+            mod_fighter_dir,
+            &common_fighter,
+            &wii_memory,
+            single_model,
+        ))
     }
 
     pub fn load_wiird_codeset_raw(&self) -> Result<Vec<u8>, Error> {
@@ -98,7 +107,7 @@ impl BrawlMod {
             pub data: Vec<u8>,
         }
 
-        let mut gct_files: Vec<GCTFile> = vec!();
+        let mut gct_files: Vec<GCTFile> = vec![];
         if let Some(mod_path) = &self.mod_path {
             for entry in fs::read_dir(mod_path).unwrap() {
                 if let Ok(entry) = entry {
@@ -115,14 +124,19 @@ impl BrawlMod {
                                                 if data.len() < 8 {
                                                     bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
                                                 }
-                                                if let Some(matching_file) = gct_files.iter().find(|x| x.name == name) {
+                                                if let Some(matching_file) =
+                                                    gct_files.iter().find(|x| x.name == name)
+                                                {
                                                     assert_eq!(matching_file.data, data);
-                                                }
-                                                else {
+                                                } else {
                                                     gct_files.push(GCTFile { name, data });
                                                 }
                                             }
-                                            Err(err) => bail!("Cannot read WiiRD codeset {:?}: {}", codeset_path, err)
+                                            Err(err) => bail!(
+                                                "Cannot read WiiRD codeset {:?}: {}",
+                                                codeset_path,
+                                                err
+                                            ),
                                         };
                                     }
                                 }
@@ -139,7 +153,7 @@ impl BrawlMod {
         // Will make issues much easier to reproduce.
         gct_files.sort_by_key(|x| x.name.clone());
 
-        let mut result = vec!();
+        let mut result = vec![];
         for gct_file in gct_files {
             result.extend(&gct_file.data[8..]); // skip the header
         }

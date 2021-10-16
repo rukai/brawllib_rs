@@ -1,58 +1,40 @@
-use crate::high_level_fighter::{CollisionBoxValues, SectionScriptAst};
+use crate::fighter::WiiRDFrameSpeedModifier;
 use crate::high_level_fighter;
+use crate::high_level_fighter::{CollisionBoxValues, SectionScriptAst};
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::script::{Requirement, VariableDataType};
-use crate::script_ast::{
-    ScriptAst,
-    Block,
-    EventAst,
-    Iterations,
-    HitBoxArguments,
-    SpecialHitBoxArguments,
-    GrabBoxArguments,
-    HurtBoxState,
-    LedgeGrabEnable,
-    ArmorType,
-    DisableMovement,
-    EdgeSlide,
-    Expression,
-    ComparisonOperator,
-    BinaryExpression,
-    Interrupt,
-    SpecifyThrow,
-    ThrowUse,
-    FloatValue,
-};
-use crate::fighter::WiiRDFrameSpeedModifier;
 use crate::script_ast::variable_ast::{
-    VariableAst,
-    InternalConstantInt,
-    LongtermAccessInt, LongtermAccessFloat, LongtermAccessBool,
-    RandomAccessInt,   RandomAccessFloat,   RandomAccessBool,
+    InternalConstantInt, LongtermAccessBool, LongtermAccessFloat, LongtermAccessInt,
+    RandomAccessBool, RandomAccessFloat, RandomAccessInt, VariableAst,
+};
+use crate::script_ast::{
+    ArmorType, BinaryExpression, Block, ComparisonOperator, DisableMovement, EdgeSlide, EventAst,
+    Expression, FloatValue, GrabBoxArguments, HitBoxArguments, HurtBoxState, Interrupt, Iterations,
+    LedgeGrabEnable, ScriptAst, SpecialHitBoxArguments, SpecifyThrow, ThrowUse,
 };
 
 use std::collections::HashMap;
 
 pub struct ScriptRunner<'a> {
-    pub subaction_name:              String,
+    pub subaction_name: String,
     pub wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier],
-    pub call_stacks:                 Vec<CallStack<'a>>,
-    pub fighter_scripts:             &'a [&'a ScriptAst],
-    pub common_scripts:              &'a [&'a ScriptAst],
-    pub section_scripts:             &'a [SectionScriptAst],
-    pub call_every_frame:            HashMap<i32, CallEveryFrame<'a>>,
-    pub visited_gotos:               Vec<i32>,
-    pub subaction_index:             usize,
-    pub frame_index:                 f32, // affected by frame speed modifiers
-    pub animation_index:             f32, // affected by frame speed modifiers, usually in sync with frame_index but not always because some commands affect only animation_index
-    pub frame_count:                 usize, // goes up by exactly 1 every frame, only used for external statistics like iasa
-    pub interruptible:               bool,
-    pub hitboxes:                    [Option<ScriptCollisionBox>; 7],
-    pub hurtbox_state_all:           HurtBoxState,
-    pub hurtbox_states:              HashMap<i32, HurtBoxState>,
-    pub ledge_grab_enable:           LedgeGrabEnable,
-    pub frame_speed_modifier:        f32,
-    pub tag_display:                 bool,
+    pub call_stacks: Vec<CallStack<'a>>,
+    pub fighter_scripts: &'a [&'a ScriptAst],
+    pub common_scripts: &'a [&'a ScriptAst],
+    pub section_scripts: &'a [SectionScriptAst],
+    pub call_every_frame: HashMap<i32, CallEveryFrame<'a>>,
+    pub visited_gotos: Vec<i32>,
+    pub subaction_index: usize,
+    pub frame_index: f32,     // affected by frame speed modifiers
+    pub animation_index: f32, // affected by frame speed modifiers, usually in sync with frame_index but not always because some commands affect only animation_index
+    pub frame_count: usize, // goes up by exactly 1 every frame, only used for external statistics like iasa
+    pub interruptible: bool,
+    pub hitboxes: [Option<ScriptCollisionBox>; 7],
+    pub hurtbox_state_all: HurtBoxState,
+    pub hurtbox_states: HashMap<i32, HurtBoxState>,
+    pub ledge_grab_enable: LedgeGrabEnable,
+    pub frame_speed_modifier: f32,
+    pub tag_display: bool,
     /// State is maintained across frames
     pub x: f32,
     /// State is maintained across frames
@@ -65,27 +47,27 @@ pub struct ScriptRunner<'a> {
     pub x_vel_modify: VelModify,
     /// Reset to None before processing each frame
     pub y_vel_modify: VelModify,
-    pub disable_movement:  DisableMovement,
-    pub armor_type:        ArmorType,
-    pub armor_tolerance:   f32,
-    pub damage:            f32,
-    pub airbourne:         bool,
-    pub edge_slide:        EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
+    pub disable_movement: DisableMovement,
+    pub armor_type: ArmorType,
+    pub armor_tolerance: f32,
+    pub damage: f32,
+    pub airbourne: bool,
+    pub edge_slide: EdgeSlide, // TODO: This value seems inaccurate as its rarely set, is ledge cancel normally just hardcoded for say movement vs attack
     pub reverse_direction: bool,
-    pub change_subaction:  ChangeSubaction,
+    pub change_subaction: ChangeSubaction,
     /// Children of these bones are also visible
     pub invisible_bones: Vec<i32>,
     /// Each Interrupt is rechecked every frame after being created
     pub interrupts: Vec<Interrupt>,
     /// As a hack to get some subactions working we store "bad interrupts" here instead.
-    pub bad_interrupts:        Vec<Interrupt>,
-    pub hitbox_sets_rehit:     [bool; 10],
-    pub slope_contour_stand:   Option<i32>,
-    pub slope_contour_full:    Option<(i32, i32)>,
-    pub rumble:                Option<(i32, i32)>,
-    pub rumble_loop:           Option<(i32, i32)>,
+    pub bad_interrupts: Vec<Interrupt>,
+    pub hitbox_sets_rehit: [bool; 10],
+    pub slope_contour_stand: Option<i32>,
+    pub slope_contour_full: Option<(i32, i32)>,
+    pub rumble: Option<(i32, i32)>,
+    pub rumble_loop: Option<(i32, i32)>,
     pub grab_interrupt_damage: Option<i32>,
-    pub throw:                 Option<SpecifyThrow>,
+    pub throw: Option<SpecifyThrow>,
     /// Reset to false before processing each frame.
     pub throw_activate: bool,
 
@@ -185,47 +167,51 @@ pub struct Call<'a> {
 pub enum ChangeSubaction {
     Continue,
     InfiniteLoop,
-    ChangeSubaction (i32),
-    ChangeSubactionRestartFrame (i32),
+    ChangeSubaction(i32),
+    ChangeSubactionRestartFrame(i32),
     // TODO: Because we currently only operate at the subaction level, this is the best we can do.
-    Interrupt (i32),
+    Interrupt(i32),
 }
 
 #[derive(Clone, Debug)]
 pub struct ScriptCollisionBox {
-    pub bone_index:  i16,
-    pub hitbox_id:   u8,
-    pub x_offset:    f32,
-    pub y_offset:    f32,
-    pub z_offset:    f32,
-    pub size:        f32,
-    pub values:      CollisionBoxValues,
+    pub bone_index: i16,
+    pub hitbox_id: u8,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub size: f32,
+    pub values: CollisionBoxValues,
     pub interpolate: bool,
 }
 
 impl ScriptCollisionBox {
     fn from_hitbox(args: &HitBoxArguments, interpolate: bool, damage: f32) -> ScriptCollisionBox {
         ScriptCollisionBox {
-            bone_index:  args.bone_index,
-            hitbox_id:   args.hitbox_id,
-            x_offset:    args.x_offset,
-            y_offset:    args.y_offset,
-            z_offset:    args.z_offset,
-            size:        args.size,
-            values:      CollisionBoxValues::from_hitbox(args, damage),
+            bone_index: args.bone_index,
+            hitbox_id: args.hitbox_id,
+            x_offset: args.x_offset,
+            y_offset: args.y_offset,
+            z_offset: args.z_offset,
+            size: args.size,
+            values: CollisionBoxValues::from_hitbox(args, damage),
             interpolate,
         }
     }
 
-    fn from_special_hitbox(args: &SpecialHitBoxArguments, interpolate: bool, damage: f32) -> ScriptCollisionBox {
+    fn from_special_hitbox(
+        args: &SpecialHitBoxArguments,
+        interpolate: bool,
+        damage: f32,
+    ) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index: args.hitbox_args.bone_index,
-            hitbox_id:  args.hitbox_args.hitbox_id,
-            x_offset:   args.hitbox_args.x_offset,
-            y_offset:   args.hitbox_args.y_offset,
-            z_offset:   args.hitbox_args.z_offset,
-            size:       args.hitbox_args.size,
-            values:     CollisionBoxValues::from_special_hitbox(args, damage),
+            hitbox_id: args.hitbox_args.hitbox_id,
+            x_offset: args.hitbox_args.x_offset,
+            y_offset: args.hitbox_args.y_offset,
+            z_offset: args.hitbox_args.z_offset,
+            size: args.hitbox_args.size,
+            values: CollisionBoxValues::from_special_hitbox(args, damage),
             interpolate,
         }
     }
@@ -233,12 +219,12 @@ impl ScriptCollisionBox {
     fn from_grabbox(args: &GrabBoxArguments, interpolate: bool) -> ScriptCollisionBox {
         ScriptCollisionBox {
             bone_index: args.bone_index as i16,
-            hitbox_id:  args.hitbox_id as u8,
-            x_offset:   args.x_offset,
-            y_offset:   args.y_offset,
-            z_offset:   args.z_offset,
-            size:       args.size,
-            values:     CollisionBoxValues::from_grabbox(args),
+            hitbox_id: args.hitbox_id as u8,
+            x_offset: args.x_offset,
+            y_offset: args.y_offset,
+            z_offset: args.z_offset,
+            size: args.size,
+            values: CollisionBoxValues::from_grabbox(args),
             interpolate,
         }
     }
@@ -263,10 +249,20 @@ impl<'a> ScriptRunner<'a> {
     /// all_scripts contains any functions that the action scripts need to call into.
     /// The returned runner has completed the first frame.
     /// Calling `runner.step` will advance to frame 2 and then frame 3 and so on.
-    pub fn new(subaction_index: usize, wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier], subaction_scripts: &[&'a ScriptAst], fighter_scripts: &'a [&'a ScriptAst], common_scripts: &'a [&'a ScriptAst], section_scripts: &'a [SectionScriptAst], init_hack_script: &Block, fighter_data: &ArcFighterData, subaction_name: String) -> ScriptRunner<'a> {
-        let mut call_stacks = vec!();
+    pub fn new(
+        subaction_index: usize,
+        wiird_frame_speed_modifiers: &'a [WiiRDFrameSpeedModifier],
+        subaction_scripts: &[&'a ScriptAst],
+        fighter_scripts: &'a [&'a ScriptAst],
+        common_scripts: &'a [&'a ScriptAst],
+        section_scripts: &'a [SectionScriptAst],
+        init_hack_script: &Block,
+        fighter_data: &ArcFighterData,
+        subaction_name: String,
+    ) -> ScriptRunner<'a> {
+        let mut call_stacks = vec![];
         for script in subaction_scripts {
-            let calls = vec!(Call {
+            let calls = vec![Call {
                 block: &script.block,
                 else_branch: None,
                 index: 0,
@@ -274,7 +270,7 @@ impl<'a> ScriptRunner<'a> {
                 external: false,
                 if_statement: false,
                 execute: true,
-            });
+            }];
             call_stacks.push(CallStack {
                 calls,
                 wait_until: -1.0,
@@ -282,12 +278,10 @@ impl<'a> ScriptRunner<'a> {
         }
 
         let ledge_grab_enable = match subaction_name.as_ref() {
-            "JumpF" | "JumpB" | "JumpAerialF" | "JumpAerialB" |
-            "FallF" | "FallB" | "Fall" |
-            "FallAerialF" | "FallAerialB" | "FallAerial" |
-            "FallSpecialF" | "FallSpecialB" | "FallSpecial"
-                => LedgeGrabEnable::EnableInFront,
-            _   => LedgeGrabEnable::Disable,
+            "JumpF" | "JumpB" | "JumpAerialF" | "JumpAerialB" | "FallF" | "FallB" | "Fall"
+            | "FallAerialF" | "FallAerialB" | "FallAerial" | "FallSpecialF" | "FallSpecialB"
+            | "FallSpecial" => LedgeGrabEnable::EnableInFront,
+            _ => LedgeGrabEnable::Disable,
         };
 
         // TODO: Need to understand what ModelVisibility.cs:269 is doing (ResetVisibility)
@@ -303,14 +297,16 @@ impl<'a> ScriptRunner<'a> {
         // *   It lets me easily set all children
         // *   It lets me easily set and reset values
 
-        let mut invisible_bones = vec!();
+        let mut invisible_bones = vec![];
         // TODO: populate with bone flags
         // This isnt actually part of the visibility reset that occurs at the start of a subaction
         // and should be only called during initialization if such a refactor occurs.
 
         for reference in &fighter_data.model_visibility.references {
             for default in &fighter_data.model_visibility.defaults {
-                if let Some(bone_switch) = reference.bone_switches.get(default.switch_index as usize) {
+                if let Some(bone_switch) =
+                    reference.bone_switches.get(default.switch_index as usize)
+                {
                     if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
                         for bone in &group.bones {
                             invisible_bones.push(*bone);
@@ -341,7 +337,9 @@ impl<'a> ScriptRunner<'a> {
         // *   invisible_bones is populated with the visible bone flags from the MDL0 bone data.
         for reference in &fighter_data.model_visibility.references {
             for default in &fighter_data.model_visibility.defaults {
-                if let Some(bone_switch) = reference.bone_switches.get(default.switch_index as usize) {
+                if let Some(bone_switch) =
+                    reference.bone_switches.get(default.switch_index as usize)
+                {
                     if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
                         for bone in &group.bones {
                             invisible_bones.retain(|x| x != bone);
@@ -407,41 +405,41 @@ impl<'a> ScriptRunner<'a> {
             section_scripts,
             subaction_index,
             ledge_grab_enable,
-            call_every_frame:      HashMap::new(),
-            visited_gotos:         vec!(),
-            frame_index:           0.0,
-            animation_index:       0.0,
-            frame_count:           0,
-            interruptible:         false,
-            hitboxes:              [None, None, None, None, None, None, None],
-            hurtbox_state_all:     HurtBoxState::Normal,
-            hurtbox_states:        HashMap::new(),
-            frame_speed_modifier:  1.0,
-            tag_display:           true,
-            x:                     0.0,
-            y:                     0.0,
-            x_vel:                 0.0,
-            y_vel:                 0.0,
-            x_vel_modify:          VelModify::None,
-            y_vel_modify:          VelModify::None,
-            disable_movement:      DisableMovement::Enable,
-            armor_type:            ArmorType::None,
-            armor_tolerance:       0.0,
-            damage:                0.0,
-            airbourne:             false,
-            edge_slide:            EdgeSlide::SlideOff,
-            reverse_direction:     false,
-            change_subaction:      ChangeSubaction::Continue,
-            interrupts:            vec!(),
-            bad_interrupts:        vec!(),
-            hitbox_sets_rehit:     [false; 10],
-            slope_contour_stand:   None,
-            slope_contour_full:    None,
-            rumble:                None,
-            rumble_loop:           None,
+            call_every_frame: HashMap::new(),
+            visited_gotos: vec![],
+            frame_index: 0.0,
+            animation_index: 0.0,
+            frame_count: 0,
+            interruptible: false,
+            hitboxes: [None, None, None, None, None, None, None],
+            hurtbox_state_all: HurtBoxState::Normal,
+            hurtbox_states: HashMap::new(),
+            frame_speed_modifier: 1.0,
+            tag_display: true,
+            x: 0.0,
+            y: 0.0,
+            x_vel: 0.0,
+            y_vel: 0.0,
+            x_vel_modify: VelModify::None,
+            y_vel_modify: VelModify::None,
+            disable_movement: DisableMovement::Enable,
+            armor_type: ArmorType::None,
+            armor_tolerance: 0.0,
+            damage: 0.0,
+            airbourne: false,
+            edge_slide: EdgeSlide::SlideOff,
+            reverse_direction: false,
+            change_subaction: ChangeSubaction::Continue,
+            interrupts: vec![],
+            bad_interrupts: vec![],
+            hitbox_sets_rehit: [false; 10],
+            slope_contour_stand: None,
+            slope_contour_full: None,
+            rumble: None,
+            rumble_loop: None,
             grab_interrupt_damage: None,
-            throw:                 None,
-            throw_activate:        false,
+            throw: None,
+            throw_activate: false,
             invisible_bones,
 
             // LongtermAccessInt
@@ -469,7 +467,7 @@ impl<'a> ScriptRunner<'a> {
             tether_count: 0,
             temp1: 0,
             temp2: 0,
-            longterm_access_int: vec!(0; 0x500), // TODO: How big should this be?
+            longterm_access_int: vec![0; 0x500], // TODO: How big should this be?
 
             // LongtermAccessFloat
             special_landing_lag: 0.0,
@@ -477,7 +475,7 @@ impl<'a> ScriptRunner<'a> {
             shield_charge: 0.0,
             curry_angle1: 0.0,
             curry_randomness: 0.0,
-            longterm_access_float: vec!(0.0; 0x500), // TODO: How big should this be?
+            longterm_access_float: vec![0.0; 0x500], // TODO: How big should this be?
 
             // LongtermAccessBool
             is_dead: false,
@@ -495,17 +493,17 @@ impl<'a> ScriptRunner<'a> {
             can_not_teeter: false,
             velocity_ignore_hitstun: false,
             deflection: false,
-            longterm_access_bool: vec!(false; 0x500), // TODO: How big should this be?
+            longterm_access_bool: vec![false; 0x500], // TODO: How big should this be?
 
             // RandomAccessInt
             throw_data_param1: 0,
             throw_data_param2: 0,
             throw_data_param3: 0,
-            random_access_int: vec!(0; 0x100), // Pika has 72 bytes allocated, so this should be plenty.
+            random_access_int: vec![0; 0x100], // Pika has 72 bytes allocated, so this should be plenty.
 
             // RandomAccessFloat
             enable_turn_when_below_zero: 0.0,
-            random_access_float: vec!(0.0; 0x100), // Pika has 56 bytes allocated, so this should be plenty.
+            random_access_float: vec![0.0; 0x100], // Pika has 56 bytes allocated, so this should be plenty.
 
             // RandomAccessBool
             character_float: false,
@@ -518,7 +516,7 @@ impl<'a> ScriptRunner<'a> {
             enable_auto_jab: false,
             enable_jab_end: false,
             landing_lag: false,
-            random_access_bool: vec!(false; 0x100), // normally has 8-16 bytes allocated
+            random_access_bool: vec![false; 0x100], // normally has 8-16 bytes allocated
         };
 
         for event in &init_hack_script.events {
@@ -534,10 +532,13 @@ impl<'a> ScriptRunner<'a> {
 
     /// Steps the main, gfx, sfx and other scripts by 1 game frame.
     pub fn step(&mut self) {
-        let mut fsms = vec!();
+        let mut fsms = vec![];
         for fsm in self.wiird_frame_speed_modifiers {
             // TODO: Because we currently only operate at the subaction level, this is the best we can do.
-            if !fsm.action && fsm.action_subaction_id as usize == self.subaction_index && (self.frame_index as u16) >= fsm.frame as u16 {
+            if !fsm.action
+                && fsm.action_subaction_id as usize == self.subaction_index
+                && (self.frame_index as u16) >= fsm.frame as u16
+            {
                 fsms.push(fsm);
             }
         }
@@ -574,13 +575,13 @@ impl<'a> ScriptRunner<'a> {
         for interrupt in self.interrupts.clone() {
             if self.evaluate_expression(&interrupt.test).unwrap_bool() {
                 // TODO: Because we currently only operate at the subaction level, this is the best we can do.
-                self.change_subaction = ChangeSubaction::Interrupt (interrupt.action);
+                self.change_subaction = ChangeSubaction::Interrupt(interrupt.action);
             }
         }
 
         // create a callstack for CallEveryFrame block
         for call_every_frame in self.call_every_frame.values() {
-            let calls = vec!(Call {
+            let calls = vec![Call {
                 block: call_every_frame.block,
                 else_branch: None,
                 index: 0,
@@ -588,7 +589,7 @@ impl<'a> ScriptRunner<'a> {
                 external: call_every_frame.external,
                 if_statement: false,
                 execute: true,
-            });
+            }];
             self.call_stacks.push(CallStack {
                 calls,
                 wait_until: -1.0,
@@ -597,7 +598,8 @@ impl<'a> ScriptRunner<'a> {
 
         // run the main, gfx, sfx and other scripts
         for i in 0..self.call_stacks.len() {
-            while !self.call_stacks[i].calls.is_empty() { // reached the end of the script
+            while !self.call_stacks[i].calls.is_empty() {
+                // reached the end of the script
                 // Handle wait events
                 if self.frame_index < self.call_stacks[i].wait_until {
                     break;
@@ -610,20 +612,54 @@ impl<'a> ScriptRunner<'a> {
                     let external = self.call_stacks[i].calls.last().unwrap().external;
 
                     if self.call_stacks[i].calls.last().unwrap().execute {
-                        match self.step_event(event, external, self.fighter_scripts, self.common_scripts, self.section_scripts) {
-                            StepEventResult::WaitUntil (value) => {
+                        match self.step_event(
+                            event,
+                            external,
+                            self.fighter_scripts,
+                            self.common_scripts,
+                            self.section_scripts,
+                        ) {
+                            StepEventResult::WaitUntil(value) => {
                                 self.call_stacks[i].wait_until = value;
                             }
                             StepEventResult::NewForLoop { block, iterations } => {
                                 for _ in 0..iterations {
-                                    self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                                    self.call_stacks[i].calls.push(Call {
+                                        block,
+                                        else_branch: None,
+                                        index: 0,
+                                        subroutine: false,
+                                        if_statement: false,
+                                        execute: true,
+                                        external,
+                                    });
                                 }
                             }
                             StepEventResult::NewCall { block } => {
-                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                                self.call_stacks[i].calls.push(Call {
+                                    block,
+                                    else_branch: None,
+                                    index: 0,
+                                    subroutine: false,
+                                    if_statement: false,
+                                    execute: true,
+                                    external,
+                                });
                             }
-                            StepEventResult::NewIfStatement { then_branch, else_branch, execute } => {
-                                self.call_stacks[i].calls.push(Call { block: then_branch, else_branch, index: 0, subroutine: false, if_statement: true, execute, external });
+                            StepEventResult::NewIfStatement {
+                                then_branch,
+                                else_branch,
+                                execute,
+                            } => {
+                                self.call_stacks[i].calls.push(Call {
+                                    block: then_branch,
+                                    else_branch,
+                                    index: 0,
+                                    subroutine: false,
+                                    if_statement: true,
+                                    execute,
+                                    external,
+                                });
                             }
                             StepEventResult::IfStatementDisableExecution => {
                                 if self.call_stacks[i].calls.last().unwrap().if_statement {
@@ -631,29 +667,54 @@ impl<'a> ScriptRunner<'a> {
                                 }
                             }
                             StepEventResult::Subroutine { block, external } => {
-                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: true, if_statement: false, execute: true, external });
+                                self.call_stacks[i].calls.push(Call {
+                                    block,
+                                    else_branch: None,
+                                    index: 0,
+                                    subroutine: true,
+                                    if_statement: false,
+                                    execute: true,
+                                    external,
+                                });
                             }
-                            StepEventResult::CallEveryFrame { block, thread_id, external } => {
-                                self.call_every_frame.insert(thread_id, CallEveryFrame { block, external });
+                            StepEventResult::CallEveryFrame {
+                                block,
+                                thread_id,
+                                external,
+                            } => {
+                                self.call_every_frame
+                                    .insert(thread_id, CallEveryFrame { block, external });
                             }
                             StepEventResult::Return => {
                                 let mut run = false;
                                 while run {
-                                    run = self.call_stacks[i].calls.pop().map(|x| !x.subroutine).unwrap_or(false);
+                                    run = self.call_stacks[i]
+                                        .calls
+                                        .pop()
+                                        .map(|x| !x.subroutine)
+                                        .unwrap_or(false);
                                 }
                             }
                             StepEventResult::Goto { block, external } => {
                                 self.call_stacks[i].calls.pop();
-                                self.call_stacks[i].calls.push(Call { block, else_branch: None, index: 0, subroutine: false, if_statement: false, execute: true, external });
+                                self.call_stacks[i].calls.push(Call {
+                                    block,
+                                    else_branch: None,
+                                    index: 0,
+                                    subroutine: false,
+                                    if_statement: false,
+                                    execute: true,
+                                    external,
+                                });
                             }
-                            StepEventResult::None => { }
+                            StepEventResult::None => {}
                         }
-                    }
-                    else {
+                    } else {
                         // when execution is disabled we run events that may resume execution, otherwise we do nothing
                         let new_execution = match event {
-                            &EventAst::IfStatementOr (ref test) => {
-                                self.evaluate_expression(test).unwrap_bool() && self.call_stacks[i].calls.last().unwrap().if_statement
+                            &EventAst::IfStatementOr(ref test) => {
+                                self.evaluate_expression(test).unwrap_bool()
+                                    && self.call_stacks[i].calls.last().unwrap().if_statement
                             }
                             _ => false,
                         };
@@ -667,8 +728,7 @@ impl<'a> ScriptRunner<'a> {
                         call.index = 0;
                         call.else_branch = None;
                         call.execute = !call.execute;
-                    }
-                    else {
+                    } else {
                         self.call_stacks[i].calls.pop();
                     }
                 }
@@ -698,42 +758,68 @@ impl<'a> ScriptRunner<'a> {
     }
 
     /// Returns the wait_until value
-    fn step_event<'b>(&mut self, event: &'b EventAst, external: bool, fighter_scripts: &[&'b ScriptAst], common_scripts: &[&'b ScriptAst], section_scripts: &'b [SectionScriptAst]) -> StepEventResult<'b> {
+    fn step_event<'b>(
+        &mut self,
+        event: &'b EventAst,
+        external: bool,
+        fighter_scripts: &[&'b ScriptAst],
+        common_scripts: &[&'b ScriptAst],
+        section_scripts: &'b [SectionScriptAst],
+    ) -> StepEventResult<'b> {
         match event {
-            &EventAst::SyncWait (ref value) => {
-                return StepEventResult::WaitUntil (self.frame_index + *value);
+            &EventAst::SyncWait(ref value) => {
+                return StepEventResult::WaitUntil(self.frame_index + *value);
             }
-            &EventAst::AsyncWait (ref value) => {
-                return StepEventResult::WaitUntil (*value);
+            &EventAst::AsyncWait(ref value) => {
+                return StepEventResult::WaitUntil(*value);
             }
-            &EventAst::ForLoop (ref for_loop) => {
+            &EventAst::ForLoop(ref for_loop) => {
                 match for_loop.iterations {
-                    Iterations::Finite (iterations) => {
-                        return StepEventResult::NewForLoop { block: &for_loop.block, iterations };
+                    Iterations::Finite(iterations) => {
+                        return StepEventResult::NewForLoop {
+                            block: &for_loop.block,
+                            iterations,
+                        };
                     }
                     Iterations::Infinite => {
                         // obviously an infinite loop should not be attempted :P
-                        return StepEventResult::NewCall { block: &for_loop.block };
+                        return StepEventResult::NewCall {
+                            block: &for_loop.block,
+                        };
                     }
                 }
             }
-            &EventAst::Subroutine (ref offset) => {
+            &EventAst::Subroutine(ref offset) => {
                 if !external {
-                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
-                        return StepEventResult::Subroutine { block: &script.script.block, external: true };
+                    if let Some(script) = section_scripts
+                        .iter()
+                        .find(|x| x.callers.contains(&offset.origin))
+                    {
+                        return StepEventResult::Subroutine {
+                            block: &script.script.block,
+                            external: true,
+                        };
                     }
                 }
 
-                let all_scripts = if external { common_scripts } else { fighter_scripts };
+                let all_scripts = if external {
+                    common_scripts
+                } else {
+                    fighter_scripts
+                };
                 // TODO: Maybe I should implement a protection similar to visited_gotos for subroutines.
                 // If that turns out to be a bad idea document why.
                 for script in all_scripts.iter() {
                     if script.offset == offset.offset {
-                        if script.block.events.len() > 0 && &script.block.events[0] as *const _ == event as *const _ {
+                        if script.block.events.len() > 0
+                            && &script.block.events[0] as *const _ == event as *const _
+                        {
                             error!("Avoided hard Subroutine infinite loop (attempted to jump to the same location)");
-                        }
-                        else {
-                            return StepEventResult::Subroutine { block: &script.block, external };
+                        } else {
+                            return StepEventResult::Subroutine {
+                                block: &script.block,
+                                external,
+                            };
                         }
                     }
                 }
@@ -742,72 +828,111 @@ impl<'a> ScriptRunner<'a> {
             &EventAst::Return => {
                 return StepEventResult::Return;
             }
-            &EventAst::Goto (ref offset) => {
+            &EventAst::Goto(ref offset) => {
                 if !external {
-                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
-                        return StepEventResult::Goto { block: &script.script.block, external: true };
+                    if let Some(script) = section_scripts
+                        .iter()
+                        .find(|x| x.callers.contains(&offset.origin))
+                    {
+                        return StepEventResult::Goto {
+                            block: &script.script.block,
+                            external: true,
+                        };
                     }
                 }
 
-                let all_scripts = if external { common_scripts } else { fighter_scripts };
+                let all_scripts = if external {
+                    common_scripts
+                } else {
+                    fighter_scripts
+                };
                 if !self.visited_gotos.iter().any(|x| *x == offset.offset) {
                     self.visited_gotos.push(offset.offset);
                     for script in all_scripts.iter() {
                         if script.offset == offset.offset {
-                            return StepEventResult::Goto { block: &script.block, external };
+                            return StepEventResult::Goto {
+                                block: &script.block,
+                                external,
+                            };
                         }
                     }
                     error!("Couldnt find Goto offset");
                 }
                 error!("Avoided Goto infinite loop");
             }
-            &EventAst::IfStatement (ref if_statement) => {
+            &EventAst::IfStatement(ref if_statement) => {
                 let then_branch = &if_statement.then_branch;
                 let else_branch = if_statement.else_branch.as_ref();
                 let execute = self.evaluate_expression(&if_statement.test).unwrap_bool();
-                return StepEventResult::NewIfStatement { then_branch, else_branch, execute };
+                return StepEventResult::NewIfStatement {
+                    then_branch,
+                    else_branch,
+                    execute,
+                };
             }
-            &EventAst::IfStatementAnd (ref test) => {
+            &EventAst::IfStatementAnd(ref test) => {
                 if !self.evaluate_expression(test).unwrap_bool() {
                     return StepEventResult::IfStatementDisableExecution;
                 }
             }
-            &EventAst::IfStatementOr (_) => { } // This is handled in the !execution branch
-            &EventAst::Switch (_, _) => { } // TODO
-            &EventAst::EndSwitch => { }
-            &EventAst::Case (_) => { }
-            &EventAst::DefaultCase => { }
-            &EventAst::LoopRest => { error!("LoopRest: This means the code is expected to infinite loop") } // TODO: Handle infinite loops better
-            &EventAst::CallEveryFrame { thread_id, ref offset } => {
+            &EventAst::IfStatementOr(_) => {} // This is handled in the !execution branch
+            &EventAst::Switch(_, _) => {}     // TODO
+            &EventAst::EndSwitch => {}
+            &EventAst::Case(_) => {}
+            &EventAst::DefaultCase => {}
+            &EventAst::LoopRest => {
+                error!("LoopRest: This means the code is expected to infinite loop")
+            } // TODO: Handle infinite loops better
+            &EventAst::CallEveryFrame {
+                thread_id,
+                ref offset,
+            } => {
                 if !external {
-                    if let Some(script) = section_scripts.iter().find(|x| x.callers.contains(&offset.origin)) {
-                        return StepEventResult::CallEveryFrame { thread_id, block: &script.script.block, external: true };
+                    if let Some(script) = section_scripts
+                        .iter()
+                        .find(|x| x.callers.contains(&offset.origin))
+                    {
+                        return StepEventResult::CallEveryFrame {
+                            thread_id,
+                            block: &script.script.block,
+                            external: true,
+                        };
                     }
                 }
 
-                let all_scripts = if external { common_scripts } else { fighter_scripts };
+                let all_scripts = if external {
+                    common_scripts
+                } else {
+                    fighter_scripts
+                };
                 for script in all_scripts.iter() {
                     if script.offset == offset.offset {
-                        return StepEventResult::CallEveryFrame { thread_id, block: &script.block, external };
+                        return StepEventResult::CallEveryFrame {
+                            thread_id,
+                            block: &script.block,
+                            external,
+                        };
                     }
                 }
             }
             &EventAst::RemoveCallEveryFrame { thread_id } => {
                 self.call_every_frame.remove(&thread_id);
             }
-            &EventAst::IndependentSubroutine { .. } => { } // TODO
-            &EventAst::RemoveIndependentSubroutine { .. } => { } // TODO
-            &EventAst::SetIndependentSubroutineThreadType { .. } => { } // TODO
-            &EventAst::DisableInterrupt (_) => { } // TODO
-            &EventAst::EnableInterrupt (_) => { } // TODO
-            &EventAst::ToggleInterrupt { .. } => { } // TODO
-            &EventAst::EnableInterruptGroup (_) => { } // TODO
-            &EventAst::DisableInterruptGroup (_) => { } // TODO
-            &EventAst::ClearInterruptGroup (_) => { } // TODO
-            &EventAst::CreateInterrupt (ref interrupt) => {
+            &EventAst::IndependentSubroutine { .. } => {} // TODO
+            &EventAst::RemoveIndependentSubroutine { .. } => {} // TODO
+            &EventAst::SetIndependentSubroutineThreadType { .. } => {} // TODO
+            &EventAst::DisableInterrupt(_) => {}          // TODO
+            &EventAst::EnableInterrupt(_) => {}           // TODO
+            &EventAst::ToggleInterrupt { .. } => {}       // TODO
+            &EventAst::EnableInterruptGroup(_) => {}      // TODO
+            &EventAst::DisableInterruptGroup(_) => {}     // TODO
+            &EventAst::ClearInterruptGroup(_) => {}       // TODO
+            &EventAst::CreateInterrupt(ref interrupt) => {
                 // If the interrupt would succeed on the first frame then ignore it.
                 // This is a super hacky hack to get moves like DK's dash attack working.
-                if !(self.frame_index == 0.0 && self.evaluate_expression(&interrupt.test).unwrap_bool()) {
+                if !(self.frame_index == 0.0
+                    && self.evaluate_expression(&interrupt.test).unwrap_bool())
+                {
                     self.interrupts.push(interrupt.clone());
                 } else {
                     self.bad_interrupts.push(interrupt.clone());
@@ -818,41 +943,45 @@ impl<'a> ScriptRunner<'a> {
                     let left = Box::new(interrupt.test.clone());
                     let right = Box::new(test.clone());
                     let operator = ComparisonOperator::And;
-                    interrupt.test = Expression::Binary(BinaryExpression { left, operator, right });
+                    interrupt.test = Expression::Binary(BinaryExpression {
+                        left,
+                        operator,
+                        right,
+                    });
                 }
             }
-            &EventAst::InterruptAddRequirement { .. } => { } // TODO
+            &EventAst::InterruptAddRequirement { .. } => {} // TODO
             &EventAst::AllowInterrupts => {
                 self.interruptible = true;
             }
             &EventAst::DisallowInterrupts => {
                 self.interruptible = false;
             }
-            &EventAst::ChangeSubaction (v0) => {
-                self.change_subaction = ChangeSubaction::ChangeSubaction (v0);
+            &EventAst::ChangeSubaction(v0) => {
+                self.change_subaction = ChangeSubaction::ChangeSubaction(v0);
             }
-            &EventAst::ChangeSubactionRestartFrame (v0) => {
-                self.change_subaction = ChangeSubaction::ChangeSubactionRestartFrame (v0);
+            &EventAst::ChangeSubactionRestartFrame(v0) => {
+                self.change_subaction = ChangeSubaction::ChangeSubactionRestartFrame(v0);
             }
 
             // timing
-            &EventAst::SetAnimationFrame (v0) => {
+            &EventAst::SetAnimationFrame(v0) => {
                 self.animation_index = v0;
             }
-            &EventAst::SetAnimationAndTimerFrame (v0) => {
+            &EventAst::SetAnimationAndTimerFrame(v0) => {
                 self.animation_index = v0;
                 self.frame_index = v0;
             }
             &EventAst::FrameSpeedModifier { multiplier, .. } => {
                 self.frame_speed_modifier = multiplier;
             }
-            &EventAst::TimeManipulation (_, _) => { }
+            &EventAst::TimeManipulation(_, _) => {}
 
             // misc state
-            &EventAst::SetAirGround (v0) => {
+            &EventAst::SetAirGround(v0) => {
                 self.airbourne = v0 == 0; // TODO: Seems like brawlbox is incomplete here e.g 36
             }
-            &EventAst::SetEdgeSlide (ref v0) => {
+            &EventAst::SetEdgeSlide(ref v0) => {
                 self.edge_slide = v0.clone();
             }
             &EventAst::ReverseDirection => {
@@ -860,23 +989,28 @@ impl<'a> ScriptRunner<'a> {
             }
 
             // hitboxes
-            &EventAst::CreateHitBox (ref args) => {
+            &EventAst::CreateHitBox(ref args) => {
                 if args.hitbox_id < self.hitboxes.len() as u8 {
                     // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
                     // In this case interpolation should not occur.
-                    let interpolate = if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
-                        match prev_hitbox.values {
-                            CollisionBoxValues::Hit (ref prev_hitbox) => args.set_id == prev_hitbox.set_id,
-                            _ => false,
-                        }
-                    } else { false };
+                    let interpolate =
+                        if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
+                            match prev_hitbox.values {
+                                CollisionBoxValues::Hit(ref prev_hitbox) => {
+                                    args.set_id == prev_hitbox.set_id
+                                }
+                                _ => false,
+                            }
+                        } else {
+                            false
+                        };
 
                     // Force rehit if no existing hitboxes.
                     // Both DeleteAllHitboxes and DeleteHitbox on the last hitbox will trigger rehit.
                     // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html?frame=11
                     let mut empty_set = true;
                     for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
-                        if let CollisionBoxValues::Hit (hitbox) = hitbox.values {
+                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values {
                             if hitbox.set_id == args.set_id {
                                 empty_set = false;
                             }
@@ -889,45 +1023,63 @@ impl<'a> ScriptRunner<'a> {
                     }
 
                     let damage = self.get_float_value(&args.damage);
-                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_hitbox(args, interpolate, damage));
+                    self.hitboxes[args.hitbox_id as usize] =
+                        Some(ScriptCollisionBox::from_hitbox(args, interpolate, damage));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_id, self.subaction_name);
+                    error!(
+                        "invalid hitbox index {} {}",
+                        args.hitbox_id, self.subaction_name
+                    );
                 }
             }
-            &EventAst::ThrownHitBox (_) => { }
-            &EventAst::CreateSpecialHitBox (ref args) => {
+            &EventAst::ThrownHitBox(_) => {}
+            &EventAst::CreateSpecialHitBox(ref args) => {
                 if args.hitbox_args.hitbox_id < self.hitboxes.len() as u8 {
                     // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
                     // In this case interpolation should not occur.
                     let index = args.hitbox_args.hitbox_id as usize;
                     let interpolate = if let Some(ref prev_hitbox) = self.hitboxes[index] {
                         match prev_hitbox.values {
-                            CollisionBoxValues::Hit (ref prev_hitbox) => args.hitbox_args.set_id == prev_hitbox.set_id,
+                            CollisionBoxValues::Hit(ref prev_hitbox) => {
+                                args.hitbox_args.set_id == prev_hitbox.set_id
+                            }
                             _ => false,
                         }
-                    } else { false };
+                    } else {
+                        false
+                    };
 
                     // Force rehit if no existing hitboxes.
                     // Both DeleteAllHitboxes and DeleteHitbox on the last hitbox will trigger rehit.
                     // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
                     let mut empty_set = true;
                     for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
-                        if let CollisionBoxValues::Hit (hitbox) = hitbox.values {
+                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values {
                             if hitbox.set_id == args.hitbox_args.set_id {
                                 empty_set = false;
                             }
                         }
                     }
                     if empty_set {
-                        if let Some(rehit) = self.hitbox_sets_rehit.get_mut(args.hitbox_args.set_id as usize) {
+                        if let Some(rehit) = self
+                            .hitbox_sets_rehit
+                            .get_mut(args.hitbox_args.set_id as usize)
+                        {
                             *rehit = true;
                         }
                     }
 
                     let damage = self.get_float_value(&args.hitbox_args.damage);
-                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(args, interpolate, damage));
+                    self.hitboxes[index] = Some(ScriptCollisionBox::from_special_hitbox(
+                        args,
+                        interpolate,
+                        damage,
+                    ));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_args.hitbox_id, self.subaction_name);
+                    error!(
+                        "invalid hitbox index {} {}",
+                        args.hitbox_args.hitbox_id, self.subaction_name
+                    );
                 }
             }
             &EventAst::DeleteAllHitBoxes => {
@@ -937,9 +1089,8 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::DefensiveCollision { .. } => {
-            }
-            &EventAst::MoveHitBox (ref move_hitbox) => {
+            &EventAst::DefensiveCollision { .. } => {}
+            &EventAst::MoveHitBox(ref move_hitbox) => {
                 if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
                     hitbox.bone_index = move_hitbox.new_bone as i16;
                     hitbox.x_offset = move_hitbox.new_x_offset;
@@ -947,43 +1098,61 @@ impl<'a> ScriptRunner<'a> {
                     hitbox.z_offset = move_hitbox.new_z_offset;
                 }
             }
-            &EventAst::ChangeHitBoxDamage { hitbox_id, new_damage } => {
+            &EventAst::ChangeHitBoxDamage {
+                hitbox_id,
+                new_damage,
+            } => {
                 if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit (ref mut hitbox) = hitbox.values {
+                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
                         hitbox.damage = new_damage as f32;
                     }
                 }
             }
-            &EventAst::ChangeHitBoxSize { hitbox_id, new_size } => {
+            &EventAst::ChangeHitBoxSize {
+                hitbox_id,
+                new_size,
+            } => {
                 if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit (ref mut hitbox) = hitbox.values {
+                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
                         hitbox.size = new_size as f32;
                     }
                 }
             }
-            &EventAst::DeleteHitBox (hitbox_id) => {
+            &EventAst::DeleteHitBox(hitbox_id) => {
                 // Shock claims this doesnt work on special hitboxes but it seems to work fine here:
                 // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
-                if self.hitboxes[hitbox_id as usize].as_ref().map(|x| x.is_hit()).unwrap_or(false) {
+                if self.hitboxes[hitbox_id as usize]
+                    .as_ref()
+                    .map(|x| x.is_hit())
+                    .unwrap_or(false)
+                {
                     self.hitboxes[hitbox_id as usize] = None;
                 }
             }
-            &EventAst::CreateGrabBox (ref args) => {
+            &EventAst::CreateGrabBox(ref args) => {
                 let mut interpolate = false;
                 if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
                     // TODO: Should a grabbox interpolate from an existing hitbox and vice versa
-                    if let CollisionBoxValues::Grab (_) = prev_hitbox.values {
+                    if let CollisionBoxValues::Grab(_) = prev_hitbox.values {
                         interpolate = true;
                     }
                 }
                 if args.hitbox_id < self.hitboxes.len() as i32 {
-                    self.hitboxes[args.hitbox_id as usize] = Some(ScriptCollisionBox::from_grabbox(args, interpolate));
+                    self.hitboxes[args.hitbox_id as usize] =
+                        Some(ScriptCollisionBox::from_grabbox(args, interpolate));
                 } else {
-                    error!("invalid hitbox index {} {}", args.hitbox_id, self.subaction_name);
+                    error!(
+                        "invalid hitbox index {} {}",
+                        args.hitbox_id, self.subaction_name
+                    );
                 }
             }
-            &EventAst::DeleteGrabBox (hitbox_id) => {
-                if self.hitboxes[hitbox_id as usize].as_ref().map(|x| x.is_grab()).unwrap_or(false) {
+            &EventAst::DeleteGrabBox(hitbox_id) => {
+                if self.hitboxes[hitbox_id as usize]
+                    .as_ref()
+                    .map(|x| x.is_grab())
+                    .unwrap_or(false)
+                {
                     self.hitboxes[hitbox_id as usize] = None;
                 }
             }
@@ -994,7 +1163,7 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::SpecifyThrow (ref throw) => {
+            &EventAst::SpecifyThrow(ref throw) => {
                 match throw.throw_use {
                     ThrowUse::Throw => {
                         self.throw = Some(throw.clone());
@@ -1003,16 +1172,19 @@ impl<'a> ScriptRunner<'a> {
                         // The only known value in the specifier that affects the grab interrupt is damage
                         self.grab_interrupt_damage = Some(throw.damage);
                     }
-                    ThrowUse::Unknown (_) => { }
+                    ThrowUse::Unknown(_) => {}
                 }
             }
-            &EventAst::ApplyThrow (_) => {
+            &EventAst::ApplyThrow(_) => {
                 self.throw_activate = true;
             }
-            &EventAst::AddHitBoxDamage { hitbox_id, ref add_damage } => {
+            &EventAst::AddHitBoxDamage {
+                hitbox_id,
+                ref add_damage,
+            } => {
                 let add_damage = self.get_float_value(&add_damage);
                 if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit (ref mut hitbox) = hitbox.values {
+                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
                         hitbox.damage += add_damage;
                     }
                 }
@@ -1030,7 +1202,8 @@ impl<'a> ScriptRunner<'a> {
                         // I havent confirmed which, so the current implementation just does nothing.
                     }
                     _ => {
-                        self.hurtbox_states.insert(high_level_fighter::get_bone_index(bone), state.clone());
+                        self.hurtbox_states
+                            .insert(high_level_fighter::get_bone_index(bone), state.clone());
                     }
                 }
             }
@@ -1039,63 +1212,62 @@ impl<'a> ScriptRunner<'a> {
             }
 
             // controller
-            &EventAst::ControllerClearBuffer => { }
-            &EventAst::ControllerUnk01 => { }
-            &EventAst::ControllerUnk02 => { }
-            &EventAst::ControllerUnk06 (_) => { }
-            &EventAst::ControllerUnk0C => { }
-            &EventAst::Rumble { unk1, unk2 } => {
-                self.rumble = Some((unk1, unk2))
-            }
-            &EventAst::RumbleLoop { unk1, unk2 } => {
-                self.rumble_loop = Some((unk1, unk2))
-            }
+            &EventAst::ControllerClearBuffer => {}
+            &EventAst::ControllerUnk01 => {}
+            &EventAst::ControllerUnk02 => {}
+            &EventAst::ControllerUnk06(_) => {}
+            &EventAst::ControllerUnk0C => {}
+            &EventAst::Rumble { unk1, unk2 } => self.rumble = Some((unk1, unk2)),
+            &EventAst::RumbleLoop { unk1, unk2 } => self.rumble_loop = Some((unk1, unk2)),
 
             // misc
             &EventAst::SlopeContourStand { leg_bone_parent } => {
                 if leg_bone_parent == 0 {
                     self.slope_contour_stand = None;
-                }
-                else {
+                } else {
                     self.slope_contour_stand = Some(leg_bone_parent);
                 }
             }
-            &EventAst::SlopeContourFull { hip_n_or_top_n, trans_bone } => {
+            &EventAst::SlopeContourFull {
+                hip_n_or_top_n,
+                trans_bone,
+            } => {
                 if hip_n_or_top_n == 0 && trans_bone == 0 {
                     self.slope_contour_full = None;
-                }
-                else {
+                } else {
                     self.slope_contour_full = Some((hip_n_or_top_n, trans_bone));
                 }
             }
-            &EventAst::GenerateArticle { .. } => { }
-            &EventAst::ArticleEvent (_) => { }
-            &EventAst::ArticleAnimation (_) => { }
-            &EventAst::ArticleRemove (_) => { }
-            &EventAst::ArticleVisibility { .. } => { }
-            &EventAst::FinalSmashEnter => { }
-            &EventAst::FinalSmashExit => { }
-            &EventAst::TerminateSelf => { }
-            &EventAst::Posture (_) => { }
-            &EventAst::LedgeGrabEnable (ref enable) => {
+            &EventAst::GenerateArticle { .. } => {}
+            &EventAst::ArticleEvent(_) => {}
+            &EventAst::ArticleAnimation(_) => {}
+            &EventAst::ArticleRemove(_) => {}
+            &EventAst::ArticleVisibility { .. } => {}
+            &EventAst::FinalSmashEnter => {}
+            &EventAst::FinalSmashExit => {}
+            &EventAst::TerminateSelf => {}
+            &EventAst::Posture(_) => {}
+            &EventAst::LedgeGrabEnable(ref enable) => {
                 self.ledge_grab_enable = enable.clone();
             }
-            &EventAst::TagDisplay (display) => {
+            &EventAst::TagDisplay(display) => {
                 self.tag_display = display;
             }
-            &EventAst::Armor { ref armor_type, tolerance } => {
+            &EventAst::Armor {
+                ref armor_type,
+                tolerance,
+            } => {
                 self.armor_type = armor_type.clone();
                 self.armor_tolerance = tolerance;
             }
-            &EventAst::AddDamage (damage) => {
+            &EventAst::AddDamage(damage) => {
                 self.damage += damage;
             }
-            &EventAst::SetOrAddVelocity (ref values) => {
+            &EventAst::SetOrAddVelocity(ref values) => {
                 if values.x_set {
                     self.x_vel = values.x_vel;
                     self.x_vel_modify = VelModify::Set(values.x_vel);
-                }
-                else {
+                } else {
                     self.x_vel += values.x_vel;
                     self.x_vel_modify = VelModify::Add(self.x_vel_modify.value() + values.x_vel);
                 }
@@ -1103,8 +1275,7 @@ impl<'a> ScriptRunner<'a> {
                 if values.y_set {
                     self.y_vel = values.y_vel;
                     self.y_vel_modify = VelModify::Set(values.y_vel);
-                }
-                else {
+                } else {
                     self.y_vel += values.y_vel;
                     self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + values.y_vel);
                 }
@@ -1116,7 +1287,10 @@ impl<'a> ScriptRunner<'a> {
                 self.x_vel_modify = VelModify::Set(x_vel);
                 self.y_vel_modify = VelModify::Set(y_vel);
             }
-            &EventAst::AddVelocity { ref x_vel, ref y_vel } => {
+            &EventAst::AddVelocity {
+                ref x_vel,
+                ref y_vel,
+            } => {
                 let x_vel = self.get_float_value(x_vel);
                 let y_vel = self.get_float_value(y_vel);
 
@@ -1126,42 +1300,51 @@ impl<'a> ScriptRunner<'a> {
                 self.x_vel_modify = VelModify::Add(self.x_vel_modify.value() + x_vel);
                 self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + y_vel);
             }
-            &EventAst::DisableMovement (ref disable_movement) => {
+            &EventAst::DisableMovement(ref disable_movement) => {
                 self.disable_movement = disable_movement.clone();
             }
-            &EventAst::DisableMovement2 (_) => { } // TODO: What!?!?
-            &EventAst::ResetVerticalVelocityAndAcceleration (reset) => {
+            &EventAst::DisableMovement2(_) => {} // TODO: What!?!?
+            &EventAst::ResetVerticalVelocityAndAcceleration(reset) => {
                 if reset {
                     self.y_vel = 0.0;
 
                     self.y_vel_modify = VelModify::Set(0.0);
                 }
             }
-            &EventAst::NormalizePhysics => { } // TODO
+            &EventAst::NormalizePhysics => {} // TODO
 
             // sound
-            &EventAst::SoundEffect1 (_) => { }
-            &EventAst::SoundEffect2 (_) => { }
-            &EventAst::SoundEffectTransient (_) => { }
-            &EventAst::SoundEffectStop (_) => { }
-            &EventAst::SoundEffectVictory (_) => { }
-            &EventAst::SoundEffectUnk (_) => { }
-            &EventAst::SoundEffectOther1 (_) => { }
-            &EventAst::SoundEffectOther2 (_) => { }
-            &EventAst::SoundVoiceLow => { }
-            &EventAst::SoundVoiceDamage => { }
-            &EventAst::SoundVoiceOttotto => { }
-            &EventAst::SoundVoiceEating => { }
+            &EventAst::SoundEffect1(_) => {}
+            &EventAst::SoundEffect2(_) => {}
+            &EventAst::SoundEffectTransient(_) => {}
+            &EventAst::SoundEffectStop(_) => {}
+            &EventAst::SoundEffectVictory(_) => {}
+            &EventAst::SoundEffectUnk(_) => {}
+            &EventAst::SoundEffectOther1(_) => {}
+            &EventAst::SoundEffectOther2(_) => {}
+            &EventAst::SoundVoiceLow => {}
+            &EventAst::SoundVoiceDamage => {}
+            &EventAst::SoundVoiceOttotto => {}
+            &EventAst::SoundVoiceEating => {}
 
             // variables
-            &EventAst::IntVariableSet { value, ref variable } => {
+            &EventAst::IntVariableSet {
+                value,
+                ref variable,
+            } => {
                 self.set_variable_int(variable, value);
             }
-            &EventAst::IntVariableAdd { value, ref variable } => {
+            &EventAst::IntVariableAdd {
+                value,
+                ref variable,
+            } => {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value + value);
             }
-            &EventAst::IntVariableSubtract { value, ref variable } => {
+            &EventAst::IntVariableSubtract {
+                value,
+                ref variable,
+            } => {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value - value);
             }
@@ -1173,94 +1356,106 @@ impl<'a> ScriptRunner<'a> {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value - 1);
             }
-            &EventAst::FloatVariableSet { ref value, ref variable } => {
+            &EventAst::FloatVariableSet {
+                ref value,
+                ref variable,
+            } => {
                 let value = self.get_float_value(value);
                 self.set_variable_float(variable, value);
             }
-            &EventAst::FloatVariableAdd { ref value, ref variable } => {
+            &EventAst::FloatVariableAdd {
+                ref value,
+                ref variable,
+            } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value + value);
             }
-            &EventAst::FloatVariableSubtract { ref value, ref variable } => {
+            &EventAst::FloatVariableSubtract {
+                ref value,
+                ref variable,
+            } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value - value);
             }
-            &EventAst::FloatVariableMultiply { ref value, ref variable } => {
+            &EventAst::FloatVariableMultiply {
+                ref value,
+                ref variable,
+            } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value * value);
             }
-            &EventAst::FloatVariableDivide { ref value, ref variable } => {
+            &EventAst::FloatVariableDivide {
+                ref value,
+                ref variable,
+            } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value / value);
             }
-            &EventAst::BoolVariableSetTrue { ref variable } => {
-                match variable.data_type() {
-                    VariableDataType::Int   => self.set_variable_int_inner(variable, 1),
-                    VariableDataType::Float => self.set_variable_float_inner(variable, 1.0),
-                    VariableDataType::Bool  => self.set_variable_bool_inner(variable, true),
-                    VariableDataType::Unknown { .. } => { }
-                }
-            }
-            &EventAst::BoolVariableSetFalse { ref variable } => {
-                match variable.data_type() {
-                    VariableDataType::Int   => self.set_variable_int_inner(variable, 0),
-                    VariableDataType::Float => self.set_variable_float_inner(variable, 0.0),
-                    VariableDataType::Bool  => self.set_variable_bool_inner(variable, false),
-                    VariableDataType::Unknown { .. } => { }
-                }
-            }
+            &EventAst::BoolVariableSetTrue { ref variable } => match variable.data_type() {
+                VariableDataType::Int => self.set_variable_int_inner(variable, 1),
+                VariableDataType::Float => self.set_variable_float_inner(variable, 1.0),
+                VariableDataType::Bool => self.set_variable_bool_inner(variable, true),
+                VariableDataType::Unknown { .. } => {}
+            },
+            &EventAst::BoolVariableSetFalse { ref variable } => match variable.data_type() {
+                VariableDataType::Int => self.set_variable_int_inner(variable, 0),
+                VariableDataType::Float => self.set_variable_float_inner(variable, 0.0),
+                VariableDataType::Bool => self.set_variable_bool_inner(variable, false),
+                VariableDataType::Unknown { .. } => {}
+            },
 
             // graphics
-            &EventAst::GraphicEffect (_) => { }
-            &EventAst::ExternalGraphicEffect (_) => { }
-            &EventAst::LimitedScreenTint (_) => { }
-            &EventAst::UnlimitedScreenTint (_) => { }
-            &EventAst::EndUnlimitedScreenTint { .. } => { }
-            &EventAst::SwordGlow (_) => { }
-            &EventAst::DeleteSwordGlow { .. } => { }
-            &EventAst::AestheticWindEffect (_) => { }
-            &EventAst::EndAestheticWindEffect { .. } => { }
-            &EventAst::ScreenShake { .. } => { }
+            &EventAst::GraphicEffect(_) => {}
+            &EventAst::ExternalGraphicEffect(_) => {}
+            &EventAst::LimitedScreenTint(_) => {}
+            &EventAst::UnlimitedScreenTint(_) => {}
+            &EventAst::EndUnlimitedScreenTint { .. } => {}
+            &EventAst::SwordGlow(_) => {}
+            &EventAst::DeleteSwordGlow { .. } => {}
+            &EventAst::AestheticWindEffect(_) => {}
+            &EventAst::EndAestheticWindEffect { .. } => {}
+            &EventAst::ScreenShake { .. } => {}
             //&EventAst::ModelChanger { reference, switch_index, bone_group_index } => {
             &EventAst::ModelChanger { .. } => {
                 // TODO: Model visibility change
             }
-            &EventAst::CameraCloseup (_) => { }
-            &EventAst::CameraNormal => { }
-            &EventAst::RemoveFlashEffect => { }
-            &EventAst::FlashEffectOverlay { .. } => { }
-            &EventAst::SetColorOfFlashEffectOverlay { .. } => { }
-            &EventAst::FlashEffectLight { .. } => { }
-            &EventAst::SetColorOfFlashEffectLight { .. } => { }
+            &EventAst::CameraCloseup(_) => {}
+            &EventAst::CameraNormal => {}
+            &EventAst::RemoveFlashEffect => {}
+            &EventAst::FlashEffectOverlay { .. } => {}
+            &EventAst::SetColorOfFlashEffectOverlay { .. } => {}
+            &EventAst::FlashEffectLight { .. } => {}
+            &EventAst::SetColorOfFlashEffectLight { .. } => {}
 
             // items
-            &EventAst::ItemPickup { .. } => { }
-            &EventAst::ItemThrow { .. } => { }
-            &EventAst::ItemThrow2 { .. } => { }
-            &EventAst::ItemDrop => { }
-            &EventAst::ItemConsume { .. } => { }
-            &EventAst::ItemSetProperty { .. } => { }
-            &EventAst::FireWeapon => { }
-            &EventAst::FireProjectile => { }
-            &EventAst::Item1F { .. } => { }
-            &EventAst::ItemCreate { .. } => { }
-            &EventAst::ItemVisibility (_) => { }
-            &EventAst::ItemDelete => { }
-            &EventAst::BeamSwordTrail { .. } => { }
+            &EventAst::ItemPickup { .. } => {}
+            &EventAst::ItemThrow { .. } => {}
+            &EventAst::ItemThrow2 { .. } => {}
+            &EventAst::ItemDrop => {}
+            &EventAst::ItemConsume { .. } => {}
+            &EventAst::ItemSetProperty { .. } => {}
+            &EventAst::FireWeapon => {}
+            &EventAst::FireProjectile => {}
+            &EventAst::Item1F { .. } => {}
+            &EventAst::ItemCreate { .. } => {}
+            &EventAst::ItemVisibility(_) => {}
+            &EventAst::ItemDelete => {}
+            &EventAst::BeamSwordTrail { .. } => {}
 
             // do nothing
-            &EventAst::Unknown (ref event) => {
+            &EventAst::Unknown(ref event) => {
                 debug!("unknown event: {:#?}", event);
             }
-            &EventAst::Nop => { }
+            &EventAst::Nop => {}
         }
         StepEventResult::None
     }
 
+    #[rustfmt::skip]
     fn evaluate_expression(&mut self, expression: &Expression) -> ExprResult {
         match expression {
             &Expression::Nullary (ref requirement) => {
@@ -1364,44 +1559,56 @@ impl<'a> ScriptRunner<'a> {
 
     fn get_variable_int(&self, variable: &VariableAst) -> i32 {
         match variable.data_type() {
-            VariableDataType::Int   => self.get_variable_int_inner(variable),
+            VariableDataType::Int => self.get_variable_int_inner(variable),
             VariableDataType::Float => self.get_variable_float_inner(variable) as i32,
-            VariableDataType::Bool  => if self.get_variable_bool_inner(variable) { 1 } else { 0 },
+            VariableDataType::Bool => {
+                if self.get_variable_bool_inner(variable) {
+                    1
+                } else {
+                    0
+                }
+            }
             VariableDataType::Unknown { .. } => 0,
         }
     }
 
     fn get_variable_float(&self, variable: &VariableAst) -> f32 {
         match variable.data_type() {
-            VariableDataType::Int   => self.get_variable_int_inner(variable) as f32,
+            VariableDataType::Int => self.get_variable_int_inner(variable) as f32,
             VariableDataType::Float => self.get_variable_float_inner(variable),
-            VariableDataType::Bool  => if self.get_variable_bool_inner(variable) { 1.0 } else { 0.0 },
+            VariableDataType::Bool => {
+                if self.get_variable_bool_inner(variable) {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
             VariableDataType::Unknown { .. } => 0.0,
         }
     }
 
     fn get_float_value(&self, value: &FloatValue) -> f32 {
         match value {
-            FloatValue::Constant (value) => *value,
-            FloatValue::Variable (variable) => self.get_variable_float(variable),
+            FloatValue::Constant(value) => *value,
+            FloatValue::Variable(variable) => self.get_variable_float(variable),
         }
     }
 
     fn set_variable_int(&mut self, variable: &VariableAst, value: i32) {
         match variable.data_type() {
-            VariableDataType::Int   => self.set_variable_int_inner(variable, value),
+            VariableDataType::Int => self.set_variable_int_inner(variable, value),
             VariableDataType::Float => self.set_variable_float_inner(variable, value as f32),
-            VariableDataType::Bool  => self.set_variable_bool_inner(variable, value != 0),
-            VariableDataType::Unknown { .. } => { }
+            VariableDataType::Bool => self.set_variable_bool_inner(variable, value != 0),
+            VariableDataType::Unknown { .. } => {}
         }
     }
 
     fn set_variable_float(&mut self, variable: &VariableAst, value: f32) {
         match variable.data_type() {
-            VariableDataType::Int   => self.set_variable_int_inner(variable, value as i32),
+            VariableDataType::Int => self.set_variable_int_inner(variable, value as i32),
             VariableDataType::Float => self.set_variable_float_inner(variable, value),
-            VariableDataType::Bool  => self.set_variable_bool_inner(variable, value != 0.0),
-            VariableDataType::Unknown { .. } => { }
+            VariableDataType::Bool => self.set_variable_bool_inner(variable, value != 0.0),
+            VariableDataType::Unknown { .. } => {}
         }
     }
 
@@ -1627,53 +1834,72 @@ impl<'a> ScriptRunner<'a> {
 }
 
 enum StepEventResult<'a> {
-    WaitUntil      (f32),
-    NewForLoop     { block: &'a Block, iterations: i32 },
-    NewCall        { block: &'a Block },
-    NewIfStatement { then_branch: &'a Block, else_branch: Option<&'a Box<Block>>, execute: bool },
+    WaitUntil(f32),
+    NewForLoop {
+        block: &'a Block,
+        iterations: i32,
+    },
+    NewCall {
+        block: &'a Block,
+    },
+    NewIfStatement {
+        then_branch: &'a Block,
+        else_branch: Option<&'a Box<Block>>,
+        execute: bool,
+    },
     IfStatementDisableExecution,
-    Goto           { block: &'a Block, external: bool },
-    Subroutine     { block: &'a Block, external: bool },
-    CallEveryFrame { block: &'a Block, external: bool, thread_id: i32 },
+    Goto {
+        block: &'a Block,
+        external: bool,
+    },
+    Subroutine {
+        block: &'a Block,
+        external: bool,
+    },
+    CallEveryFrame {
+        block: &'a Block,
+        external: bool,
+        thread_id: i32,
+    },
     Return,
-    None
+    None,
 }
 
 pub struct CallEveryFrame<'a> {
-    pub block:    &'a Block,
+    pub block: &'a Block,
     pub external: bool,
 }
 
 #[derive(Debug)]
 enum ExprResult {
-    Int   (i32),
-    Float (f32),
-    Bool  (bool),
+    Int(i32),
+    Float(f32),
+    Bool(bool),
 }
 
 impl ExprResult {
     fn unwrap_bool(&self) -> bool {
         match self {
-            ExprResult::Bool  (result) => *result,
-            ExprResult::Int   (value)  => *value != 0,
-            ExprResult::Float (value)  => *value != 0.0,
+            ExprResult::Bool(result) => *result,
+            ExprResult::Int(value) => *value != 0,
+            ExprResult::Float(value) => *value != 0.0,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum VelModify {
-    Set (f32),
-    Add (f32),
+    Set(f32),
+    Add(f32),
     None,
 }
 
 impl VelModify {
     pub fn value(&self) -> f32 {
         match self {
-            VelModify::Set (a) => *a,
-            VelModify::Add (a) => *a,
-            VelModify::None    => 0.0,
+            VelModify::Set(a) => *a,
+            VelModify::Add(a) => *a,
+            VelModify::None => 0.0,
         }
     }
 }

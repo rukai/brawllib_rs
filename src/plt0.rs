@@ -1,8 +1,9 @@
 use fancy_slice::FancySlice;
 
-use crate::wii_texture_formats::WiiPaletteFormat;
 use crate::user_data::{UserData, UserDataValue};
+use crate::wii_texture_formats::WiiPaletteFormat;
 
+#[rustfmt::skip]
 pub(crate) fn plt0(data: FancySlice) -> Plt0 {
     let size               = data.i32_be(0x4);
     let version            = data.i32_be(0x8);
@@ -47,17 +48,17 @@ pub(crate) fn plt0(data: FancySlice) -> Plt0 {
 const PLT0_HEADER_SIZE: usize = 0x40;
 #[derive(Clone, Debug)]
 pub struct Plt0 {
-    pub name:         String,
+    pub name: String,
     pub pixel_format: WiiPaletteFormat,
-    pub user_data:    Vec<UserData>,
-    pub color_data:   Vec<u16>,
+    pub user_data: Vec<UserData>,
+    pub color_data: Vec<u16>,
     // TODO: Calculate this, what is it even pointing to?
     orig_path_offset: i32,
 }
 
 impl Plt0 {
     pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
-        let mut output = vec!();
+        let mut output = vec![];
 
         let size = PLT0_HEADER_SIZE + self.color_data.len() * 2;
         let version = if self.user_data.len() > 0 { 3 } else { 1 };

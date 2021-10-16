@@ -2,6 +2,7 @@ use fancy_slice::FancySlice;
 
 use crate::resources::Resource;
 
+#[rustfmt::skip]
 pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object> {
     let mut objects = vec!();
     for resource in resources {
@@ -79,6 +80,7 @@ pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object>
 
 const _OBJECT_SIZE: usize = 0x64;
 #[derive(Debug, Clone)]
+#[rustfmt::skip]
 pub struct Object {
     pub single_bind_node_id: Option<u32>,
 
@@ -188,7 +190,9 @@ impl Object {
         if index > 1 {
             None
         } else {
-            Some(XFDataFormat::new((self.vertex_format1 >> (index * 2 + 13)) & 0b11))
+            Some(XFDataFormat::new(
+                (self.vertex_format1 >> (index * 2 + 13)) & 0b11,
+            ))
         }
     }
 
@@ -196,7 +200,9 @@ impl Object {
         if index > 7 {
             None
         } else {
-            Some(XFDataFormat::new((self.vertex_format2 >> (index * 2)) & 0b11))
+            Some(XFDataFormat::new(
+                (self.vertex_format2 >> (index * 2)) & 0b11,
+            ))
         }
     }
 
@@ -224,11 +230,11 @@ pub enum XFDataFormat {
 impl XFDataFormat {
     fn new(value: u32) -> XFDataFormat {
         match value {
-             0 => XFDataFormat::None,
-             1 => XFDataFormat::Direct,
-             2 => XFDataFormat::Index8,
-             3 => XFDataFormat::Index16,
-             _ => panic!("Unknown XFDataFormat.")
+            0 => XFDataFormat::None,
+            1 => XFDataFormat::Direct,
+            2 => XFDataFormat::Index8,
+            3 => XFDataFormat::Index16,
+            _ => panic!("Unknown XFDataFormat."),
         }
     }
 }
@@ -243,10 +249,10 @@ pub enum XFNormalType {
 impl XFNormalType {
     fn new(value: u32) -> XFNormalType {
         match value {
-             0 => XFNormalType::None,
-             1 => XFNormalType::XYZ,
-             2 => XFNormalType::NBT,
-             _ => panic!("Unknown XFNormalType.")
+            0 => XFNormalType::None,
+            1 => XFNormalType::XYZ,
+            2 => XFNormalType::NBT,
+            _ => panic!("Unknown XFNormalType."),
         }
     }
 }
@@ -263,10 +269,10 @@ pub enum Modifier {
 impl Modifier {
     fn new(value: u32) -> Self {
         match value {
-             0 => Modifier::None,
-             1 => Modifier::ChangeCurrentMatrix,
-             2 => Modifier::Invisible,
-             _ => panic!("Unknown Modifier.")
+            0 => Modifier::None,
+            1 => Modifier::ChangeCurrentMatrix,
+            2 => Modifier::Invisible,
+            _ => panic!("Unknown Modifier."),
         }
     }
 }

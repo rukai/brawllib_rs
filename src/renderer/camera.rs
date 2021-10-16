@@ -1,5 +1,5 @@
-use std::f32::consts;
 use cgmath::Point3;
+use std::f32::consts;
 
 use crate::high_level_fighter::HighLevelSubaction;
 
@@ -22,14 +22,15 @@ impl Camera {
         subaction_extent.extend(&subaction.hit_box_extent());
         subaction_extent.extend(&subaction.ledge_grab_box_extent());
 
-        let extent_middle_y = (subaction_extent.up   + subaction_extent.down) / 2.0;
+        let extent_middle_y = (subaction_extent.up + subaction_extent.down) / 2.0;
         let extent_middle_z = (subaction_extent.left + subaction_extent.right) / 2.0;
-        let extent_height = subaction_extent.up    - subaction_extent.down;
-        let extent_width  = subaction_extent.right - subaction_extent.left;
+        let extent_height = subaction_extent.up - subaction_extent.down;
+        let extent_width = subaction_extent.right - subaction_extent.left;
         let extent_aspect = extent_width / extent_height;
         let aspect = width as f32 / height as f32;
 
-        let radius = (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
+        let radius =
+            (subaction_extent.up - extent_middle_y).max(subaction_extent.right - extent_middle_z);
         let fov = 40.0;
         let fov_rad = fov * consts::PI / 180.0;
 
@@ -38,8 +39,7 @@ impl Camera {
         // This logic probably only works because this.pixel_width >= this.pixel_height is always true
         if extent_aspect > aspect {
             camera_distance /= aspect;
-        }
-        else if extent_width > extent_height {
+        } else if extent_width > extent_height {
             camera_distance /= extent_aspect;
         }
 

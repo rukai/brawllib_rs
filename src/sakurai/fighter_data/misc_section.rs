@@ -3,6 +3,7 @@ use fancy_slice::FancySlice;
 
 use crate::util;
 
+#[rustfmt::skip]
 pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     let _unk0_offset          = data.i32_be(0);
     let final_smash_aura_list = util::list_offset(data.relative_fancy_slice(0x04..));
@@ -118,6 +119,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     }
 }
 
+#[rustfmt::skip]
 fn final_smash_aura(data: FancySlice) -> FinalSmashAura {
     let bone_index = data.i32_be(0x00);
     let x          = data.f32_be(0x04);
@@ -127,6 +129,7 @@ fn final_smash_aura(data: FancySlice) -> FinalSmashAura {
     FinalSmashAura { bone_index, x, y, width, height }
 }
 
+#[rustfmt::skip]
 fn hurtbox(data: FancySlice) -> HurtBox {
     let offset = Vector3::<f32>::new(
         data.f32_be(0x0),
@@ -171,6 +174,7 @@ fn hurtbox(data: FancySlice) -> HurtBox {
     }
 }
 
+#[rustfmt::skip]
 fn ledge_grab_box(data: FancySlice) -> LedgeGrabBox {
     let x_left     = data.f32_be(0x0);
     let y          = data.f32_be(0x4);
@@ -179,6 +183,7 @@ fn ledge_grab_box(data: FancySlice) -> LedgeGrabBox {
     LedgeGrabBox { x_left, y, x_padding, height }
 }
 
+#[rustfmt::skip]
 fn unk7(data: FancySlice) -> Unk7 {
     let unk1  = data.u8(0x00);
     let unk2  = data.u8(0x01);
@@ -242,7 +247,7 @@ pub struct HurtBox {
 pub enum HurtBoxZone {
     Low,
     Middle,
-    High
+    High,
 }
 
 /// The up most y value of the box = y + height
@@ -291,18 +296,17 @@ pub struct Unk7 {
 
 #[derive(Clone, Debug)]
 pub struct BoneRefs {
-    pub unk0:    i32,
-    pub unk1:    i32,
-    pub unk2:    i32,
-    pub unk3:    i32,
+    pub unk0: i32,
+    pub unk1: i32,
+    pub unk2: i32,
+    pub unk3: i32,
     pub trans_n: i32,
-    pub unk5:    i32,
-    pub unk6:    i32,
-    pub unk7:    i32,
-    pub unk8:    i32,
-    pub unk9:    i32,
+    pub unk5: i32,
+    pub unk6: i32,
+    pub unk7: i32,
+    pub unk8: i32,
+    pub unk9: i32,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct Crawl {
@@ -314,10 +318,10 @@ pub const ECB_SIZE: usize = 0x4; // TODO
 #[derive(Clone, Debug)]
 /// TODO: Currently just ECB type 0, maybe change to enum or maybe change the fields to Options
 pub struct ECB {
-    pub bones:      Vec<i32>,
+    pub bones: Vec<i32>,
     pub min_height: f32,
-    pub min_width:  f32,
-    pub unk:        f32, // Is this even part of the ecb, might just be padding...? always 0 and changing doesnt seem to do anything
+    pub min_width: f32,
+    pub unk: f32, // Is this even part of the ecb, might just be padding...? always 0 and changing doesnt seem to do anything
 }
 
 #[derive(Clone, Debug)]

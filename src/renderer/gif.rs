@@ -1,14 +1,13 @@
+use std::num::NonZeroU32;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
-use std::num::NonZeroU32;
 
 use crate::high_level_fighter::HighLevelFighter;
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::camera::Camera;
-use crate::renderer::wgpu_state::WgpuState;
 use crate::renderer::draw::draw_frame;
-
+use crate::renderer::wgpu_state::WgpuState;
 
 /// Returns a receiver of the bytes of a gif displaying hitbox and hurtboxes
 ///
@@ -16,7 +15,11 @@ use crate::renderer::draw::draw_frame;
 /// So if you are batch rendering gifs you will get a massive speedup by running multiple `render_gif`s concurrently.
 ///
 /// TODO: I should probably only expose a wrapper of this function that calls executor::block_on, so the user doesnt have to care about async
-pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Receiver<Vec<u8>> {
+pub async fn render_gif(
+    state: &mut WgpuState,
+    high_level_fighter: &HighLevelFighter,
+    subaction_index: usize,
+) -> Receiver<Vec<u8>> {
     // maximum dimensions for gifs on discord, larger values will result in one dimension being shrunk retaining aspect ratio
     // restricted to u16 because of the gif library we are using
     let width: u16 = 400;
@@ -30,15 +33,18 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
     // Spawns a thread that takes the rendered frames and quantizes the pixels into a paletted gif
     let subaction_len = subaction.frames.len();
     thread::spawn(move || {
-        let mut result = vec!();
+        let mut result = vec![];
         {
             let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
             for _ in 0..subaction_len {
                 let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
-                let gif_frame = gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
+                let gif_frame =
+                    gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
                 encoder.write_frame(&gif_frame).unwrap();
             }
-            encoder.write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite)).unwrap();
+            encoder
+                .write_extension(gif::ExtensionData::Repetitions(gif::Repeat::Infinite))
+                .unwrap();
         }
         gif_tx.send(result).unwrap();
     });
@@ -51,7 +57,7 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
         let framebuffer_extent = wgpu::Extent3d {
             width: width as u32,
             height: height as u32,
-            depth_or_array_layers: 1
+            depth_or_array_layers: 1,
         };
         let framebuffer_descriptor = &wgpu::TextureDescriptor {
             size: framebuffer_extent,
@@ -95,12 +101,28 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
                 offset: 0,
                 bytes_per_row: Some(NonZeroU32::new(padded_bytes_per_row).unwrap()),
                 rows_per_image: None,
-            }
+            },
         };
 
         let camera = Camera::new(subaction, width, height);
-        let mut command_encoder = draw_frame(state, &framebuffer.create_view(&wgpu::TextureViewDescriptor::default()), width as u32, height as u32, false, false, false, &InvulnerableType::Hit, subaction, frame_index, &camera); // 3.0ms
-        command_encoder.copy_texture_to_buffer(framebuffer_copy_view, framebuffer_out_copy_view, framebuffer_extent);
+        let mut command_encoder = draw_frame(
+            state,
+            &framebuffer.create_view(&wgpu::TextureViewDescriptor::default()),
+            width as u32,
+            height as u32,
+            false,
+            false,
+            false,
+            &InvulnerableType::Hit,
+            subaction,
+            frame_index,
+            &camera,
+        ); // 3.0ms
+        command_encoder.copy_texture_to_buffer(
+            framebuffer_copy_view,
+            framebuffer_out_copy_view,
+            framebuffer_extent,
+        );
         state.queue.submit(Some(command_encoder.finish()));
 
         let frames_tx = frames_tx.clone();
@@ -116,11 +138,15 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
                 for y in 1..height as usize {
                     let padded_offset = y * padded_bytes_per_row as usize;
                     let real_offset = y * real_bytes_per_row as usize;
-                    padded_buffer.copy_within(padded_offset..padded_offset+real_bytes_per_row as usize, real_offset)
+                    padded_buffer.copy_within(
+                        padded_offset..padded_offset + real_bytes_per_row as usize,
+                        real_offset,
+                    )
                 }
 
                 // send just the image data ignoring the padding at the end
-                let real_buffer = padded_buffer[0..real_bytes_per_row as usize * height as usize].to_vec();
+                let real_buffer =
+                    padded_buffer[0..real_bytes_per_row as usize * height as usize].to_vec();
                 frames_tx.send(real_buffer).unwrap();
             }
             Err(error) => panic!("map_read failed: {:?}", error),
@@ -131,7 +157,12 @@ pub async fn render_gif(state: &mut WgpuState, high_level_fighter: &HighLevelFig
 }
 
 /// Returns the bytes of a gif displaying hitbox and hurtboxes
-pub fn render_gif_blocking(state: &mut WgpuState, high_level_fighter: &HighLevelFighter, subaction_index: usize) -> Vec<u8> {
-    let gif_rx = futures::executor::block_on(render_gif(state, high_level_fighter, subaction_index));
+pub fn render_gif_blocking(
+    state: &mut WgpuState,
+    high_level_fighter: &HighLevelFighter,
+    subaction_index: usize,
+) -> Vec<u8> {
+    let gif_rx =
+        futures::executor::block_on(render_gif(state, high_level_fighter, subaction_index));
     gif_rx.recv().unwrap()
 }

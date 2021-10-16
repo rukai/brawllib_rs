@@ -9,7 +9,7 @@ pub enum JumpFlag {
 pub enum AddAddress {
     BaseAddress,
     PointerAddress,
-    None
+    None,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -25,24 +25,24 @@ pub enum GeckoOperation {
     ArithmeticShiftRight,
     FloatAdd,
     FloatMul,
-    Unknown (u8),
+    Unknown(u8),
 }
 
 impl GeckoOperation {
     pub(crate) fn new(value: u8) -> Self {
         match value {
-            0  => GeckoOperation::Add,
-            1  => GeckoOperation::Mul,
-            2  => GeckoOperation::Or,
-            3  => GeckoOperation::And,
-            4  => GeckoOperation::Xor,
-            5  => GeckoOperation::ShiftLeft,
-            6  => GeckoOperation::ShiftRight,
-            7  => GeckoOperation::RotateLeft,
-            8  => GeckoOperation::ArithmeticShiftRight,
+            00 => GeckoOperation::Add,
+            01 => GeckoOperation::Mul,
+            02 => GeckoOperation::Or,
+            03 => GeckoOperation::And,
+            04 => GeckoOperation::Xor,
+            05 => GeckoOperation::ShiftLeft,
+            06 => GeckoOperation::ShiftRight,
+            07 => GeckoOperation::RotateLeft,
+            08 => GeckoOperation::ArithmeticShiftRight,
             10 => GeckoOperation::FloatAdd,
             11 => GeckoOperation::FloatMul,
-            _  => GeckoOperation::Unknown (value),
+            _ => GeckoOperation::Unknown(value),
         }
     }
 }

@@ -1,10 +1,11 @@
-use cgmath::{Vector3, Matrix4};
+use cgmath::{Matrix4, Vector3};
 use fancy_slice::FancySlice;
 use std::iter::Iterator;
 
-use crate::resources;
 use crate::math;
+use crate::resources;
 
+#[rustfmt::skip]
 pub(crate) fn chr0(data: FancySlice) -> Chr0 {
     let size             = data.i32_be(0x4);
     let version          = data.i32_be(0x8);
@@ -78,15 +79,15 @@ pub struct Chr0 {
     num_children: u16,
     pub loop_value: bool,
     scaling_rule: i32,
-    pub children: Vec<Chr0Child>
+    pub children: Vec<Chr0Child>,
 }
 
 const CHR0_CHILD_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct Chr0Child {
     pub name: String,
-    pub scale:       KeyframeHolder,
-    pub rot:         KeyframeHolder,
+    pub scale: KeyframeHolder,
+    pub rot: KeyframeHolder,
     pub translation: KeyframeHolder,
     code: Chr0ChildCode,
 }
@@ -112,6 +113,7 @@ pub struct Chr0ChildCode {
     value: u32,
 }
 
+#[rustfmt::skip]
 impl Chr0ChildCode {
     fn new(value: u32) -> Chr0ChildCode {
         assert_eq!(value & 1, 1);
@@ -164,7 +166,7 @@ fn f(value: u32) -> Chr0Format {
         4 => Chr0Format::Linear1,
         5 => Chr0Format::Linear2,
         6 => Chr0Format::Linear4,
-        _ => unreachable!()
+        _ => unreachable!(),
     }
 }
 
@@ -179,7 +181,17 @@ pub enum Chr0Format {
     Linear4,
 }
 
-fn keyframe_holder(child_data: FancySlice, data_offset: &mut usize, exists: bool, isotropic: bool, fixed_x: bool, fixed_y: bool, fixed_z: bool, format: Chr0Format, num_frames: u16) -> KeyframeHolder {
+fn keyframe_holder(
+    child_data: FancySlice,
+    data_offset: &mut usize,
+    exists: bool,
+    isotropic: bool,
+    fixed_x: bool,
+    fixed_y: bool,
+    fixed_z: bool,
+    format: Chr0Format,
+    num_frames: u16,
+) -> KeyframeHolder {
     if !exists {
         KeyframeHolder::None
     } else if isotropic {
@@ -187,16 +199,24 @@ fn keyframe_holder(child_data: FancySlice, data_offset: &mut usize, exists: bool
             Keyframe::Fixed(child_data.f32_be(*data_offset))
         } else {
             let offset = child_data.u32_be(*data_offset);
-            keyframe(child_data.relative_fancy_slice(offset as usize ..), &format, num_frames)
+            keyframe(
+                child_data.relative_fancy_slice(offset as usize..),
+                &format,
+                num_frames,
+            )
         };
         *data_offset += 4;
-        KeyframeHolder::Isotropic (keyframe)
+        KeyframeHolder::Isotropic(keyframe)
     } else {
         let x = if fixed_x {
             Keyframe::Fixed(child_data.f32_be(*data_offset))
         } else {
             let offset = child_data.u32_be(*data_offset);
-            keyframe(child_data.relative_fancy_slice(offset as usize ..), &format, num_frames)
+            keyframe(
+                child_data.relative_fancy_slice(offset as usize..),
+                &format,
+                num_frames,
+            )
         };
         *data_offset += 4;
 
@@ -204,7 +224,11 @@ fn keyframe_holder(child_data: FancySlice, data_offset: &mut usize, exists: bool
             Keyframe::Fixed(child_data.f32_be(*data_offset))
         } else {
             let offset = child_data.u32_be(*data_offset);
-            keyframe(child_data.relative_fancy_slice(offset as usize ..), &format, num_frames)
+            keyframe(
+                child_data.relative_fancy_slice(offset as usize..),
+                &format,
+                num_frames,
+            )
         };
         *data_offset += 4;
 
@@ -212,7 +236,11 @@ fn keyframe_holder(child_data: FancySlice, data_offset: &mut usize, exists: bool
             Keyframe::Fixed(child_data.f32_be(*data_offset))
         } else {
             let offset = child_data.u32_be(*data_offset);
-            keyframe(child_data.relative_fancy_slice(offset as usize ..), &format, num_frames)
+            keyframe(
+                child_data.relative_fancy_slice(offset as usize..),
+                &format,
+                num_frames,
+            )
         };
         *data_offset += 4;
         KeyframeHolder::Individual { x, y, z }
@@ -221,70 +249,72 @@ fn keyframe_holder(child_data: FancySlice, data_offset: &mut usize, exists: bool
 
 #[derive(Clone, Debug)]
 pub enum KeyframeHolder {
-    Isotropic (Keyframe),
-    Individual { x: Keyframe, y: Keyframe, z: Keyframe },
+    Isotropic(Keyframe),
+    Individual {
+        x: Keyframe,
+        y: Keyframe,
+        z: Keyframe,
+    },
     None,
 }
 
 impl KeyframeHolder {
     pub fn get_value(&self, loop_value: bool, frame: i32, default: f32) -> Vector3<f32> {
         match self {
-            &KeyframeHolder::Isotropic (ref keyframe) => {
+            &KeyframeHolder::Isotropic(ref keyframe) => {
                 let value = keyframe.get_value(loop_value, frame);
                 Vector3::new(value, value, value)
             }
-            &KeyframeHolder::Individual { ref x, ref y, ref z } => {
-                Vector3::new(x.get_value(loop_value, frame), y.get_value(loop_value, frame), z.get_value(loop_value, frame))
-            }
-            &KeyframeHolder::None => Vector3::new(default, default, default)
+            &KeyframeHolder::Individual {
+                ref x,
+                ref y,
+                ref z,
+            } => Vector3::new(
+                x.get_value(loop_value, frame),
+                y.get_value(loop_value, frame),
+                z.get_value(loop_value, frame),
+            ),
+            &KeyframeHolder::None => Vector3::new(default, default, default),
         }
     }
 }
 
 #[derive(Clone, Debug)]
 pub enum Keyframe {
-    Fixed (f32),
-    Interpolated4 (Interpolated4Header),
-    Interpolated6 (Interpolated6Header),
-    Interpolated12 (Interpolated12Header),
-    Linear1 (Linear1Header),
-    Linear2 (Linear2Header),
-    Linear4 (Vec<f32>),
+    Fixed(f32),
+    Interpolated4(Interpolated4Header),
+    Interpolated6(Interpolated6Header),
+    Interpolated12(Interpolated12Header),
+    Linear1(Linear1Header),
+    Linear2(Linear2Header),
+    Linear4(Vec<f32>),
 }
 
 impl Keyframe {
     pub fn get_value(&self, loop_value: bool, frame: i32) -> f32 {
         match self {
-            &Keyframe::Fixed(value) => {
-                value
-            }
+            &Keyframe::Fixed(value) => value,
             &Keyframe::Interpolated4(ref header) => {
-                let children = header.children.iter().map(|child| {
-                    InterpolatedNEntry {
-                        value: header.base + header.step * child.step() as f32,
-                        frame_index: child.frame_index() as i32,
-                        tangent: child.tangent() as f32
-                    }
+                let children = header.children.iter().map(|child| InterpolatedNEntry {
+                    value: header.base + header.step * child.step() as f32,
+                    frame_index: child.frame_index() as i32,
+                    tangent: child.tangent() as f32,
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
             &Keyframe::Interpolated6(ref header) => {
-                let children = header.children.iter().map(|child| {
-                    InterpolatedNEntry {
-                        value: header.base + header.step * child.step as f32,
-                        frame_index: child.frame_index(),
-                        tangent: child.tangent() as f32
-                    }
+                let children = header.children.iter().map(|child| InterpolatedNEntry {
+                    value: header.base + header.step * child.step as f32,
+                    frame_index: child.frame_index(),
+                    tangent: child.tangent() as f32,
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
             &Keyframe::Interpolated12(ref header) => {
-                let children = header.children.iter().map(|child| {
-                    InterpolatedNEntry {
-                        value:       child.value,
-                        frame_index: child.frame_index as i32,
-                        tangent:     child.tangent,
-                    }
+                let children = header.children.iter().map(|child| InterpolatedNEntry {
+                    value: child.value,
+                    frame_index: child.frame_index as i32,
+                    tangent: child.tangent,
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
@@ -306,19 +336,20 @@ impl Keyframe {
             &Keyframe::Linear2(ref header) => {
                 header.base + header.step * header.children_steps[frame as usize] as f32
             }
-            &Keyframe::Linear4(ref values) => {
-                values[frame as usize]
-            }
+            &Keyframe::Linear4(ref values) => values[frame as usize],
         }
     }
 
     /// to be generic we take InterpolatedNEntry's as we can convert all other formats to this format
-    fn get_value_interpolated_n_entry<I>(children: I, _loop_value: bool, frame: i32) -> f32 where I: Iterator<Item = InterpolatedNEntry> {
+    fn get_value_interpolated_n_entry<I>(children: I, _loop_value: bool, frame: i32) -> f32
+    where
+        I: Iterator<Item = InterpolatedNEntry>,
+    {
         // TODO: the loop flag is very rarely used (most looping actions such as run or wait dont even use it)
         //       But there is a seperate loop flag AnimationFlags which is used often. Maybe that should be used here?
         let mut prev_prev: Option<InterpolatedNEntry> = None; // the keyframe before the keyframe before the current frame
-        let mut prev:      Option<InterpolatedNEntry> = None; // the keyframe before the current frame
-        let mut next:      Option<InterpolatedNEntry> = None; // the keyframe after the current frame
+        let mut prev: Option<InterpolatedNEntry> = None; // the keyframe before the current frame
+        let mut next: Option<InterpolatedNEntry> = None; // the keyframe after the current frame
         let mut next_next: Option<InterpolatedNEntry> = None; // the keyframe after the keyframe after the current frame
 
         for child in children {
@@ -336,8 +367,7 @@ impl Keyframe {
             if child.frame_index >= frame {
                 if next.is_none() {
                     next = Some(child.clone());
-                }
-                else if next_next.is_none() {
+                } else if next_next.is_none() {
                     next_next = Some(child.clone());
                 }
             }
@@ -345,8 +375,7 @@ impl Keyframe {
                 if let Some(inner_prev) = prev {
                     prev = Some(child);
                     prev_prev = Some(inner_prev);
-                }
-                else {
+                } else {
                     prev = Some(child)
                 }
             }
@@ -366,9 +395,18 @@ impl Keyframe {
                     false
                 };
 
-                let double_value = (next.value - prev.value) / (next.frame_index - prev.frame_index) as f32;
-                let prev_tangent = if one_apart || prev_double { double_value } else { prev.tangent };
-                let next_tangent = if one_apart || next_double { double_value } else { next.tangent };
+                let double_value =
+                    (next.value - prev.value) / (next.frame_index - prev.frame_index) as f32;
+                let prev_tangent = if one_apart || prev_double {
+                    double_value
+                } else {
+                    prev.tangent
+                };
+                let next_tangent = if one_apart || next_double {
+                    double_value
+                } else {
+                    next.tangent
+                };
 
                 // Interpolate using a hermite curve
                 let value_diff = next.value - prev.value;
@@ -383,16 +421,16 @@ impl Keyframe {
                     let time = offset as f32 / span as f32;
                     let time_inv = time - 1.0;
                     let result = prev.value
-                        + (offset as f32 * time_inv * (time_inv * prev_tangent + time * next_tangent))
+                        + (offset as f32
+                            * time_inv
+                            * (time_inv * prev_tangent + time * next_tangent))
                         + ((time * time) * (3.0 - 2.0 * time) * value_diff);
 
                     result
                 }
             }
-            (Some(child), None) | (None, Some(child)) => {
-                child.value
-            }
-            (None, None) => unreachable!()
+            (Some(child), None) | (None, Some(child)) => child.value,
+            (None, None) => unreachable!(),
         };
         debug_assert!(result.is_finite());
         result
@@ -416,6 +454,7 @@ pub struct Interpolated4Entry {
     pub data: u32,
 }
 
+#[rustfmt::skip]
 impl Interpolated4Entry {
     pub fn frame_index(&self) -> u8  { ((self.data & 0xFF00_0000) >> 24) as u8 }
     pub fn step       (&self) -> u16 { ((self.data & 0x00FF_F000) >> 12) as u16 }
@@ -451,8 +490,12 @@ pub struct Interpolated6Entry {
 }
 
 impl Interpolated6Entry {
-    pub fn frame_index(&self) -> i32 { (self.frame_index >> 5) as i32 }
-    pub fn tangent    (&self) -> f32 { self.tangent as f32 / 256.0 }
+    pub fn frame_index(&self) -> i32 {
+        (self.frame_index >> 5) as i32
+    }
+    pub fn tangent(&self) -> f32 {
+        self.tangent as f32 / 256.0
+    }
 }
 
 const INTERPOLATED_12_HEADER_SIZE: usize = 0x8;
@@ -498,6 +541,7 @@ pub struct Linear2Header {
 const LINEAR_2_ENTRY_SIZE: usize = 0x2;
 const LINEAR_4_ENTRY_SIZE: usize = 0x4;
 
+#[rustfmt::skip]
 fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe {
     match format {
         &Chr0Format::Interpolated4 => {

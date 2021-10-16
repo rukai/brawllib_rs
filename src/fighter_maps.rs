@@ -1,3 +1,4 @@
+#[rustfmt::skip]
 pub fn fighter_name(name: &str) -> String {
     match name {
         "Captain"        => String::from("Captain Falcon"),
@@ -52,6 +53,7 @@ pub fn fighter_name(name: &str) -> String {
     }
 }
 
+#[rustfmt::skip]
 pub fn fighter_id(name: &str) -> Option<u8> {
     match name {
         "Captain"        => Some(0x09),

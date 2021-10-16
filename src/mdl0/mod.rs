@@ -1,23 +1,24 @@
 pub mod bones;
+pub mod definitions;
+pub mod objects;
 pub mod palettes;
 pub mod textures;
 pub mod vertices;
-pub mod objects;
-pub mod definitions;
 
 use fancy_slice::FancySlice;
 
-use crate::resources::Resource;
-use crate::resources;
-use crate::mbox::MBox;
 use crate::mbox;
+use crate::mbox::MBox;
+use crate::resources;
+use crate::resources::Resource;
+use bones::Bone;
+use definitions::Definitions;
+use objects::Object;
 use palettes::Palette;
 use textures::Texture;
 use vertices::Vertices;
-use bones::Bone;
-use objects::Object;
-use definitions::Definitions;
 
+#[rustfmt::skip]
 pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
     let _size        = data.i32_be(0x4);
     let version      = data.i32_be(0x8);
@@ -154,7 +155,7 @@ pub struct Mdl0 {
 
 impl Mdl0 {
     pub fn compile(&self, bres_offset: i32) -> Vec<u8> {
-        let mut output = vec!();
+        let mut output = vec![];
 
         // create mdl0 header
         output.extend("MDL0".chars().map(|x| x as u8));
@@ -168,13 +169,13 @@ impl Mdl0 {
             0x09 => 0x40,
             0x0A => 0x48,
             0x0B => 0x4C,
-            _    => panic!("Unknown MDL0 version"),
+            _ => panic!("Unknown MDL0 version"),
         };
 
         let num_props = match (&self.fur_vectors, &self.fur_layer_coords) {
             (Some(_), Some(_)) => 0xD,
-            (None, None)       => 0xB,
-            _                  => panic!("Can't have just one of the fur fields set to Some(_)"),
+            (None, None) => 0xB,
+            _ => panic!("Can't have just one of the fur fields set to Some(_)"),
         };
 
         let header_size = props_offset + num_props;
@@ -222,7 +223,7 @@ impl Mdl0 {
         }
 
         // TODO: What is the data here???
-        output.extend(&vec!(0x00; 0x8));
+        output.extend(&vec![0x00; 0x8]);
 
         output.extend(definitions);
 

@@ -1,6 +1,7 @@
 use fancy_slice::FancySlice;
 
 // ResourceGroup in brawlbox
+#[rustfmt::skip]
 pub(crate) fn resources(data: FancySlice) -> Vec<Resource> {
     let total_size   = data.i32_be(0);
     let num_children = data.i32_be(4);
@@ -31,7 +32,7 @@ pub(crate) const RESOURCE_HEADER_SIZE: usize = 0x8;
 pub(crate) const RESOURCE_SIZE: usize = 0x10;
 #[derive(Clone, Debug)]
 pub struct Resource {
-    flag:            u16,
+    flag: u16,
     pub data_offset: i32,
-    pub string:      String,
+    pub string: String,
 }

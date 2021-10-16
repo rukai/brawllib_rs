@@ -1,7 +1,7 @@
 use fancy_slice::FancySlice;
 
-use crate::resources::Resource;
 use crate::resources;
+use crate::resources::Resource;
 
 #[derive(Clone, Debug)]
 pub struct Definitions {
@@ -10,15 +10,19 @@ pub struct Definitions {
 
 impl Definitions {
     pub fn compile(&self) -> Vec<u8> {
-        let mut output = vec!();
+        let mut output = vec![];
 
         // create resources header
-        let resources_size = (self.values.len() + 1) * resources::RESOURCE_SIZE + resources::RESOURCE_HEADER_SIZE; // includes the dummy child
+        let resources_size =
+            (self.values.len() + 1) * resources::RESOURCE_SIZE + resources::RESOURCE_HEADER_SIZE; // includes the dummy child
         output.extend(&i32::to_be_bytes(resources_size as i32));
         output.extend(&i32::to_be_bytes(self.values.len() as i32)); // num_children
 
         // insert the dummy child
-        output.extend(&[0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        output.extend(&[
+            0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ]);
 
         //let data_offset = 0; // TODO
 
@@ -35,6 +39,7 @@ impl Definitions {
     }
 }
 
+#[rustfmt::skip]
 pub(crate) fn definitions(data: FancySlice, resources: Vec<Resource>) -> Definitions {
     let mut definitions = vec!();
     for resource in resources {
@@ -61,7 +66,7 @@ pub(crate) fn definitions(data: FancySlice, resources: Vec<Resource>) -> Definit
 
 impl Definition {
     pub fn compile(&self) -> Vec<u8> {
-        let output = vec!();
+        let output = vec![];
 
         output
     }

@@ -1,14 +1,14 @@
 use std::sync::mpsc::{channel, Sender};
 
+use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
-use winit::event::Event;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
-use crate::renderer::wgpu_state::{WgpuState, CompatibleSurface};
-use crate::renderer::draw::draw_frame;
 use crate::renderer::camera::Camera;
+use crate::renderer::draw::draw_frame;
+use crate::renderer::wgpu_state::{CompatibleSurface, WgpuState};
 
 pub mod state;
 
@@ -32,10 +32,10 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 /// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: HighLevelSubaction) {
-    use winit::platform::web::WindowExtWebSys;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
     use web_sys::HtmlElement;
+    use winit::platform::web::WindowExtWebSys;
 
     let event_loop = EventLoop::new();
     let window = Window::new(&event_loop).unwrap();
@@ -43,7 +43,9 @@ pub async fn render_window_wasm(subaction: HighLevelSubaction) {
     let document = web_sys::window().unwrap().document().unwrap();
 
     let visualiser_span = document.get_element_by_id("visualiser").unwrap();
-    visualiser_span.append_child(&web_sys::Element::from(window.canvas())).unwrap();
+    visualiser_span
+        .append_child(&web_sys::Element::from(window.canvas()))
+        .unwrap();
 
     let mut app = App::new(window, subaction).await;
     let event_tx = app.get_event_tx();
@@ -51,25 +53,23 @@ pub async fn render_window_wasm(subaction: HighLevelSubaction) {
     let button = document.get_element_by_id("run").unwrap();
     let button_move = button.clone();
     button_move.set_inner_html("Run");
-    let do_thing = Closure::wrap(
-        Box::new(move || {
-            if button_move.inner_html() == "Stop" {
-                event_tx.send(AppEvent::SetState(State::Pause)).unwrap();
-                button_move.set_inner_html("Run");
-            }
-            else {
-                event_tx.send(AppEvent::SetState(State::Play)).unwrap();
-                button_move.set_inner_html("Stop");
-            }
-        }) as Box<dyn FnMut()>
-    );
+    let do_thing = Closure::wrap(Box::new(move || {
+        if button_move.inner_html() == "Stop" {
+            event_tx.send(AppEvent::SetState(State::Pause)).unwrap();
+            button_move.set_inner_html("Run");
+        } else {
+            event_tx.send(AppEvent::SetState(State::Play)).unwrap();
+            button_move.set_inner_html("Stop");
+        }
+    }) as Box<dyn FnMut()>);
     button
         .dyn_ref::<HtmlElement>()
         .unwrap()
         .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
 
-
-    app.get_event_tx().send(AppEvent::SetState(State::Pause)).unwrap();
+    app.get_event_tx()
+        .send(AppEvent::SetState(State::Pause))
+        .unwrap();
     event_loop.run(move |event, _, control_flow| {
         app.update(event, control_flow);
     });
@@ -117,7 +117,16 @@ impl App {
         let (event_tx, event_rx) = channel();
         let app_state = AppState::new(camera, event_rx);
 
-        App { wgpu_state, app_state, input, _window, surface, surface_configuration, subaction, event_tx }
+        App {
+            wgpu_state,
+            app_state,
+            input,
+            _window,
+            surface,
+            surface_configuration,
+            subaction,
+            event_tx,
+        }
     }
 
     pub fn get_event_tx(&self) -> Sender<AppEvent> {
@@ -135,13 +144,16 @@ impl App {
             if let Some(size) = self.input.window_resized() {
                 self.surface_configuration.width = size.width;
                 self.surface_configuration.height = size.height;
-                self.surface.configure(&self.wgpu_state.device, &self.surface_configuration);
+                self.surface
+                    .configure(&self.wgpu_state.device, &self.surface_configuration);
             }
 
             let frame = self.surface.get_current_texture().unwrap();
             let command_encoder = draw_frame(
                 &mut self.wgpu_state,
-                &frame.texture.create_view(&wgpu::TextureViewDescriptor::default()),
+                &frame
+                    .texture
+                    .create_view(&wgpu::TextureViewDescriptor::default()),
                 self.surface_configuration.width,
                 self.surface_configuration.height,
                 self.app_state.perspective,

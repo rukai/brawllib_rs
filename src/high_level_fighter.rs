@@ -1,41 +1,31 @@
-use cgmath::{Point3, Vector3, Matrix4, SquareMatrix, Transform, Matrix};
+use cgmath::{Matrix, Matrix4, Point3, SquareMatrix, Transform, Vector3};
 use rayon::prelude::*;
 
 use crate::chr0::Chr0;
 use crate::fighter::Fighter;
-use crate::mdl0::bones::Bone;
-use crate::sakurai::{SectionScript, ExternalSubroutine};
-use crate::sakurai::fighter_data::misc_section::{HurtBox, BoneRefs};
-use crate::sakurai::fighter_data::{FighterAttributes, AnimationFlags};
-use crate::script_ast::{
-    ScriptAst,
-    HitBoxArguments,
-    SpecialHitBoxArguments,
-    GrabBoxArguments,
-    HurtBoxState,
-    EdgeSlide,
-    AngleFlip,
-    HitBoxEffect,
-    HitBoxSound,
-    HitBoxSseType,
-    GrabTarget,
-    LedgeGrabEnable,
-};
-use crate::script_runner::{ScriptRunner, ChangeSubaction, ScriptCollisionBox, VelModify};
 use crate::init_hack_script::init_hack_script;
+use crate::mdl0::bones::Bone;
+use crate::sakurai::fighter_data::misc_section::{BoneRefs, HurtBox};
+use crate::sakurai::fighter_data::{AnimationFlags, FighterAttributes};
+use crate::sakurai::{ExternalSubroutine, SectionScript};
+use crate::script_ast::{
+    AngleFlip, EdgeSlide, GrabBoxArguments, GrabTarget, HitBoxArguments, HitBoxEffect, HitBoxSound,
+    HitBoxSseType, HurtBoxState, LedgeGrabEnable, ScriptAst, SpecialHitBoxArguments,
+};
+use crate::script_runner::{ChangeSubaction, ScriptCollisionBox, ScriptRunner, VelModify};
 
 /// The HighLevelFighter stores processed Fighter data in a format that is easy to read from.
 /// If brawllib_rs eventually implements the ability to modify character files via modifying Fighter and its children, then HighLevelFighter WILL NOT support that.
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelFighter {
-    pub name:                     String,
-    pub internal_name:            String,
-    pub attributes:               FighterAttributes,
-    pub actions:                  Vec<HighLevelAction>,
-    pub subactions:               Vec<HighLevelSubaction>,
+    pub name: String,
+    pub internal_name: String,
+    pub attributes: FighterAttributes,
+    pub actions: Vec<HighLevelAction>,
+    pub subactions: Vec<HighLevelSubaction>,
     pub scripts_fragment_fighter: Vec<ScriptAst>,
-    pub scripts_fragment_common:  Vec<ScriptAst>,
-    pub scripts_section:          Vec<SectionScriptAst>,
+    pub scripts_fragment_common: Vec<ScriptAst>,
+    pub scripts_section: Vec<SectionScriptAst>,
 }
 
 impl HighLevelFighter {
@@ -54,23 +44,67 @@ impl HighLevelFighter {
         let attributes = fighter_data.attributes.clone();
         let fighter_animations = fighter.get_animations();
 
-        let fragment_scripts_fighter: Vec<_> = fighter_sakurai.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_main:           Vec<_> = fighter_data.subaction_main  .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_gfx:            Vec<_> = fighter_data.subaction_gfx   .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_sfx:            Vec<_> = fighter_data.subaction_sfx   .iter().map(|x| ScriptAst::new(x)).collect();
-        let subaction_other:          Vec<_> = fighter_data.subaction_other .iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_fighter: Vec<_> = fighter_sakurai
+            .fragment_scripts
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let subaction_main: Vec<_> = fighter_data
+            .subaction_main
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let subaction_gfx: Vec<_> = fighter_data
+            .subaction_gfx
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let subaction_sfx: Vec<_> = fighter_data
+            .subaction_sfx
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let subaction_other: Vec<_> = fighter_data
+            .subaction_other
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
 
-        let fragment_scripts_common: Vec<_> = fighter_sakurai_common.fragment_scripts.iter().map(|x| ScriptAst::new(x)).collect();
+        let fragment_scripts_common: Vec<_> = fighter_sakurai_common
+            .fragment_scripts
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
 
-        let scripts_section: Vec<_> = fighter_data_common_scripts.iter().map(|x| SectionScriptAst::new(x, &fighter_sakurai.external_subroutines)).collect();
+        let scripts_section: Vec<_> = fighter_data_common_scripts
+            .iter()
+            .map(|x| SectionScriptAst::new(x, &fighter_sakurai.external_subroutines))
+            .collect();
 
-        let entry_actions_common: Vec<_> = fighter_data_common.entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
-        let entry_actions:        Vec<_> = fighter_data       .entry_actions.iter().map(|x| ScriptAst::new(x)).collect();
-        let exit_actions_common:  Vec<_> = fighter_data_common.exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
-        let exit_actions:         Vec<_> = fighter_data       .exit_actions .iter().map(|x| ScriptAst::new(x)).collect();
+        let entry_actions_common: Vec<_> = fighter_data_common
+            .entry_actions
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let entry_actions: Vec<_> = fighter_data
+            .entry_actions
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let exit_actions_common: Vec<_> = fighter_data_common
+            .exit_actions
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
+        let exit_actions: Vec<_> = fighter_data
+            .exit_actions
+            .iter()
+            .map(|x| ScriptAst::new(x))
+            .collect();
 
-        let mut fighter_scripts = vec!();
-        for script in fragment_scripts_fighter.iter()
+        let mut fighter_scripts = vec![];
+        for script in fragment_scripts_fighter
+            .iter()
             .chain(subaction_main.iter())
             .chain(subaction_gfx.iter())
             .chain(subaction_sfx.iter())
@@ -81,8 +115,9 @@ impl HighLevelFighter {
             fighter_scripts.push(script);
         }
 
-        let mut common_scripts = vec!();
-        for script in fragment_scripts_common.iter()
+        let mut common_scripts = vec![];
+        for script in fragment_scripts_common
+            .iter()
             .chain(scripts_section.iter().map(|x| &x.script))
             .chain(entry_actions_common.iter())
             .chain(exit_actions_common.iter())
@@ -90,333 +125,405 @@ impl HighLevelFighter {
             common_scripts.push(script);
         }
 
-        let mut subaction_scripts = vec!();
+        let mut subaction_scripts = vec![];
         for i in 0..subaction_main.len() {
             subaction_scripts.push(HighLevelScripts {
-                script_main:  subaction_main[i].clone(),
-                script_gfx:   subaction_gfx[i].clone(),
-                script_sfx:   subaction_sfx[i].clone(),
+                script_main: subaction_main[i].clone(),
+                script_gfx: subaction_gfx[i].clone(),
+                script_sfx: subaction_sfx[i].clone(),
                 script_other: subaction_other[i].clone(),
             });
         }
 
-        let mut actions = vec!();
+        let mut actions = vec![];
         for i in 0..entry_actions_common.len() {
             let name = crate::action_names::action_name(i);
 
-            let entry_action_override = fighter_data.entry_action_overrides.iter().find(|x| x.action_id == i as u32);
-            let (script_entry, script_entry_common) = if let Some(action_override) = entry_action_override {
-                (ScriptAst::new(&action_override.script), false)
-            } else {
-                (entry_actions_common[i].clone(), true)
-            };
-            let exit_action_override = fighter_data.exit_action_overrides.iter().find(|x| x.action_id == i as u32);
-            let (script_exit, script_exit_common) = if let Some(action_override) = exit_action_override {
-                (ScriptAst::new(&action_override.script), false)
-            } else {
-                (exit_actions_common[i].clone(), true)
-            };
-            actions.push(HighLevelAction { name, script_entry, script_exit, script_entry_common, script_exit_common });
+            let entry_action_override = fighter_data
+                .entry_action_overrides
+                .iter()
+                .find(|x| x.action_id == i as u32);
+            let (script_entry, script_entry_common) =
+                if let Some(action_override) = entry_action_override {
+                    (ScriptAst::new(&action_override.script), false)
+                } else {
+                    (entry_actions_common[i].clone(), true)
+                };
+            let exit_action_override = fighter_data
+                .exit_action_overrides
+                .iter()
+                .find(|x| x.action_id == i as u32);
+            let (script_exit, script_exit_common) =
+                if let Some(action_override) = exit_action_override {
+                    (ScriptAst::new(&action_override.script), false)
+                } else {
+                    (exit_actions_common[i].clone(), true)
+                };
+            actions.push(HighLevelAction {
+                name,
+                script_entry,
+                script_exit,
+                script_entry_common,
+                script_exit_common,
+            });
         }
 
         for i in 0..entry_actions.len() {
             actions.push(HighLevelAction {
-                name:                crate::action_names::action_name(0x112 + i),
-                script_entry:        entry_actions[i].clone(),
+                name: crate::action_names::action_name(0x112 + i),
+                script_entry: entry_actions[i].clone(),
                 script_entry_common: false,
-                script_exit:         exit_actions[i].clone(),
-                script_exit_common:  false,
+                script_exit: exit_actions[i].clone(),
+                script_exit_common: false,
             });
         }
 
         let subactions = if let Some(first_bone) = fighter.get_bones() {
             // TODO: After fixing a bug, where a huge amount of needless work was being done, parallelizing this doesnt get us as much.
             // It might be better for the caller of HighLevelFighter::new() to do the parallelization.
-            subaction_scripts.into_par_iter().enumerate().map(|(i, scripts)| {
-                let subaction_flags = &fighter_data.subaction_flags[i];
-                let actual_name = subaction_flags.name.clone();
+            subaction_scripts
+                .into_par_iter()
+                .enumerate()
+                .map(|(i, scripts)| {
+                    let subaction_flags = &fighter_data.subaction_flags[i];
+                    let actual_name = subaction_flags.name.clone();
 
-                // create a unique name for this subaction
-                let mut count = 0;
-                for j in 0..i {
-                    if fighter_data.subaction_flags[j].name == actual_name {
-                        count += 1;
+                    // create a unique name for this subaction
+                    let mut count = 0;
+                    for j in 0..i {
+                        if fighter_data.subaction_flags[j].name == actual_name {
+                            count += 1;
+                        }
                     }
-                }
-                let name = if count == 0 {
-                    actual_name.clone()
-                } else {
-                    format!("{}_{}", actual_name, count)
-                };
-
-                let animation_flags = subaction_flags.animation_flags.clone();
-
-                let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
-                let subaction_scripts = vec!(&scripts.script_main, &scripts.script_gfx, &scripts.script_sfx, &scripts.script_other);
-                let init_hack_script = init_hack_script(&fighter.cased_name, &actual_name);
-
-                let mut frames: Vec<HighLevelFrame> = vec!();
-                let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
-                let mut script_runner = ScriptRunner::new(i, &fighter.wiird_frame_speed_modifiers, &subaction_scripts, &fighter_scripts, &common_scripts, &scripts_section, &init_hack_script, &fighter_data, actual_name.clone());
-                let mut iasa = None;
-                let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
-
-                if let Some(chr0) = chr0 {
-                    let num_frames = match actual_name.as_ref() {
-                        "JumpSquat"    => attributes.jump_squat_frames as f32,
-                        "LandingAirN"  => attributes.nair_landing_lag,
-                        "LandingAirF"  => attributes.fair_landing_lag,
-                        "LandingAirB"  => attributes.bair_landing_lag,
-                        "LandingAirHi" => attributes.uair_landing_lag,
-                        "LandingAirLw" => attributes.dair_landing_lag,
-                        "LandingLight" => attributes.light_landing_lag, // TODO: This needs +1 do the others?!?!?
-                        "LandingHeavy" => attributes.normal_landing_lag,
-                        _              => chr0.num_frames as f32
+                    let name = if count == 0 {
+                        actual_name.clone()
+                    } else {
+                        format!("{}_{}", actual_name, count)
                     };
 
-                    let mut x_vel = 0.0;
-                    let mut y_vel = 0.0;
+                    let animation_flags = subaction_flags.animation_flags.clone();
 
-                    let mut x_pos = 0.0;
-                    let mut y_pos = 0.0;
+                    let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
+                    let subaction_scripts = vec![
+                        &scripts.script_main,
+                        &scripts.script_gfx,
+                        &scripts.script_sfx,
+                        &scripts.script_other,
+                    ];
+                    let init_hack_script = init_hack_script(&fighter.cased_name, &actual_name);
 
-                    while script_runner.animation_index < num_frames {
-                        let chr0_frame_index = script_runner.animation_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
-                        let (animation_xyz_offset, frame_bones) = HighLevelFighter::transform_bones(
-                            &first_bone,
-                            &fighter_data.misc.bone_refs,
-                            Matrix4::<f32>::identity(),
-                            Matrix4::<f32>::identity(),
-                            chr0,
-                            chr0_frame_index as i32,
-                            animation_flags,
-                            fighter_data.attributes.size
-                        );
-                        let animation_xyz_offset = animation_xyz_offset.unwrap_or(Vector3::new(0.0, 0.0, 0.0));
-                        // TODO: should DisableMovement affect xyz_offset from transform_bones?????
-                        // script runner x-axis is equivalent to model z-axis
+                    let mut frames: Vec<HighLevelFrame> = vec![];
+                    let mut prev_animation_xyz_offset = Vector3::new(0.0, 0.0, 0.0);
+                    let mut script_runner = ScriptRunner::new(
+                        i,
+                        &fighter.wiird_frame_speed_modifiers,
+                        &subaction_scripts,
+                        &fighter_scripts,
+                        &common_scripts,
+                        &scripts_section,
+                        &init_hack_script,
+                        &fighter_data,
+                        actual_name.clone(),
+                    );
+                    let mut iasa = None;
+                    let mut prev_hit_boxes: Option<Vec<PositionHitBox>> = None;
 
-                        let animation_xyz_velocity = animation_xyz_offset - prev_animation_xyz_offset;
-                        prev_animation_xyz_offset = animation_xyz_offset;
+                    if let Some(chr0) = chr0 {
+                        let num_frames = match actual_name.as_ref() {
+                            "JumpSquat" => attributes.jump_squat_frames as f32,
+                            "LandingAirN" => attributes.nair_landing_lag,
+                            "LandingAirF" => attributes.fair_landing_lag,
+                            "LandingAirB" => attributes.bair_landing_lag,
+                            "LandingAirHi" => attributes.uair_landing_lag,
+                            "LandingAirLw" => attributes.dair_landing_lag,
+                            "LandingLight" => attributes.light_landing_lag, // TODO: This needs +1 do the others?!?!?
+                            "LandingHeavy" => attributes.normal_landing_lag,
+                            _ => chr0.num_frames as f32,
+                        };
 
-                        let x_vel_modify = script_runner.x_vel_modify.clone();
-                        let y_vel_modify = script_runner.y_vel_modify.clone();
+                        let mut x_vel = 0.0;
+                        let mut y_vel = 0.0;
 
-                        let x_vel_temp = animation_xyz_velocity.z;
-                        let y_vel_temp = animation_xyz_velocity.y;
+                        let mut x_pos = 0.0;
+                        let mut y_pos = 0.0;
 
-                        match x_vel_modify {
-                            VelModify::Set (vel) => x_vel = vel,
-                            VelModify::Add (vel) => x_vel += vel,
-                            VelModify::None      => { }
-                        }
+                        while script_runner.animation_index < num_frames {
+                            let chr0_frame_index =
+                                script_runner.animation_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
+                            let (animation_xyz_offset, frame_bones) =
+                                HighLevelFighter::transform_bones(
+                                    &first_bone,
+                                    &fighter_data.misc.bone_refs,
+                                    Matrix4::<f32>::identity(),
+                                    Matrix4::<f32>::identity(),
+                                    chr0,
+                                    chr0_frame_index as i32,
+                                    animation_flags,
+                                    fighter_data.attributes.size,
+                                );
+                            let animation_xyz_offset =
+                                animation_xyz_offset.unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+                            // TODO: should DisableMovement affect xyz_offset from transform_bones?????
+                            // script runner x-axis is equivalent to model z-axis
 
-                        match y_vel_modify {
-                            VelModify::Set (vel) => y_vel = vel,
-                            VelModify::Add (vel) => y_vel += vel,
-                            VelModify::None      => { }
-                        }
+                            let animation_xyz_velocity =
+                                animation_xyz_offset - prev_animation_xyz_offset;
+                            prev_animation_xyz_offset = animation_xyz_offset;
 
-                        x_pos += x_vel + x_vel_temp;
-                        y_pos += y_vel + y_vel_temp;
+                            let x_vel_modify = script_runner.x_vel_modify.clone();
+                            let y_vel_modify = script_runner.y_vel_modify.clone();
 
-                        let hurt_boxes = gen_hurt_boxes(&frame_bones, &fighter_data.misc.hurt_boxes, &script_runner, fighter_data.attributes.size);
-                        let hit_boxes: Vec<_> = script_runner.hitboxes.iter().filter(|x| x.is_some()).map(|x| x.clone().unwrap()).collect();
-                        let hit_boxes = gen_hit_boxes(&frame_bones, &hit_boxes, fighter_data.attributes.size);
-                        let mut hl_hit_boxes = vec!();
-                        for next in &hit_boxes {
-                            let mut prev_pos = None;
-                            let mut prev_size = None;
-                            let mut prev_values = None;
-                            if next.interpolate {
-                                if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
-                                    for prev_hit_box in prev_hit_boxes {
-                                        if prev_hit_box.hitbox_id == next.hitbox_id {
-                                            // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                            prev_pos = Some(prev_hit_box.hitbox_position - Vector3::new(0.0, y_vel, x_vel));
-                                            prev_size = Some(prev_hit_box.size);
-                                            prev_values = Some(prev_hit_box.values.clone());
+                            let x_vel_temp = animation_xyz_velocity.z;
+                            let y_vel_temp = animation_xyz_velocity.y;
+
+                            match x_vel_modify {
+                                VelModify::Set(vel) => x_vel = vel,
+                                VelModify::Add(vel) => x_vel += vel,
+                                VelModify::None => {}
+                            }
+
+                            match y_vel_modify {
+                                VelModify::Set(vel) => y_vel = vel,
+                                VelModify::Add(vel) => y_vel += vel,
+                                VelModify::None => {}
+                            }
+
+                            x_pos += x_vel + x_vel_temp;
+                            y_pos += y_vel + y_vel_temp;
+
+                            let hurt_boxes = gen_hurt_boxes(
+                                &frame_bones,
+                                &fighter_data.misc.hurt_boxes,
+                                &script_runner,
+                                fighter_data.attributes.size,
+                            );
+                            let hit_boxes: Vec<_> = script_runner
+                                .hitboxes
+                                .iter()
+                                .filter(|x| x.is_some())
+                                .map(|x| x.clone().unwrap())
+                                .collect();
+                            let hit_boxes = gen_hit_boxes(
+                                &frame_bones,
+                                &hit_boxes,
+                                fighter_data.attributes.size,
+                            );
+                            let mut hl_hit_boxes = vec![];
+                            for next in &hit_boxes {
+                                let mut prev_pos = None;
+                                let mut prev_size = None;
+                                let mut prev_values = None;
+                                if next.interpolate {
+                                    if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
+                                        for prev_hit_box in prev_hit_boxes {
+                                            if prev_hit_box.hitbox_id == next.hitbox_id {
+                                                // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
+                                                prev_pos = Some(
+                                                    prev_hit_box.hitbox_position
+                                                        - Vector3::new(0.0, y_vel, x_vel),
+                                                );
+                                                prev_size = Some(prev_hit_box.size);
+                                                prev_values = Some(prev_hit_box.values.clone());
+                                            }
                                         }
                                     }
                                 }
-                            }
 
-                            // abuse the hitbox interpolation fields to create stretch hitboxes
-                            if next.values.stretches_to_bone() {
-                                prev_pos = Some(next.bone_position);
-                                prev_size = Some(next.size);
-                                prev_values = Some(next.values.clone());
-                            }
+                                // abuse the hitbox interpolation fields to create stretch hitboxes
+                                if next.values.stretches_to_bone() {
+                                    prev_pos = Some(next.bone_position);
+                                    prev_size = Some(next.size);
+                                    prev_values = Some(next.values.clone());
+                                }
 
-                            hl_hit_boxes.push(HighLevelHitBox {
-                                hitbox_id: next.hitbox_id,
+                                hl_hit_boxes.push(HighLevelHitBox {
+                                    hitbox_id: next.hitbox_id,
 
-                                prev_pos,
-                                prev_size,
-                                prev_values,
+                                    prev_pos,
+                                    prev_size,
+                                    prev_values,
 
-                                next_pos:    next.hitbox_position,
-                                next_size:   next.size,
-                                next_values: next.values.clone(),
-                            });
-                        }
-                        hl_hit_boxes.sort_by_key(|x| x.hitbox_id);
-
-                        let mut option_ecb = None;
-                        for misc_ecb in &fighter_data.misc.ecbs {
-                            let min_ecb = ECB {
-                                // This implementation is just a guess from my observations that:
-                                // *    The higher the min_width the higher the right ecb point.
-                                // *    The higher the min_width the lower the left ecb point.
-                                // *    When further than all bones, both points move equally far apart.
-                                // *    When further than all bones, actions that affect the ecb horizontally no longer affect the ecb e.g. marth jab
-                                left:     -misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
-                                right:    misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
-                                top:      -10000.0,
-                                bottom:   10000.0,
-                                transn_x: 0.0,
-                                transn_y: 0.0,
-                            };
-                            let mut ecb = gen_ecb(&frame_bones, &misc_ecb.bones, &fighter_data.misc.bone_refs, min_ecb);
-
-                            // This implementation is just a guess from my observations that:
-                            // *    The higher the min_height the higher the top ecb point.
-                            // *    The higher the min_height the lower the bottom ecb point, capping out at transN.
-                            // *    Actions such as crouching, lower the height of the top ecb point.
-                            let middle_y = (ecb.top + ecb.bottom) / 2.0;
-                            let new_top    = middle_y + misc_ecb.min_height / 2.0;
-                            let new_bottom = middle_y - misc_ecb.min_height / 2.0;
-                            if new_top > ecb.top {
-                                ecb.top = new_top;
-                            }
-                            if new_bottom < ecb.bottom {
-                                ecb.bottom = new_bottom;
-                            }
-                            if ecb.bottom < ecb.transn_y {
-                                ecb.bottom = ecb.transn_y
-                            }
-
-                            option_ecb = Some(ecb);
-                        }
-                        let ecb = option_ecb.unwrap();
-
-                        let weight_dependent_speed = match actual_name.as_ref() {
-                            "ThrowLw" => attributes.weight_dependent_throw_down,
-                            "ThrowHi" => attributes.weight_dependent_throw_up,
-                            "ThrowF" => attributes.weight_dependent_throw_forward,
-                            "ThrowB" => attributes.weight_dependent_throw_backward,
-                            _        => false,
-                        };
-
-                        let mut throw = None;
-                        if let Some(ref specify_throw) = script_runner.throw {
-                            if script_runner.throw_activate {
-                                throw = Some(HighLevelThrow {
-                                    damage:      specify_throw.damage,
-                                    trajectory:  specify_throw.trajectory,
-                                    kbg:         specify_throw.kbg,
-                                    wdsk:        specify_throw.wdsk,
-                                    bkb:         specify_throw.bkb,
-                                    effect:      specify_throw.effect.clone(),
-                                    sfx:         specify_throw.sfx.clone(),
-                                    grab_target: specify_throw.grab_target.clone(),
-                                    i_frames:    specify_throw.i_frames,
-                                    weight_dependent_speed,
+                                    next_pos: next.hitbox_position,
+                                    next_size: next.size,
+                                    next_values: next.values.clone(),
                                 });
                             }
-                        }
+                            hl_hit_boxes.sort_by_key(|x| x.hitbox_id);
 
-                        let ledge_grab_box = if script_runner.ledge_grab_enable.enabled() {
-                            // The first misc.ledge_grabs entry seems to be used for everything, not sure what the other entries are for.
-                            if let Some(ledge_grab_box) = fighter_data.misc.ledge_grab_boxes.get(0) {
-                                let left = if let LedgeGrabEnable::EnableInFrontAndBehind = script_runner.ledge_grab_enable {
-                                    ecb.left - ledge_grab_box.x_padding
-                                } else {
-                                    ledge_grab_box.x_left
+                            let mut option_ecb = None;
+                            for misc_ecb in &fighter_data.misc.ecbs {
+                                let min_ecb = ECB {
+                                    // This implementation is just a guess from my observations that:
+                                    // *    The higher the min_width the higher the right ecb point.
+                                    // *    The higher the min_width the lower the left ecb point.
+                                    // *    When further than all bones, both points move equally far apart.
+                                    // *    When further than all bones, actions that affect the ecb horizontally no longer affect the ecb e.g. marth jab
+                                    left: -misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
+                                    right: misc_ecb.min_width / 2.0, // TODO: Should I divide by 2.0 here?
+                                    top: -10000.0,
+                                    bottom: 10000.0,
+                                    transn_x: 0.0,
+                                    transn_y: 0.0,
                                 };
+                                let mut ecb = gen_ecb(
+                                    &frame_bones,
+                                    &misc_ecb.bones,
+                                    &fighter_data.misc.bone_refs,
+                                    min_ecb,
+                                );
 
-                                Some(Extent {
-                                    left,
-                                    right:  ecb.right + ledge_grab_box.x_padding,
-                                    up:     ledge_grab_box.y + ledge_grab_box.height,
-                                    down:   ledge_grab_box.y,
-                                })
+                                // This implementation is just a guess from my observations that:
+                                // *    The higher the min_height the higher the top ecb point.
+                                // *    The higher the min_height the lower the bottom ecb point, capping out at transN.
+                                // *    Actions such as crouching, lower the height of the top ecb point.
+                                let middle_y = (ecb.top + ecb.bottom) / 2.0;
+                                let new_top = middle_y + misc_ecb.min_height / 2.0;
+                                let new_bottom = middle_y - misc_ecb.min_height / 2.0;
+                                if new_top > ecb.top {
+                                    ecb.top = new_top;
+                                }
+                                if new_bottom < ecb.bottom {
+                                    ecb.bottom = new_bottom;
+                                }
+                                if ecb.bottom < ecb.transn_y {
+                                    ecb.bottom = ecb.transn_y
+                                }
+
+                                option_ecb = Some(ecb);
+                            }
+                            let ecb = option_ecb.unwrap();
+
+                            let weight_dependent_speed = match actual_name.as_ref() {
+                                "ThrowLw" => attributes.weight_dependent_throw_down,
+                                "ThrowHi" => attributes.weight_dependent_throw_up,
+                                "ThrowF" => attributes.weight_dependent_throw_forward,
+                                "ThrowB" => attributes.weight_dependent_throw_backward,
+                                _ => false,
+                            };
+
+                            let mut throw = None;
+                            if let Some(ref specify_throw) = script_runner.throw {
+                                if script_runner.throw_activate {
+                                    throw = Some(HighLevelThrow {
+                                        damage: specify_throw.damage,
+                                        trajectory: specify_throw.trajectory,
+                                        kbg: specify_throw.kbg,
+                                        wdsk: specify_throw.wdsk,
+                                        bkb: specify_throw.bkb,
+                                        effect: specify_throw.effect.clone(),
+                                        sfx: specify_throw.sfx.clone(),
+                                        grab_target: specify_throw.grab_target.clone(),
+                                        i_frames: specify_throw.i_frames,
+                                        weight_dependent_speed,
+                                    });
+                                }
+                            }
+
+                            let ledge_grab_box = if script_runner.ledge_grab_enable.enabled() {
+                                // The first misc.ledge_grabs entry seems to be used for everything, not sure what the other entries are for.
+                                if let Some(ledge_grab_box) =
+                                    fighter_data.misc.ledge_grab_boxes.get(0)
+                                {
+                                    let left = if let LedgeGrabEnable::EnableInFrontAndBehind =
+                                        script_runner.ledge_grab_enable
+                                    {
+                                        ecb.left - ledge_grab_box.x_padding
+                                    } else {
+                                        ledge_grab_box.x_left
+                                    };
+
+                                    Some(Extent {
+                                        left,
+                                        right: ecb.right + ledge_grab_box.x_padding,
+                                        up: ledge_grab_box.y + ledge_grab_box.height,
+                                        down: ledge_grab_box.y,
+                                    })
+                                } else {
+                                    None
+                                }
                             } else {
                                 None
+                            };
+
+                            frames.push(HighLevelFrame {
+                                throw,
+                                ecb,
+                                x_pos,
+                                y_pos,
+                                x_vel_modify,
+                                y_vel_modify,
+                                x_vel_temp,
+                                y_vel_temp,
+                                ledge_grab_box,
+                                hurt_boxes,
+                                hit_boxes: hl_hit_boxes,
+                                interruptible: script_runner.interruptible,
+                                landing_lag: script_runner.landing_lag,
+                                edge_slide: script_runner.edge_slide.clone(),
+                                reverse_direction: script_runner.reverse_direction.clone(),
+                                airbourne: script_runner.airbourne,
+                                hitbox_sets_rehit: script_runner.hitbox_sets_rehit,
+                                slope_contour_stand: script_runner.slope_contour_stand,
+                                slope_contour_full: script_runner.slope_contour_full,
+                                rumble: script_runner.rumble,
+                                rumble_loop: script_runner.rumble_loop,
+                                grab_interrupt_damage: script_runner.grab_interrupt_damage,
+                            });
+
+                            if iasa.is_none() && script_runner.interruptible {
+                                iasa = Some(script_runner.frame_count)
                             }
-                        } else {
-                            None
-                        };
 
-                        frames.push(HighLevelFrame {
-                            throw,
-                            ecb,
-                            x_pos,
-                            y_pos,
-                            x_vel_modify,
-                            y_vel_modify,
-                            x_vel_temp,
-                            y_vel_temp,
-                            ledge_grab_box,
-                            hurt_boxes,
-                            hit_boxes:             hl_hit_boxes,
-                            interruptible:         script_runner.interruptible,
-                            landing_lag:           script_runner.landing_lag,
-                            edge_slide:            script_runner.edge_slide.clone(),
-                            reverse_direction:     script_runner.reverse_direction.clone(),
-                            airbourne:             script_runner.airbourne,
-                            hitbox_sets_rehit:     script_runner.hitbox_sets_rehit,
-                            slope_contour_stand:   script_runner.slope_contour_stand,
-                            slope_contour_full:    script_runner.slope_contour_full,
-                            rumble:                script_runner.rumble,
-                            rumble_loop:           script_runner.rumble_loop,
-                            grab_interrupt_damage: script_runner.grab_interrupt_damage,
-                        });
+                            script_runner.step();
+                            prev_hit_boxes = Some(hit_boxes);
 
-                        if iasa.is_none() && script_runner.interruptible {
-                            iasa = Some(script_runner.frame_count)
+                            if let ChangeSubaction::Continue = script_runner.change_subaction {
+                            } else {
+                                break;
+                            }
                         }
-
-                        script_runner.step();
-                        prev_hit_boxes = Some(hit_boxes);
-
-                        if let ChangeSubaction::Continue = script_runner.change_subaction { } else { break }
                     }
-                }
 
-                if iasa.is_none() {
-                    iasa = match actual_name.as_ref() {
-                        "LandingAirN"  | "LandingAirF" |
-                        "LandingAirB"  | "LandingAirHi" |
-                        "LandingAirLw" | "LandingLight" |
-                        "LandingHeavy" | "LandingFallSpecial"
-                          => Some(script_runner.frame_count),
-                        _ => None
+                    if iasa.is_none() {
+                        iasa = match actual_name.as_ref() {
+                            "LandingAirN" | "LandingAirF" | "LandingAirB" | "LandingAirHi"
+                            | "LandingAirLw" | "LandingLight" | "LandingHeavy"
+                            | "LandingFallSpecial" => Some(script_runner.frame_count),
+                            _ => None,
+                        }
+                    };
+
+                    let landing_lag = match actual_name.as_ref() {
+                        "AttackAirN" => Some(attributes.nair_landing_lag),
+                        "AttackAirF" => Some(attributes.fair_landing_lag),
+                        "AttackAirB" => Some(attributes.bair_landing_lag),
+                        "AttackAirHi" => Some(attributes.uair_landing_lag),
+                        "AttackAirLw" => Some(attributes.dair_landing_lag),
+                        _ => None,
+                    };
+
+                    let bad_interrupts = script_runner.bad_interrupts.len() > 0;
+
+                    HighLevelSubaction {
+                        name,
+                        iasa,
+                        landing_lag,
+                        frames,
+                        animation_flags,
+                        scripts,
+                        bad_interrupts,
                     }
-                };
-
-                let landing_lag = match actual_name.as_ref() {
-                    "AttackAirN"  => Some(attributes.nair_landing_lag),
-                    "AttackAirF"  => Some(attributes.fair_landing_lag),
-                    "AttackAirB"  => Some(attributes.bair_landing_lag),
-                    "AttackAirHi" => Some(attributes.uair_landing_lag),
-                    "AttackAirLw" => Some(attributes.dair_landing_lag),
-                    _             => None,
-                };
-
-                let bad_interrupts = script_runner.bad_interrupts.len() > 0;
-
-                HighLevelSubaction { name, iasa, landing_lag, frames, animation_flags, scripts, bad_interrupts }
-            }).collect()
+                })
+                .collect()
         } else {
-            vec!()
+            vec![]
         };
 
         HighLevelFighter {
-            internal_name:            fighter.cased_name.clone(),
-            name:                     crate::fighter_maps::fighter_name(&fighter.cased_name),
+            internal_name: fighter.cased_name.clone(),
+            name: crate::fighter_maps::fighter_name(&fighter.cased_name),
             scripts_fragment_fighter: fragment_scripts_fighter,
-            scripts_fragment_common:  fragment_scripts_common,
+            scripts_fragment_common: fragment_scripts_common,
             scripts_section,
             attributes,
             actions,
@@ -429,7 +536,16 @@ impl HighLevelFighter {
     /// Returns a tuple containing:
     ///     0.  The MOVES_CHARACTER offset if enabled. this is used by e.g. Ness's double jump
     ///     1.  The BoneTransforms tree.
-    fn transform_bones(bone: &Bone, bone_refs: &BoneRefs, parent_transform: Matrix4<f32>, parent_transform_hitbox: Matrix4<f32>, chr0: &Chr0, frame: i32, animation_flags: AnimationFlags, size: f32) -> (Option<Vector3<f32>>, BoneTransforms) {
+    fn transform_bones(
+        bone: &Bone,
+        bone_refs: &BoneRefs,
+        parent_transform: Matrix4<f32>,
+        parent_transform_hitbox: Matrix4<f32>,
+        chr0: &Chr0,
+        frame: i32,
+        animation_flags: AnimationFlags,
+        size: f32,
+    ) -> (Option<Vector3<f32>>, BoneTransforms) {
         let moves_character = animation_flags.contains(AnimationFlags::MOVES_CHARACTER);
 
         // by default the bones tpose transformation is used.
@@ -446,11 +562,11 @@ impl HighLevelFighter {
                     assert!(offset.is_none());
                     offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
                     // TODO: Should this case modify transform_normal rot and scale?
-                }
-                else {
+                } else {
                     // The animation specifies a transform for this bone, and its not used for character movement. USE IT!
                     transform_normal = transform;
-                    transform_hitbox = parent_transform_hitbox * chr0_child.get_transform_rot_only(chr0.loop_value, frame);
+                    transform_hitbox = parent_transform_hitbox
+                        * chr0_child.get_transform_rot_only(chr0.loop_value, frame);
                 }
             }
         }
@@ -463,9 +579,18 @@ impl HighLevelFighter {
         }
 
         // do the same for all children bones
-        let mut children = vec!();
+        let mut children = vec![];
         for child in bone.children.iter() {
-            let (moves, processed_child) = HighLevelFighter::transform_bones(child, bone_refs, transform_normal, transform_hitbox, chr0, frame, animation_flags, size);
+            let (moves, processed_child) = HighLevelFighter::transform_bones(
+                child,
+                bone_refs,
+                transform_normal,
+                transform_hitbox,
+                chr0,
+                frame,
+                animation_flags,
+                size,
+            );
             children.push(processed_child);
             if let Some(moves) = moves {
                 assert!(offset.is_none());
@@ -483,17 +608,17 @@ impl HighLevelFighter {
 }
 
 pub struct BoneTransforms {
-    pub index:            i32,
+    pub index: i32,
     pub transform_normal: Matrix4<f32>,
     pub transform_hitbox: Matrix4<f32>,
-    pub children:         Vec<BoneTransforms>,
+    pub children: Vec<BoneTransforms>,
 }
 
 #[derive(Serialize, Clone, Debug)]
 pub struct HighLevelAction {
-    pub name:         String,
+    pub name: String,
     pub script_entry: ScriptAst,
-    pub script_exit:  ScriptAst,
+    pub script_exit: ScriptAst,
     /// This is needed to determine where Goto/Subroutine events are pointing
     pub script_entry_common: bool,
     /// This is needed to determine where Goto/Subroutine events are pointing
@@ -502,14 +627,14 @@ pub struct HighLevelAction {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelSubaction {
-    pub name:            String,
-    pub iasa:            Option<usize>,
-    pub frames:          Vec<HighLevelFrame>,
-    pub landing_lag:     Option<f32>,
+    pub name: String,
+    pub iasa: Option<usize>,
+    pub frames: Vec<HighLevelFrame>,
+    pub landing_lag: Option<f32>,
     pub animation_flags: AnimationFlags,
-    pub scripts:         HighLevelScripts,
+    pub scripts: HighLevelScripts,
     /// A hack where bad interrupts are ignored was used to process this subaction
-    pub bad_interrupts:  bool,
+    pub bad_interrupts: bool,
 }
 
 impl HighLevelSubaction {
@@ -519,9 +644,9 @@ impl HighLevelSubaction {
         let mut extent = Extent::new();
         for frame in &self.frames {
             let mut new_extent = frame.hit_box_extent();
-            new_extent.up    += frame.y_pos;
-            new_extent.down  += frame.y_pos;
-            new_extent.left  += frame.x_pos;
+            new_extent.up += frame.y_pos;
+            new_extent.down += frame.y_pos;
+            new_extent.left += frame.x_pos;
             new_extent.right += frame.x_pos;
             extent.extend(&new_extent);
         }
@@ -534,9 +659,9 @@ impl HighLevelSubaction {
         let mut extent = Extent::new();
         for frame in &self.frames {
             let mut new_extent = frame.hurt_box_extent();
-            new_extent.up    += frame.y_pos;
-            new_extent.down  += frame.y_pos;
-            new_extent.left  += frame.x_pos;
+            new_extent.up += frame.y_pos;
+            new_extent.down += frame.y_pos;
+            new_extent.left += frame.x_pos;
             new_extent.right += frame.x_pos;
             extent.extend(&new_extent);
         }
@@ -550,9 +675,9 @@ impl HighLevelSubaction {
         for frame in &self.frames {
             if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
                 let mut new_extent = ledge_grab_box.clone();
-                new_extent.up    += frame.y_pos;
-                new_extent.down  += frame.y_pos;
-                new_extent.left  += frame.x_pos;
+                new_extent.up += frame.y_pos;
+                new_extent.down += frame.y_pos;
+                new_extent.left += frame.x_pos;
                 new_extent.right += frame.x_pos;
                 extent.extend(&new_extent);
             }
@@ -563,9 +688,9 @@ impl HighLevelSubaction {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelScripts {
-    pub script_main:  ScriptAst,
-    pub script_gfx:   ScriptAst,
-    pub script_sfx:   ScriptAst,
+    pub script_main: ScriptAst,
+    pub script_gfx: ScriptAst,
+    pub script_sfx: ScriptAst,
     pub script_other: ScriptAst,
 }
 
@@ -573,38 +698,38 @@ pub struct HighLevelScripts {
 pub struct HighLevelThrow {
     // TODO: I imagine the bone is used to determine the location the character is thrown from.
     // Transform the bone into an xy offset.
-    pub damage:                 i32,
-    pub trajectory:             i32,
-    pub kbg:                    i32,
-    pub wdsk:                   i32,
-    pub bkb:                    i32,
-    pub effect:                 HitBoxEffect,
-    pub sfx:                    HitBoxSound,
-    pub grab_target:            GrabTarget,
-    pub i_frames:               i32,
+    pub damage: i32,
+    pub trajectory: i32,
+    pub kbg: i32,
+    pub wdsk: i32,
+    pub bkb: i32,
+    pub effect: HitBoxEffect,
+    pub sfx: HitBoxSound,
+    pub grab_target: GrabTarget,
+    pub i_frames: i32,
     pub weight_dependent_speed: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HighLevelFrame {
-    pub hurt_boxes:            Vec<HighLevelHurtBox>,
-    pub hit_boxes:             Vec<HighLevelHitBox>,
-    pub ledge_grab_box:        Option<Extent>,
-    pub x_pos:                 f32,
-    pub y_pos:                 f32,
-    pub interruptible:         bool,
-    pub edge_slide:            EdgeSlide,
-    pub reverse_direction:     bool,
-    pub airbourne:             bool,
-    pub landing_lag:           bool,
-    pub ecb:                   ECB,
-    pub hitbox_sets_rehit:     [bool; 10],
-    pub slope_contour_stand:   Option<i32>,
-    pub slope_contour_full:    Option<(i32, i32)>,
-    pub rumble:                Option<(i32, i32)>,
-    pub rumble_loop:           Option<(i32, i32)>,
+    pub hurt_boxes: Vec<HighLevelHurtBox>,
+    pub hit_boxes: Vec<HighLevelHitBox>,
+    pub ledge_grab_box: Option<Extent>,
+    pub x_pos: f32,
+    pub y_pos: f32,
+    pub interruptible: bool,
+    pub edge_slide: EdgeSlide,
+    pub reverse_direction: bool,
+    pub airbourne: bool,
+    pub landing_lag: bool,
+    pub ecb: ECB,
+    pub hitbox_sets_rehit: [bool; 10],
+    pub slope_contour_stand: Option<i32>,
+    pub slope_contour_full: Option<(i32, i32)>,
+    pub rumble: Option<(i32, i32)>,
+    pub rumble_loop: Option<(i32, i32)>,
     pub grab_interrupt_damage: Option<i32>,
-    pub throw:                 Option<HighLevelThrow>,
+    pub throw: Option<HighLevelThrow>,
     /// Affects the next frames velocity
     pub x_vel_modify: VelModify,
     /// Affects the next frames velocity
@@ -622,9 +747,9 @@ impl HighLevelFrame {
         for hit_box in &self.hit_boxes {
             if let (Some(pos), Some(size)) = (hit_box.prev_pos, hit_box.prev_size) {
                 let new_extent = Extent {
-                    up:    pos.y + size,
-                    down:  pos.y - size,
-                    left:  pos.z - size,
+                    up: pos.y + size,
+                    down: pos.y - size,
+                    left: pos.z - size,
                     right: pos.z + size,
                 };
                 extent.extend(&new_extent);
@@ -633,9 +758,9 @@ impl HighLevelFrame {
             let pos = hit_box.next_pos;
             let size = hit_box.next_size;
             let new_extent = Extent {
-                up:    pos.y + size,
-                down:  pos.y - size,
-                left:  pos.z - size,
+                up: pos.y + size,
+                down: pos.y - size,
+                left: pos.z - size,
                 right: pos.z + size,
             };
             extent.extend(&new_extent);
@@ -659,7 +784,11 @@ impl HighLevelFrame {
     }
 
     /// https://stackoverflow.com/questions/4368961/calculating-an-aabb-for-a-transformed-sphere
-    fn sphere_extent(sphere_location: Vector3<f32>, radius: f32, transform: Matrix4<f32>) -> Extent {
+    fn sphere_extent(
+        sphere_location: Vector3<f32>,
+        radius: f32,
+        transform: Matrix4<f32>,
+    ) -> Extent {
         let scale = Matrix4::from_scale(radius);
         let transform = transform * Matrix4::from_translation(sphere_location.clone()) * scale;
 
@@ -669,9 +798,9 @@ impl HighLevelFrame {
             let r = transform * s_inverse * transform.transpose();
 
             Extent {
-                up:    (r.y.w - (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
-                down:  (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
-                left:  (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
+                up: (r.y.w - (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                down: (r.y.w + (r.y.w * r.y.w - r.w.w * r.y.y).sqrt()) / r.w.w,
+                left: (r.z.w + (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
                 right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
             }
         } else {
@@ -682,20 +811,20 @@ impl HighLevelFrame {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Extent {
-    pub left:  f32,
+    pub left: f32,
     pub right: f32,
-    pub up:    f32,
-    pub down:  f32,
+    pub up: f32,
+    pub down: f32,
     //pub extents: Vec<Extent>,
 }
 
 impl Extent {
     pub fn new() -> Extent {
         Extent {
-            left:  0.0,
+            left: 0.0,
             right: 0.0,
-            up:    0.0,
-            down:  0.0,
+            up: 0.0,
+            down: 0.0,
         }
     }
 
@@ -731,183 +860,186 @@ pub struct HighLevelHurtBox {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum CollisionBoxValues {
-    Hit (HitBoxValues),
-    Grab (GrabBoxValues),
+    Hit(HitBoxValues),
+    Grab(GrabBoxValues),
 }
 
 impl CollisionBoxValues {
     pub(crate) fn from_hitbox(args: &HitBoxArguments, damage: f32) -> CollisionBoxValues {
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_id:            args.hitbox_id,
-            set_id:               args.set_id,
-            damage:               damage,
-            trajectory:           args.trajectory,
-            wdsk:                 args.wdsk,
-            kbg:                  args.kbg,
-            shield_damage:        args.shield_damage,
-            bkb:                  args.bkb,
-            size:                 args.size,
-            tripping_rate:        args.tripping_rate,
-            hitlag_mult:          args.hitlag_mult,
-            sdi_mult:             args.sdi_mult,
-            effect:               args.effect.clone(),
-            sound_level:          args.sound_level,
-            sound:                args.sound.clone(),
-            ground:               args.ground,
-            aerial:               args.aerial,
-            sse_type:             args.sse_type.clone(),
-            clang:                args.clang,
-            direct:               args.direct,
-            rehit_rate:           0, // TODO: ?
-            angle_flipping:       AngleFlip::AttackerPosition,
-            stretches_to_bone:    false,
-            can_hit1:             true,
-            can_hit2:             true,
-            can_hit3:             true,
-            can_hit4:             true,
-            can_hit5:             true,
-            can_hit6:             true,
-            can_hit7:             true,
-            can_hit8:             true,
-            can_hit9:             true,
-            can_hit10:            true,
-            can_hit11:            true,
-            can_hit12:            true,
-            can_hit13:            true,
-            enabled:              true,
-            can_be_shielded:      true,
-            can_be_reflected:     false,
-            can_be_absorbed:      false,
-            remain_grabbed:       false,
+            hitbox_id: args.hitbox_id,
+            set_id: args.set_id,
+            damage,
+            trajectory: args.trajectory,
+            wdsk: args.wdsk,
+            kbg: args.kbg,
+            shield_damage: args.shield_damage,
+            bkb: args.bkb,
+            size: args.size,
+            tripping_rate: args.tripping_rate,
+            hitlag_mult: args.hitlag_mult,
+            sdi_mult: args.sdi_mult,
+            effect: args.effect.clone(),
+            sound_level: args.sound_level,
+            sound: args.sound.clone(),
+            ground: args.ground,
+            aerial: args.aerial,
+            sse_type: args.sse_type.clone(),
+            clang: args.clang,
+            direct: args.direct,
+            rehit_rate: 0, // TODO: ?
+            angle_flipping: AngleFlip::AttackerPosition,
+            stretches_to_bone: false,
+            can_hit1: true,
+            can_hit2: true,
+            can_hit3: true,
+            can_hit4: true,
+            can_hit5: true,
+            can_hit6: true,
+            can_hit7: true,
+            can_hit8: true,
+            can_hit9: true,
+            can_hit10: true,
+            can_hit11: true,
+            can_hit12: true,
+            can_hit13: true,
+            enabled: true,
+            can_be_shielded: true,
+            can_be_reflected: false,
+            can_be_absorbed: false,
+            remain_grabbed: false,
             ignore_invincibility: false,
             freeze_frame_disable: false,
-            flinchless:           false,
+            flinchless: false,
         })
     }
 
-    pub(crate) fn from_special_hitbox(special_args: &SpecialHitBoxArguments, damage: f32) -> CollisionBoxValues {
+    pub(crate) fn from_special_hitbox(
+        special_args: &SpecialHitBoxArguments,
+        damage: f32,
+    ) -> CollisionBoxValues {
         let args = &special_args.hitbox_args;
         CollisionBoxValues::Hit(HitBoxValues {
-            hitbox_id:            args.hitbox_id,
-            set_id:               args.set_id,
-            damage:               damage,
-            trajectory:           args.trajectory,
-            wdsk:                 args.wdsk,
-            kbg:                  args.kbg,
-            shield_damage:        args.shield_damage,
-            bkb:                  args.bkb,
-            size:                 args.size,
-            tripping_rate:        args.tripping_rate,
-            hitlag_mult:          args.hitlag_mult,
-            sdi_mult:             args.sdi_mult,
-            effect:               args.effect.clone(),
-            sound_level:          args.sound_level,
-            sound:                args.sound.clone(),
-            ground:               args.ground,
-            aerial:               args.aerial,
-            sse_type:             args.sse_type.clone(),
-            clang:                args.clang,
-            direct:               args.direct,
-            rehit_rate:           special_args.rehit_rate,
-            angle_flipping:       special_args.angle_flipping.clone(),
-            stretches_to_bone:    special_args.stretches_to_bone,
-            can_hit1:             special_args.can_hit1,
-            can_hit2:             special_args.can_hit2,
-            can_hit3:             special_args.can_hit3,
-            can_hit4:             special_args.can_hit4,
-            can_hit5:             special_args.can_hit5,
-            can_hit6:             special_args.can_hit6,
-            can_hit7:             special_args.can_hit7,
-            can_hit8:             special_args.can_hit8,
-            can_hit9:             special_args.can_hit9,
-            can_hit10:            special_args.can_hit10,
-            can_hit11:            special_args.can_hit11,
-            can_hit12:            special_args.can_hit12,
-            can_hit13:            special_args.can_hit13,
-            enabled:              special_args.enabled,
-            can_be_shielded:      special_args.can_be_shielded,
-            can_be_reflected:     special_args.can_be_reflected,
-            can_be_absorbed:      special_args.can_be_absorbed,
-            remain_grabbed:       special_args.remain_grabbed,
+            hitbox_id: args.hitbox_id,
+            set_id: args.set_id,
+            damage,
+            trajectory: args.trajectory,
+            wdsk: args.wdsk,
+            kbg: args.kbg,
+            shield_damage: args.shield_damage,
+            bkb: args.bkb,
+            size: args.size,
+            tripping_rate: args.tripping_rate,
+            hitlag_mult: args.hitlag_mult,
+            sdi_mult: args.sdi_mult,
+            effect: args.effect.clone(),
+            sound_level: args.sound_level,
+            sound: args.sound.clone(),
+            ground: args.ground,
+            aerial: args.aerial,
+            sse_type: args.sse_type.clone(),
+            clang: args.clang,
+            direct: args.direct,
+            rehit_rate: special_args.rehit_rate,
+            angle_flipping: special_args.angle_flipping.clone(),
+            stretches_to_bone: special_args.stretches_to_bone,
+            can_hit1: special_args.can_hit1,
+            can_hit2: special_args.can_hit2,
+            can_hit3: special_args.can_hit3,
+            can_hit4: special_args.can_hit4,
+            can_hit5: special_args.can_hit5,
+            can_hit6: special_args.can_hit6,
+            can_hit7: special_args.can_hit7,
+            can_hit8: special_args.can_hit8,
+            can_hit9: special_args.can_hit9,
+            can_hit10: special_args.can_hit10,
+            can_hit11: special_args.can_hit11,
+            can_hit12: special_args.can_hit12,
+            can_hit13: special_args.can_hit13,
+            enabled: special_args.enabled,
+            can_be_shielded: special_args.can_be_shielded,
+            can_be_reflected: special_args.can_be_reflected,
+            can_be_absorbed: special_args.can_be_absorbed,
+            remain_grabbed: special_args.remain_grabbed,
             ignore_invincibility: special_args.ignore_invincibility,
             freeze_frame_disable: special_args.freeze_frame_disable,
-            flinchless:           special_args.flinchless,
+            flinchless: special_args.flinchless,
         })
     }
 
     pub(crate) fn from_grabbox(args: &GrabBoxArguments) -> CollisionBoxValues {
         CollisionBoxValues::Grab(GrabBoxValues {
-            hitbox_id:  args.hitbox_id,
-            size:       args.size,
+            hitbox_id: args.hitbox_id,
+            size: args.size,
             set_action: args.set_action,
-            target:     args.target.clone(),
-            unk:        args.unk.clone(),
+            target: args.target.clone(),
+            unk: args.unk.clone(),
         })
     }
 
     pub(crate) fn stretches_to_bone(&self) -> bool {
         match self {
             CollisionBoxValues::Hit(values) => values.stretches_to_bone,
-            CollisionBoxValues::Grab(_)     => false,
+            CollisionBoxValues::Grab(_) => false,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct GrabBoxValues {
-    pub hitbox_id:  i32,
-    pub size:       f32,
+    pub hitbox_id: i32,
+    pub size: f32,
     pub set_action: i32,
-    pub target:     GrabTarget,
-    pub unk:        Option<i32>,
+    pub target: GrabTarget,
+    pub unk: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct HitBoxValues {
-    pub hitbox_id:            u8,
-    pub set_id:               u8,
-    pub damage:               f32,
-    pub trajectory:           i32,
-    pub wdsk:                 i16,
-    pub kbg:                  i16,
-    pub shield_damage:        i16,
-    pub bkb:                  i16,
-    pub size:                 f32,
-    pub tripping_rate:        f32,
-    pub hitlag_mult:          f32,
-    pub sdi_mult:             f32,
-    pub effect:               HitBoxEffect,
-    pub sound_level:          u8,
-    pub sound:                HitBoxSound,
-    pub ground:               bool,
-    pub aerial:               bool,
-    pub sse_type:             HitBoxSseType,
-    pub clang:                bool,
-    pub direct:               bool,
-    pub rehit_rate:           i32,
-    pub angle_flipping:       AngleFlip,
-    pub stretches_to_bone:    bool,
-    pub can_hit1:             bool,
-    pub can_hit2:             bool,
-    pub can_hit3:             bool,
-    pub can_hit4:             bool,
-    pub can_hit5:             bool,
-    pub can_hit6:             bool,
-    pub can_hit7:             bool,
-    pub can_hit8:             bool,
-    pub can_hit9:             bool,
-    pub can_hit10:            bool,
-    pub can_hit11:            bool,
-    pub can_hit12:            bool,
-    pub can_hit13:            bool,
-    pub enabled:              bool,
-    pub can_be_shielded:      bool,
-    pub can_be_reflected:     bool,
-    pub can_be_absorbed:      bool,
-    pub remain_grabbed:       bool,
+    pub hitbox_id: u8,
+    pub set_id: u8,
+    pub damage: f32,
+    pub trajectory: i32,
+    pub wdsk: i16,
+    pub kbg: i16,
+    pub shield_damage: i16,
+    pub bkb: i16,
+    pub size: f32,
+    pub tripping_rate: f32,
+    pub hitlag_mult: f32,
+    pub sdi_mult: f32,
+    pub effect: HitBoxEffect,
+    pub sound_level: u8,
+    pub sound: HitBoxSound,
+    pub ground: bool,
+    pub aerial: bool,
+    pub sse_type: HitBoxSseType,
+    pub clang: bool,
+    pub direct: bool,
+    pub rehit_rate: i32,
+    pub angle_flipping: AngleFlip,
+    pub stretches_to_bone: bool,
+    pub can_hit1: bool,
+    pub can_hit2: bool,
+    pub can_hit3: bool,
+    pub can_hit4: bool,
+    pub can_hit5: bool,
+    pub can_hit6: bool,
+    pub can_hit7: bool,
+    pub can_hit8: bool,
+    pub can_hit9: bool,
+    pub can_hit10: bool,
+    pub can_hit11: bool,
+    pub can_hit12: bool,
+    pub can_hit13: bool,
+    pub enabled: bool,
+    pub can_be_shielded: bool,
+    pub can_be_reflected: bool,
+    pub can_be_absorbed: bool,
+    pub remain_grabbed: bool,
     pub ignore_invincibility: bool,
     pub freeze_frame_disable: bool,
-    pub flinchless:           bool,
+    pub flinchless: bool,
 }
 
 impl HitBoxValues {
@@ -958,12 +1090,12 @@ impl HitBoxValues {
 
 #[derive(Clone, Debug)]
 struct PositionHitBox {
-    pub values:          CollisionBoxValues,
-    pub hitbox_id:       u8,
-    pub size:            f32,
-    pub interpolate:     bool,
+    pub values: CollisionBoxValues,
+    pub hitbox_id: u8,
+    pub size: f32,
+    pub interpolate: bool,
     pub hitbox_position: Point3<f32>,
-    pub bone_position:   Point3<f32>,
+    pub bone_position: Point3<f32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -971,21 +1103,21 @@ pub struct HighLevelHitBox {
     pub hitbox_id: u8,
 
     /// This value doesnt take into account the distance travelled by the character that HighLevelFighter doesnt know about e.g. due to velocity from previous subaction
-    pub prev_pos:    Option<Point3<f32>>,
-    pub prev_size:   Option<f32>,
+    pub prev_pos: Option<Point3<f32>>,
+    pub prev_size: Option<f32>,
     pub prev_values: Option<CollisionBoxValues>,
 
-    pub next_pos:    Point3<f32>,
-    pub next_size:   f32,
+    pub next_pos: Point3<f32>,
+    pub next_size: f32,
     pub next_values: CollisionBoxValues,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ECB {
-    pub left:     f32,
-    pub right:    f32,
-    pub top:      f32,
-    pub bottom:   f32,
+    pub left: f32,
+    pub right: f32,
+    pub top: f32,
+    pub bottom: f32,
     pub transn_x: f32,
     pub transn_y: f32,
 }
@@ -1021,21 +1153,30 @@ fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], bone_refs: &BoneRefs, mut e
     ecb
 }
 
-fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: &ScriptRunner, fighter_size: f32) -> Vec<HighLevelHurtBox> {
+fn gen_hurt_boxes(
+    bone: &BoneTransforms,
+    hurt_boxes: &[HurtBox],
+    script_runner: &ScriptRunner,
+    fighter_size: f32,
+) -> Vec<HighLevelHurtBox> {
     let hurtbox_state_all = &script_runner.hurtbox_state_all;
-    let hurtbox_states    = &script_runner.hurtbox_states;
-    let invisible_bones   = &script_runner.invisible_bones;
+    let hurtbox_states = &script_runner.hurtbox_states;
+    let invisible_bones = &script_runner.invisible_bones;
 
-    let mut hl_hurt_boxes = vec!();
+    let mut hl_hurt_boxes = vec![];
     for hurt_box in hurt_boxes {
         if bone.index == get_bone_index(hurt_box.bone_index as i32) {
             let state = if let Some(state) = hurtbox_states.get(&bone.index) {
                 state
             } else {
                 hurtbox_state_all
-            }.clone();
+            }
+            .clone();
 
-            if invisible_bones.iter().all(|x| get_bone_index(*x) != bone.index) {
+            if invisible_bones
+                .iter()
+                .all(|x| get_bone_index(*x) != bone.index)
+            {
                 let mut hurt_box = hurt_box.clone();
                 hurt_box.offset *= fighter_size;
                 hurt_box.stretch *= fighter_size;
@@ -1051,14 +1192,23 @@ fn gen_hurt_boxes(bone: &BoneTransforms, hurt_boxes: &[HurtBox], script_runner: 
     }
 
     for child in bone.children.iter() {
-        hl_hurt_boxes.extend(gen_hurt_boxes(child, hurt_boxes, script_runner, fighter_size));
+        hl_hurt_boxes.extend(gen_hurt_boxes(
+            child,
+            hurt_boxes,
+            script_runner,
+            fighter_size,
+        ));
     }
 
     hl_hurt_boxes
 }
 
-fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox], fighter_size: f32) -> Vec<PositionHitBox> {
-    let mut pos_hit_boxes = vec!();
+fn gen_hit_boxes(
+    bone: &BoneTransforms,
+    hit_boxes: &[ScriptCollisionBox],
+    fighter_size: f32,
+) -> Vec<PositionHitBox> {
+    let mut pos_hit_boxes = vec![];
     for hit_box in hit_boxes.iter() {
         if bone.index == get_bone_index(hit_box.bone_index as i32) {
             let offset = Point3::new(hit_box.x_offset, hit_box.y_offset, hit_box.z_offset);
@@ -1083,8 +1233,8 @@ fn gen_hit_boxes(bone: &BoneTransforms, hit_boxes: &[ScriptCollisionBox], fighte
             };
 
             pos_hit_boxes.push(PositionHitBox {
-                values:      hit_box.values.clone(),
-                hitbox_id:   hit_box.hitbox_id,
+                values: hit_box.values.clone(),
+                hitbox_id: hit_box.hitbox_id,
                 interpolate: hit_box.interpolate,
                 size,
                 hitbox_position,
@@ -1112,17 +1262,24 @@ pub fn get_bone_index(index: i32) -> i32 {
 
 #[derive(Serialize, Clone, Debug)]
 pub struct SectionScriptAst {
-    pub name:    String,
-    pub script:  ScriptAst,
+    pub name: String,
+    pub script: ScriptAst,
     pub callers: Vec<i32>,
 }
 
 impl SectionScriptAst {
-    fn new(section_script: &SectionScript, external_subroutines: &[ExternalSubroutine]) -> SectionScriptAst {
+    fn new(
+        section_script: &SectionScript,
+        external_subroutines: &[ExternalSubroutine],
+    ) -> SectionScriptAst {
         SectionScriptAst {
-            name:    section_script.name.clone(),
-            script:  ScriptAst::new(&section_script.script),
-            callers: external_subroutines.iter().find(|x| x.name == section_script.name).map(|x| x.offsets.clone()).unwrap_or_default(),
+            name: section_script.name.clone(),
+            script: ScriptAst::new(&section_script.script),
+            callers: external_subroutines
+                .iter()
+                .find(|x| x.name == section_script.name)
+                .map(|x| x.offsets.clone())
+                .unwrap_or_default(),
         }
     }
 }

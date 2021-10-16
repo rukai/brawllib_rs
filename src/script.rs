@@ -2,8 +2,13 @@ use fancy_slice::FancySlice;
 
 use crate::wii_memory::WiiMemory;
 
-pub(crate) fn scripts(parent_data: FancySlice, offset_data: FancySlice, num: usize, wii_memory: &WiiMemory) -> Vec<Script> {
-    let mut result = vec!();
+pub(crate) fn scripts(
+    parent_data: FancySlice,
+    offset_data: FancySlice,
+    num: usize,
+    wii_memory: &WiiMemory,
+) -> Vec<Script> {
+    let mut result = vec![];
     for i in 0..num {
         let offset = offset_data.u32_be(i * 4);
         result.push(new_script(parent_data, offset, wii_memory));
@@ -12,25 +17,36 @@ pub(crate) fn scripts(parent_data: FancySlice, offset_data: FancySlice, num: usi
 }
 
 /// finds any scripts that are pointed to by Goto's and Subroutines but dont exist yet.
-pub(crate) fn fragment_scripts(parent_data: FancySlice, known_scripts: &[&[Script]], ignore_origins: &[i32], wii_memory: &WiiMemory) -> Vec<Script> {
-    let mut fragments: Vec<Script> = vec!();
+pub(crate) fn fragment_scripts(
+    parent_data: FancySlice,
+    known_scripts: &[&[Script]],
+    ignore_origins: &[i32],
+    wii_memory: &WiiMemory,
+) -> Vec<Script> {
+    let mut fragments: Vec<Script> = vec![];
     for scripts in known_scripts.iter() {
         for script in scripts.iter() {
             for event in &script.events {
                 let mut found_offset = None;
-                if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) { // if the event is a subroutine or goto
-                    if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(0) {
+                if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) {
+                    // if the event is a subroutine or goto
+                    if let Some(Argument::Offset(Offset { offset, origin })) =
+                        event.arguments.get(0)
+                    {
                         if !ignore_origins.contains(origin) {
                             found_offset = Some(*offset);
                         }
                     }
 
-                    if let Some(Argument::Value (offset)) = event.arguments.get(0) {
+                    if let Some(Argument::Value(offset)) = event.arguments.get(0) {
                         found_offset = Some(*offset);
                     }
                 }
-                if event.namespace == 0x0D && (event.code == 0x00 || event.code == 0x05) { // if the event is a CallEveryFrame or IndependentSubroutine
-                    if let Some(Argument::Offset (Offset { offset, origin })) = event.arguments.get(1) {
+                if event.namespace == 0x0D && (event.code == 0x00 || event.code == 0x05) {
+                    // if the event is a CallEveryFrame or IndependentSubroutine
+                    if let Some(Argument::Offset(Offset { offset, origin })) =
+                        event.arguments.get(1)
+                    {
                         if !ignore_origins.contains(origin) {
                             found_offset = Some(*offset);
                         }
@@ -68,26 +84,33 @@ pub(crate) fn fragment_scripts(parent_data: FancySlice, known_scripts: &[&[Scrip
 
 pub fn new_script(parent_data: FancySlice, offset: u32, wii_memory: &WiiMemory) -> Script {
     let buffer = if offset == 0 || offset as i32 == -1 {
-        return Script { events: vec!(), offset: offset as i32 }
+        return Script {
+            events: vec![],
+            offset: offset as i32,
+        };
     } else if offset > 0 && offset < (parent_data.len() as u32) {
-        parent_data.relative_fancy_slice(offset as usize ..)
+        parent_data.relative_fancy_slice(offset as usize..)
     } else if offset < 0x8000_0000 {
-        return Script { events: vec!(), offset: offset as i32 }
+        return Script {
+            events: vec![],
+            offset: offset as i32,
+        };
     } else {
         wii_memory.fancy_slice_from(offset as usize)
     };
 
-    let mut events = vec!();
+    let mut events = vec![];
     let mut event_offset = 0;
     loop {
-        let namespace     = buffer.u8    (event_offset as usize);
-        let code          = buffer.u8    (event_offset as usize + 1);
-        let num_arguments = buffer.u8    (event_offset as usize + 2);
-        let unk1          = buffer.u8    (event_offset as usize + 3);
-        let raw_id        = buffer.u32_be(event_offset as usize);
+        let namespace = buffer.u8(event_offset as usize);
+        let code = buffer.u8(event_offset as usize + 1);
+        let num_arguments = buffer.u8(event_offset as usize + 2);
+        let unk1 = buffer.u8(event_offset as usize + 3);
+        let raw_id = buffer.u32_be(event_offset as usize);
 
-        if code == 0 && namespace == 0 { // end of script
-            break
+        if code == 0 && namespace == 0 {
+            // end of script
+            break;
         }
 
         // PSA fills empty space with these bytes:
@@ -113,9 +136,13 @@ pub fn new_script(parent_data: FancySlice, offset: u32, wii_memory: &WiiMemory) 
 
         event_offset += EVENT_SIZE as u32;
     }
-    Script { events, offset: offset as i32 }
+    Script {
+        events,
+        offset: offset as i32,
+    }
 }
 
+#[rustfmt::skip]
 fn arguments(data: FancySlice, origin: u32, num_arguments: usize) -> Vec<Argument> {
     let mut arguments = vec!();
     for i in 0..num_arguments as i32 {
@@ -182,14 +209,14 @@ impl Event {
 const ARGUMENT_SIZE: usize = 0x8;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Argument {
-    Value (i32),
-    Scalar (f32),
-    Offset (Offset),
-    Bool (bool),
-    File (i32),
-    Variable (Variable),
+    Value(i32),
+    Scalar(f32),
+    Offset(Offset),
+    Bool(bool),
+    File(i32),
+    Variable(Variable),
     Requirement { flip: bool, ty: Requirement },
-    Unknown (i32, i32)
+    Unknown(i32, i32),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -207,8 +234,8 @@ pub struct Offset {
 
 #[derive(Debug)]
 pub enum OffsetType {
-    Internal (i32),
-    External (String, ),
+    Internal(i32),
+    External(String),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -219,7 +246,7 @@ pub enum VariableMemoryType {
     LongtermAccess,
     /// Known as RA in existing tools
     RandomAccess,
-    Unknown (u8),
+    Unknown(u8),
 }
 
 impl VariableMemoryType {
@@ -228,7 +255,7 @@ impl VariableMemoryType {
             0 => VariableMemoryType::InternalConstant,
             1 => VariableMemoryType::LongtermAccess,
             2 => VariableMemoryType::RandomAccess,
-            _ => VariableMemoryType::Unknown (value),
+            _ => VariableMemoryType::Unknown(value),
         }
     }
 }
@@ -241,7 +268,7 @@ pub enum VariableDataType {
     Float,
     /// Known as Bit in existing tools
     Bool,
-    Unknown (u8)
+    Unknown(u8),
 }
 
 impl VariableDataType {
@@ -250,7 +277,7 @@ impl VariableDataType {
             0 => VariableDataType::Int,
             1 => VariableDataType::Float,
             2 => VariableDataType::Bool,
-            _ => VariableDataType::Unknown (value),
+            _ => VariableDataType::Unknown(value),
         }
     }
 }
@@ -326,7 +353,7 @@ pub enum Requirement {
     CanPickupAnotherItem,
     FSmashShortcut,
     TapJumpOn,
-    Unknown (u32)
+    Unknown(u32),
 }
 
 impl Requirement {
@@ -396,7 +423,7 @@ impl Requirement {
             0x2719 => Requirement::CanPickupAnotherItem,
             0x271D => Requirement::FSmashShortcut,
             0x2725 => Requirement::TapJumpOn,
-            v      => Requirement::Unknown (v),
+            v => Requirement::Unknown(v),
         };
         Argument::Requirement { ty, flip }
     }

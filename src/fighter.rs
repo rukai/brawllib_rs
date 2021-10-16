@@ -1,18 +1,18 @@
 use std::collections::HashMap;
-use std::fs::ReadDir;
 use std::fs;
+use std::fs::ReadDir;
 use std::path::Path;
 
 use rayon::prelude::*;
 
-use crate::arc::{Arc, ArcChildData};
 use crate::arc;
+use crate::arc::{Arc, ArcChildData};
 use crate::bres::BresChildData;
 use crate::chr0::Chr0;
 use crate::mdl0::bones::Bone;
 use crate::sakurai::fighter_data::ArcFighterData;
 use crate::sakurai::fighter_data_common::ArcFighterDataCommon;
-use crate::sakurai::{SectionData, SectionScript, ArcSakurai};
+use crate::sakurai::{ArcSakurai, SectionData, SectionScript};
 use crate::wii_memory::WiiMemory;
 
 use fancy_slice::FancySlice;
@@ -54,32 +54,52 @@ impl Fighter {
     ///
     /// If single_model is true then only one model for each fighter is loaded, otherwise all models are loaded.
     /// It's much faster to only process one model so set this to true if you only need one.
-    pub fn load(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>, common_fighter: &Arc, wii_memory: &WiiMemory, single_model: bool) -> Vec<Fighter> {
+    pub fn load(
+        brawl_fighter_dir: ReadDir,
+        mod_fighter_dir: Option<ReadDir>,
+        common_fighter: &Arc,
+        wii_memory: &WiiMemory,
+        single_model: bool,
+    ) -> Vec<Fighter> {
         // TODO: Could probably make this faster by beginning processing of a fighter_data immediately after it is read from disk.
         // However it might actually slow things down because all the threads are reading from disk at once.
         // Is there a way to stagger the threads so the next thread starts when the previous finishes reading from disk?
         // Will need to benchmark any such changes.
         let fighter_datas = fighter_datas(brawl_fighter_dir, mod_fighter_dir);
-            fighter_datas.par_iter()
-                .filter_map(|x| Fighter::load_single(x, &fighter_datas, common_fighter, single_model, wii_memory))
-                .collect()
+        fighter_datas
+            .par_iter()
+            .filter_map(|x| {
+                Fighter::load_single(x, &fighter_datas, common_fighter, single_model, wii_memory)
+            })
+            .collect()
     }
 
-    fn load_single(fighter_data: &FighterData, other_fighters: &[FighterData], common_fighter: &Arc, single_model: bool, wii_memory: &WiiMemory) -> Option<Fighter> {
+    fn load_single(
+        fighter_data: &FighterData,
+        other_fighters: &[FighterData],
+        common_fighter: &Arc,
+        single_model: bool,
+        wii_memory: &WiiMemory,
+    ) -> Option<Fighter> {
         info!("Parsing fighter: {}", fighter_data.cased_name);
         let moveset_file_name = format!("Fit{}.pac", fighter_data.cased_name);
         let moveset = if let Some(data) = fighter_data.data.get(&moveset_file_name) {
             let data = FancySlice::new(data);
             arc::arc(data, wii_memory, false)
         } else {
-            error!("Failed to load {}, missing moveset file: {}", fighter_data.cased_name, moveset_file_name);
+            error!(
+                "Failed to load {}, missing moveset file: {}",
+                fighter_data.cased_name, moveset_file_name
+            );
             return None;
         };
 
         let moveset_common = common_fighter.clone();
 
         let psa_sequence = [0xfa, 0xde, 0xf0, 0x0d];
-        let modded_by_psa = fighter_data.data.get(&moveset_file_name)
+        let modded_by_psa = fighter_data
+            .data
+            .get(&moveset_file_name)
             .map(|a| a.windows(4).any(|b| b == psa_sequence))
             .unwrap_or(false);
 
@@ -97,42 +117,52 @@ impl Fighter {
                 let data = FancySlice::new(data);
                 arc::arc(data, wii_memory, false)
             } else {
-                error!("Failed to load {}, Missing motion file: {} or {}", fighter_data.cased_name, motion_file_name, motion_etc_file_name);
+                error!(
+                    "Failed to load {}, Missing motion file: {} or {}",
+                    fighter_data.cased_name, motion_file_name, motion_etc_file_name
+                );
                 return None;
             }
         };
 
-        let mut models = vec!();
+        let mut models = vec![];
         for i in 0..100 {
-            if let Some(model_data) = fighter_data.data.get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i)) {
+            if let Some(model_data) = fighter_data
+                .data
+                .get(&format!("Fit{}{:02}.pac", fighter_data.cased_name, i))
+            {
                 let data = FancySlice::new(model_data);
                 models.push(arc::arc(data, wii_memory, false));
                 if single_model {
                     break;
                 }
-            }
-            else {
+            } else {
                 break;
             }
         }
 
-        let mut kirby_hats = vec!();
+        let mut kirby_hats = vec![];
         for other_fighter in other_fighters {
-            if let Some(moveset_data) = fighter_data.data.get(&format!("FitKirby{}.pac", other_fighter.cased_name)) {
+            if let Some(moveset_data) = fighter_data
+                .data
+                .get(&format!("FitKirby{}.pac", other_fighter.cased_name))
+            {
                 info!("Parsing kirby hat: {}", other_fighter.cased_name);
                 let moveset_data = FancySlice::new(moveset_data);
                 let moveset = arc::arc(moveset_data, wii_memory, true);
 
-                let mut models = vec!();
+                let mut models = vec![];
                 for i in 0..100 {
-                    if let Some(model_data) = fighter_data.data.get(&format!("FitKirby{}{:02}.pac", other_fighter.cased_name, i)) {
+                    if let Some(model_data) = fighter_data
+                        .data
+                        .get(&format!("FitKirby{}{:02}.pac", other_fighter.cased_name, i))
+                    {
                         let data = FancySlice::new(model_data);
                         models.push(arc::arc(data, wii_memory, true));
                         if single_model {
                             break;
                         }
-                    }
-                    else {
+                    } else {
                         break;
                     }
                 }
@@ -142,24 +172,28 @@ impl Fighter {
         }
 
         let mod_type = match (fighter_data.read_from_vanilla, fighter_data.read_from_mod) {
-            (true, true)   => ModType::ModFromBase,
-            (true, false)  => ModType::NotMod,
-            (false, true)  => ModType::ModFromScratch,
+            (true, true) => ModType::ModFromBase,
+            (true, false) => ModType::NotMod,
+            (false, true) => ModType::ModFromScratch,
             (false, false) => unreachable!("The data has to have been read from somewhere"),
         };
 
-        let mut wiird_frame_speed_modifiers = vec!();
+        let mut wiird_frame_speed_modifiers = vec![];
         let mut fighter_byte = 1;
         let mut offset = 0x80581000;
         let required_fighter_id = crate::fighter_maps::fighter_id(&fighter_data.cased_name);
         while fighter_byte != 0 {
             fighter_byte = wii_memory.read_u8(offset);
-            if required_fighter_id.map(|id| id == fighter_byte).unwrap_or(false) || fighter_byte == 0xFF {
+            if required_fighter_id
+                .map(|id| id == fighter_byte)
+                .unwrap_or(false)
+                || fighter_byte == 0xFF
+            {
                 wiird_frame_speed_modifiers.push(WiiRDFrameSpeedModifier {
-                    action:              wii_memory.read_u8(offset + 2) & 0xF0 == 0,
+                    action: wii_memory.read_u8(offset + 2) & 0xF0 == 0,
                     action_subaction_id: wii_memory.read_u16(offset + 2) & 0x0FFF,
-                    frame:               wii_memory.read_u8(offset + 1),
-                    frame_speed:         wii_memory.read_f32(offset + 4),
+                    frame: wii_memory.read_u8(offset + 1),
+                    frame_speed: wii_memory.read_f32(offset + 4),
                 });
             }
 
@@ -183,10 +217,10 @@ impl Fighter {
     pub fn get_fighter_sakurai(&self) -> Option<&ArcSakurai> {
         for sub_arc in &self.moveset.children {
             match &sub_arc.data {
-                &ArcChildData::Sakurai (ref sakurai) => {
+                &ArcChildData::Sakurai(ref sakurai) => {
                     return Some(sakurai);
                 }
-                _ => { }
+                _ => {}
             }
         }
         None
@@ -196,10 +230,10 @@ impl Fighter {
     pub fn get_fighter_sakurai_common(&self) -> Option<&ArcSakurai> {
         for sub_arc in &self.moveset_common.children {
             match &sub_arc.data {
-                &ArcChildData::Sakurai (ref sakurai) => {
+                &ArcChildData::Sakurai(ref sakurai) => {
                     return Some(sakurai);
                 }
-                _ => { }
+                _ => {}
             }
         }
         None
@@ -209,14 +243,14 @@ impl Fighter {
     pub fn get_fighter_data(&self) -> Option<&ArcFighterData> {
         for sub_arc in &self.moveset.children {
             match &sub_arc.data {
-                &ArcChildData::Sakurai (ref data) => {
+                &ArcChildData::Sakurai(ref data) => {
                     for section in &data.sections {
-                        if let &SectionData::FighterData (ref fighter_data_ref) = &section.data {
+                        if let &SectionData::FighterData(ref fighter_data_ref) = &section.data {
                             return Some(fighter_data_ref);
                         }
                     }
                 }
-                _ => { }
+                _ => {}
             }
         }
         None
@@ -226,14 +260,15 @@ impl Fighter {
     pub fn get_fighter_data_common(&self) -> Option<&ArcFighterDataCommon> {
         for sub_arc in &self.moveset_common.children {
             match &sub_arc.data {
-                &ArcChildData::Sakurai (ref data) => {
+                &ArcChildData::Sakurai(ref data) => {
                     for section in &data.sections {
-                        if let &SectionData::FighterDataCommon (ref fighter_data_ref) = &section.data {
+                        if let &SectionData::FighterDataCommon(ref fighter_data_ref) = &section.data
+                        {
                             return Some(fighter_data_ref);
                         }
                     }
                 }
-                _ => { }
+                _ => {}
             }
         }
         None
@@ -241,17 +276,17 @@ impl Fighter {
 
     /// retrieves the script sections from fighter data common
     pub fn get_fighter_data_common_scripts(&self) -> Vec<&SectionScript> {
-        let mut scripts = vec!();
+        let mut scripts = vec![];
         for sub_arc in &self.moveset_common.children {
             match &sub_arc.data {
-                &ArcChildData::Sakurai (ref data) => {
+                &ArcChildData::Sakurai(ref data) => {
                     for section in &data.sections {
-                        if let &SectionData::Script (ref script) = &section.data {
+                        if let &SectionData::Script(ref script) = &section.data {
                             scripts.push(script);
                         }
                     }
                 }
-                _ => { }
+                _ => {}
             }
         }
         scripts
@@ -262,34 +297,34 @@ impl Fighter {
         if let Some(model) = self.models.get(0) {
             for sub_arc in model.children.iter() {
                 match &sub_arc.data {
-                    &ArcChildData::Arc (_) => {
+                    &ArcChildData::Arc(_) => {
                         panic!("Not expecting arc at this level")
                     }
-                    &ArcChildData::Bres (ref bres) => {
+                    &ArcChildData::Bres(ref bres) => {
                         for bres_child in bres.children.iter() {
                             match &bres_child.data {
-                                &BresChildData::Bres (ref model) => {
+                                &BresChildData::Bres(ref model) => {
                                     for model_child in model.iter() {
                                         // A check like this would be useful but it doesnt account for cloned mod fighters.
                                         // `if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() { }`
                                         // Instead, the first model is the characters model, so we just return it immediately.
 
                                         match &model_child.data {
-                                            &BresChildData::Mdl0 (ref model) => {
+                                            &BresChildData::Mdl0(ref model) => {
                                                 return model.bones.as_ref();
                                             }
-                                            _ => { }
+                                            _ => {}
                                         }
                                     }
                                 }
-                                &BresChildData::Mdl0 (_) => {
+                                &BresChildData::Mdl0(_) => {
                                     panic!("Not expecting Mdl at this level");
                                 }
-                                _ => { }
+                                _ => {}
                             }
                         }
                     }
-                    _ => { }
+                    _ => {}
                 }
             }
         }
@@ -303,11 +338,10 @@ impl Fighter {
 
         if self.motion.name.ends_with("Motion") {
             return Fighter::get_animations_fit_motion(&self.motion);
-        }
-        else if self.motion.name.ends_with("MotionEtc") {
+        } else if self.motion.name.ends_with("MotionEtc") {
             for sub_arc in &self.motion.children {
                 match &sub_arc.data {
-                    &ArcChildData::Arc (ref arc) => {
+                    &ArcChildData::Arc(ref arc) => {
                         if arc.name.ends_with("Motion") {
                             return Fighter::get_animations_fit_motion(arc);
                         }
@@ -321,36 +355,36 @@ impl Fighter {
 
     /// retrieves the animations for the character model from the Fit{}Motion arc
     pub fn get_animations_fit_motion(motion: &Arc) -> Vec<&Chr0> {
-        let mut chr0s: Vec<&Chr0> = vec!();
+        let mut chr0s: Vec<&Chr0> = vec![];
         for sub_arc in &motion.children {
             match &sub_arc.data {
-                &ArcChildData::Bres (ref bres) => {
+                &ArcChildData::Bres(ref bres) => {
                     for bres_child in bres.children.iter() {
                         match &bres_child.data {
-                            &BresChildData::Bres (ref children) => {
+                            &BresChildData::Bres(ref children) => {
                                 for bres_child in children.iter() {
                                     match &bres_child.data {
-                                        &BresChildData::Bres (_) => {
+                                        &BresChildData::Bres(_) => {
                                             panic!("Not expecting bres at this level");
                                         }
-                                        &BresChildData::Chr0 (ref chr0) => {
+                                        &BresChildData::Chr0(ref chr0) => {
                                             chr0s.push(chr0);
                                         }
-                                        _ => { }
+                                        _ => {}
                                     }
                                 }
                             }
-                            &BresChildData::Chr0 (_) => {
+                            &BresChildData::Chr0(_) => {
                                 panic!("Not expecting Chr0 at this level");
                             }
-                            _ => { }
+                            _ => {}
                         }
                     }
                 }
-                &ArcChildData::Arc (_) => {
+                &ArcChildData::Arc(_) => {
                     //panic!("Not expecting arc at this level"); // TODO: Whats here
                 }
-                _ => { }
+                _ => {}
             }
         }
         chr0s
@@ -360,7 +394,7 @@ impl Fighter {
 /// Returns the binary fighter data for all fighters
 /// Replaces brawl fighter data with mod fighter data
 fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -> Vec<FighterData> {
-    let mut fighter_datas = vec!();
+    let mut fighter_datas = vec![];
     for fighter_path in brawl_fighter_dir {
         let fighter_path = fighter_path.unwrap();
         let file_type = fighter_path.file_type().unwrap();
@@ -377,18 +411,28 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
             let fighter_path = fighter_path.unwrap();
             if fighter_path.file_type().unwrap().is_dir() {
                 let fighter_path = fighter_path.path();
-                let dir_name = fighter_path.file_name().unwrap().to_str().unwrap().to_string();
+                let dir_name = fighter_path
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_string();
 
-                if let Some(fighter_data) = fighter_datas.iter_mut().find(|x| x.cased_name.to_lowercase() == dir_name.to_lowercase()) {
+                if let Some(fighter_data) = fighter_datas
+                    .iter_mut()
+                    .find(|x| x.cased_name.to_lowercase() == dir_name.to_lowercase())
+                {
                     // fighter data already exists, overwrite and insert new files
                     for data_path in fs::read_dir(&fighter_path).unwrap() {
                         let data_path = data_path.unwrap().path();
                         let file_data = std::fs::read(&data_path).unwrap();
-                        fighter_data.data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+                        fighter_data.data.insert(
+                            data_path.file_name().unwrap().to_str().unwrap().to_string(),
+                            file_data,
+                        );
                         fighter_data.read_from_mod = true;
                     }
-                }
-                else {
+                } else {
                     // fighter data doesnt exist yet, create it
                     if let Some(mut fighter_data) = fighter_data(&fighter_path) {
                         fighter_data.read_from_mod = true;
@@ -400,13 +444,16 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
     }
 
     // copy missing warioman file from wario
-    if let Some(Some(wario_motion_etc)) = fighter_datas.iter()
+    if let Some(Some(wario_motion_etc)) = fighter_datas
+        .iter()
         .find(|x| x.cased_name == "Wario")
         .map(|x| x.data.get("FitWarioMotionEtc.pac").cloned())
     {
         for fighter_data in &mut fighter_datas {
             if fighter_data.cased_name == "WarioMan" {
-                fighter_data.data.insert(String::from("FitWarioManMotionEtc.pac"), wario_motion_etc);
+                fighter_data
+                    .data
+                    .insert(String::from("FitWarioManMotionEtc.pac"), wario_motion_etc);
                 // Just assume wariomans read_from_* is unaffected by this copy :/
                 break;
             }
@@ -418,18 +465,36 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
 
 /// Returns the binary fighter data for each file in the passed dir
 fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
-    let dir_name = fighter_path.file_name().unwrap().to_str().unwrap().to_string();
+    let dir_name = fighter_path
+        .file_name()
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
     let mut cased_name: Option<String> = None;
 
     for data_path in fs::read_dir(&fighter_path).unwrap() {
-        let data_name = data_path.unwrap().path().file_name().unwrap().to_str().unwrap().to_string();
+        let data_name = data_path
+            .unwrap()
+            .path()
+            .file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
         if data_name.to_lowercase() == format!("Fit{}.pac", dir_name).to_lowercase() {
-            cased_name = Some(String::from(data_name.trim_end_matches(".pac").trim_start_matches("Fit")));
+            cased_name = Some(String::from(
+                data_name.trim_end_matches(".pac").trim_start_matches("Fit"),
+            ));
         }
     }
 
     if let Some(cased_name) = cased_name {
-        if cased_name == "ZakoBoy" || cased_name == "ZakoGirl" || cased_name == "ZakoChild" || cased_name == "ZakoBall" {
+        if cased_name == "ZakoBoy"
+            || cased_name == "ZakoGirl"
+            || cased_name == "ZakoChild"
+            || cased_name == "ZakoBall"
+        {
             error!("Can't load: {} (unfixed bug)", cased_name);
             None
         } else {
@@ -437,7 +502,10 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
             for data_path in fs::read_dir(&fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
                 let file_data = std::fs::read(&data_path).unwrap();
-                data.insert(data_path.file_name().unwrap().to_str().unwrap().to_string(), file_data);
+                data.insert(
+                    data_path.file_name().unwrap().to_str().unwrap().to_string(),
+                    file_data,
+                );
             }
             Some(FighterData {
                 cased_name,
@@ -447,7 +515,9 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
                 read_from_mod: false,
             })
         }
-    } else { None }
+    } else {
+        None
+    }
 }
 
 struct FighterData {

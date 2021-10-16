@@ -1,5 +1,5 @@
-use brawllib_rs::high_level_fighter::HighLevelFighter;
 use brawllib_rs::brawl_mod::BrawlMod;
+use brawllib_rs::high_level_fighter::HighLevelFighter;
 
 use getopts::Options;
 
@@ -18,8 +18,18 @@ fn main() {
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
-    opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
+    opts.optopt(
+        "d",
+        "dir",
+        "full path to a brawl directory",
+        "DIRECTORY_NAME",
+    );
+    opts.optopt(
+        "m",
+        "mod",
+        "full path to a mod directory that will overwrite brawl files",
+        "DIRECTORY_NAME",
+    );
     opts.optopt("f", "fighter", "fighter name", "FIGHTER_NAME");
     opts.optopt("a", "subaction", "subaction name", "ACTION_NAME");
 

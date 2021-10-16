@@ -3,9 +3,9 @@ use brawllib_rs::high_level_fighter::HighLevelFighter;
 
 use getopts::Options;
 
+use std::collections::HashMap;
 use std::env;
 use std::path::PathBuf;
-use std::collections::HashMap;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -19,8 +19,18 @@ fn main() {
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
-    opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
+    opts.optopt(
+        "d",
+        "dir",
+        "full path to a brawl directory",
+        "DIRECTORY_NAME",
+    );
+    opts.optopt(
+        "m",
+        "mod",
+        "full path to a mod directory that will overwrite brawl files",
+        "DIRECTORY_NAME",
+    );
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -84,7 +94,7 @@ fn main() {
     }
     println!("{}", header);
 
-    let moves = vec!(
+    let moves = vec![
         ("Jab", "Attack11"),
         ("UTilt", "AttackHi3"),
         ("DTilt", "AttackLw3"),
@@ -106,7 +116,7 @@ fn main() {
         ("Getup Attack Face Down", "DownAttackD"),
         ("Getup Attack Face Up", "DownAttackU"),
         ("Slip Getup Attack", "SlipAttack"),
-    );
+    ];
 
     for (name, subaction_name) in moves {
         let mut row = name.to_string();
@@ -114,38 +124,39 @@ fn main() {
             if let Some(facts) = fighter_map[name.clone()].get(subaction_name) {
                 if let Some(first_active_frame) = facts.first_active_frame {
                     row.push_str(&format!(",{}", first_active_frame))
-                }
-                else {
+                } else {
                     if subaction_name == "AttackS4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()].get("AttackS4S").and_then(|x| x.first_active_frame) {
+                        if let Some(first_active_frame) = fighter_map[name.clone()]
+                            .get("AttackS4S")
+                            .and_then(|x| x.first_active_frame)
+                        {
                             row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        }
-                        else {
+                        } else {
                             row.push_str(",Unknown");
                         }
-                    }
-                    else if subaction_name == "AttackLw4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()].get("AttackLw4").and_then(|x| x.first_active_frame) {
+                    } else if subaction_name == "AttackLw4Start" {
+                        if let Some(first_active_frame) = fighter_map[name.clone()]
+                            .get("AttackLw4")
+                            .and_then(|x| x.first_active_frame)
+                        {
                             row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        }
-                        else {
+                        } else {
                             row.push_str(",Unknown");
                         }
-                    }
-                    else if subaction_name == "AttackHi4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()].get("AttackHi4").and_then(|x| x.first_active_frame) {
+                    } else if subaction_name == "AttackHi4Start" {
+                        if let Some(first_active_frame) = fighter_map[name.clone()]
+                            .get("AttackHi4")
+                            .and_then(|x| x.first_active_frame)
+                        {
                             row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        }
-                        else {
+                        } else {
                             row.push_str(",Unknown");
                         }
-                    }
-                    else {
+                    } else {
                         row.push_str(",Unknown");
                     }
                 }
-            }
-            else {
+            } else {
                 row.push_str(",Unknown");
             }
         }

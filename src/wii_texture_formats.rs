@@ -10,7 +10,7 @@ pub enum WiiPixelFormat {
     CI4,
     CI8,
     CMPR4,
-    Unknown (u32)
+    Unknown(u32),
 }
 
 impl WiiPixelFormat {
@@ -26,10 +26,11 @@ impl WiiPixelFormat {
             0x8 => WiiPixelFormat::CI4,
             0x9 => WiiPixelFormat::CI8,
             0xE => WiiPixelFormat::CMPR4,
-            _   => WiiPixelFormat::Unknown (value)
+            _ => WiiPixelFormat::Unknown(value),
         }
     }
 
+    #[rustfmt::skip]
     pub(crate) fn _value(&self) -> u32 {
         match self {
             WiiPixelFormat::I4              => 0x0,
@@ -77,7 +78,7 @@ pub enum WiiPixelFormat2 {
     CtfZ8M,
     CtfZ8L,
     CtfZ16L,
-    Unknown (u32)
+    Unknown(u32),
 }
 
 impl WiiPixelFormat2 {
@@ -112,10 +113,11 @@ impl WiiPixelFormat2 {
             0x3A => WiiPixelFormat2::CtfZ8L,
             0x3C => WiiPixelFormat2::CtfZ16L,
 
-            _ => WiiPixelFormat2::Unknown (value)
+            _ => WiiPixelFormat2::Unknown(value),
         }
     }
 
+    #[rustfmt::skip]
     pub(crate) fn _value(&self) -> u32 {
         match self {
             WiiPixelFormat2::TfI4     => 0x00,
@@ -157,7 +159,7 @@ pub enum WiiPaletteFormat {
     IA8,
     RGB565,
     RGB5A3,
-    Unknown (u32)
+    Unknown(u32),
 }
 
 impl WiiPaletteFormat {
@@ -166,16 +168,16 @@ impl WiiPaletteFormat {
             0x0 => WiiPaletteFormat::IA8,
             0x1 => WiiPaletteFormat::RGB565,
             0x2 => WiiPaletteFormat::RGB5A3,
-            _   => WiiPaletteFormat::Unknown (value)
+            _ => WiiPaletteFormat::Unknown(value),
         }
     }
 
     pub(crate) fn value(&self) -> u32 {
         match self {
-            WiiPaletteFormat::IA8    => 0x0,
+            WiiPaletteFormat::IA8 => 0x0,
             WiiPaletteFormat::RGB565 => 0x1,
             WiiPaletteFormat::RGB5A3 => 0x2,
-            WiiPaletteFormat::Unknown (value) => *value,
+            WiiPaletteFormat::Unknown(value) => *value,
         }
     }
 }

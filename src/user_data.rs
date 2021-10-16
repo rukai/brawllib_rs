@@ -6,7 +6,7 @@ pub struct UserData {
 
 #[derive(Clone, Debug)]
 pub enum UserDataValue {
-    Int (i32),
-    Float (f32),
-    String (String),
+    Int(i32),
+    Float(f32),
+    String(String),
 }

@@ -1,13 +1,14 @@
 pub mod misc_section;
 
-use crate::script::Script;
 use crate::script;
+use crate::script::Script;
 use crate::util;
 use crate::wii_memory::WiiMemory;
 use misc_section::MiscSection;
 
 use fancy_slice::FancySlice;
 
+#[rustfmt::skip]
 pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_memory: &WiiMemory) -> ArcFighterData {
     let subaction_flags_start        = data.i32_be(0);
     let model_visibility_start       = data.i32_be(4);
@@ -104,6 +105,7 @@ pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_me
     }
 }
 
+#[rustfmt::skip]
 fn fighter_attributes(data: FancySlice) -> FighterAttributes {
     FighterAttributes {
         walk_init_vel:                     data.f32_be(0x00),
@@ -324,6 +326,7 @@ pub struct FighterAttributes {
 
 bitflags! {
     #[derive(Serialize, Deserialize)]
+    #[rustfmt::skip]
     pub struct AnimationFlags: u8 {
         const NONE                      = 0x0;
         const NO_OUT_TRANSITION         = 0x1;
@@ -338,13 +341,13 @@ bitflags! {
 }
 
 fn subaction_flags(parent_data: FancySlice, data: FancySlice, num: usize) -> Vec<SubactionFlags> {
-    let mut result = vec!();
+    let mut result = vec![];
     let num = num + 1;
     for i in 0..num {
         let in_translation_time = data.u8(i * SUB_ACTION_FLAGS_SIZE + 0);
         let animation_flags_int = data.u8(i * SUB_ACTION_FLAGS_SIZE + 1);
         //  padding               data.u16_be(i * SUB_ACTION_FLAGS_SIZE + 2..);
-        let string_offset       = data.i32_be(i * SUB_ACTION_FLAGS_SIZE + 4);
+        let string_offset = data.i32_be(i * SUB_ACTION_FLAGS_SIZE + 4);
 
         let animation_flags = AnimationFlags::from_bits(animation_flags_int).unwrap();
         let name = if string_offset == 0 {
@@ -366,17 +369,17 @@ const SUB_ACTION_FLAGS_SIZE: usize = 0x8;
 #[derive(Clone, Debug)]
 pub struct SubactionFlags {
     pub in_translation_time: u8,
-    pub animation_flags:     AnimationFlags,
-    pub name:                String,
+    pub animation_flags: AnimationFlags,
+    pub name: String,
 }
 
 fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> ModelVisibility {
-    let reference_offset  = parent_data.i32_be(model_visibility_start as usize + 0x00);
+    let reference_offset = parent_data.i32_be(model_visibility_start as usize + 0x00);
     let bone_switch_count = parent_data.i32_be(model_visibility_start as usize + 0x04);
-    let defaults_offset   = parent_data.i32_be(model_visibility_start as usize + 0x08);
-    let defaults_count    = parent_data.i32_be(model_visibility_start as usize + 0x0c);
+    let defaults_offset = parent_data.i32_be(model_visibility_start as usize + 0x08);
+    let defaults_count = parent_data.i32_be(model_visibility_start as usize + 0x0c);
 
-    let mut references = vec!();
+    let mut references = vec![];
     if reference_offset != 0 {
         // this works because the data at reference_offset, defaults_offset and model_visibility_start are stored sequentially
         let reference_count = if defaults_offset == 0 {
@@ -387,26 +390,34 @@ fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> Mod
         if reference_count < 0 {
             error!("Oh no the reference_count calculation is messed up, please handle this case properly");
             return ModelVisibility {
-                references: vec!(),
-                defaults: vec!(),
+                references: vec![],
+                defaults: vec![],
             };
         }
 
         for reference_i in 0..reference_count as usize {
-            let bone_switch_offset = parent_data.i32_be(reference_offset as usize + VISIBILITY_REFERENCE_SIZE * reference_i) as usize;
-            let mut bone_switches = vec!();
+            let bone_switch_offset = parent_data
+                .i32_be(reference_offset as usize + VISIBILITY_REFERENCE_SIZE * reference_i)
+                as usize;
+            let mut bone_switches = vec![];
             if bone_switch_offset != 0 {
-
                 for bone_switch_i in 0..bone_switch_count as usize {
-                    let visibility_group_list = util::list_offset(parent_data.relative_fancy_slice(bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i ..));
-                    let mut groups = vec!();
+                    let visibility_group_list =
+                        util::list_offset(parent_data.relative_fancy_slice(
+                            bone_switch_offset + util::LIST_OFFSET_SIZE * bone_switch_i..,
+                        ));
+                    let mut groups = vec![];
 
                     for visibility_group_i in 0..visibility_group_list.count as usize {
-                        let bone_list = util::list_offset(parent_data.relative_fancy_slice(visibility_group_list.start_offset as usize + util::LIST_OFFSET_SIZE * visibility_group_i ..));
-                        let mut bones = vec!();
+                        let bone_list = util::list_offset(parent_data.relative_fancy_slice(
+                            visibility_group_list.start_offset as usize
+                                + util::LIST_OFFSET_SIZE * visibility_group_i..,
+                        ));
+                        let mut bones = vec![];
 
                         for bone_i in 0..bone_list.count as usize {
-                            let bone = parent_data.i32_be(bone_list.start_offset as usize + 4 * bone_i);
+                            let bone =
+                                parent_data.i32_be(bone_list.start_offset as usize + 4 * bone_i);
                             bones.push(bone);
                         }
 
@@ -420,12 +431,17 @@ fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> Mod
         }
     }
 
-    let mut defaults = vec!();
+    let mut defaults = vec![];
     for i in 0..defaults_count as usize {
-        let switch_index = parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i    );
-        let group_index  = parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i + 4);
+        let switch_index =
+            parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i);
+        let group_index =
+            parent_data.i32_be(defaults_offset as usize + VISIBILITY_DEFAULT_SIZE * i + 4);
 
-        defaults.push(VisibilityDefault { switch_index, group_index });
+        defaults.push(VisibilityDefault {
+            switch_index,
+            group_index,
+        });
     }
 
     ModelVisibility {
@@ -437,7 +453,7 @@ fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> Mod
 #[derive(Clone, Debug)]
 pub struct ModelVisibility {
     pub references: Vec<VisibilityReference>,
-    pub defaults:   Vec<VisibilityDefault>,
+    pub defaults: Vec<VisibilityDefault>,
 }
 
 const VISIBILITY_REFERENCE_SIZE: usize = 0x4;
@@ -467,7 +483,7 @@ pub struct VisibilityDefault {
 }
 
 fn action_flags(data: FancySlice, num: usize) -> Vec<ActionFlags> {
-    let mut result = vec!();
+    let mut result = vec![];
     for i in 0..num {
         result.push(ActionFlags {
             flag1: data.u32_be(i * ACTION_FLAGS_SIZE + 0x0),
@@ -494,7 +510,7 @@ struct OffsetSizePair {
 }
 
 fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
-    let mut pairs = vec!();
+    let mut pairs = vec![];
     for i in 0..27 {
         let offset = data.i32_be(i * 4) as usize;
         if offset != 0 {
@@ -505,7 +521,7 @@ fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
     pairs.sort_by_key(|x| x.offset);
 
     // fill in size for most elements
-    for i in 0..pairs.len()-1 {
+    for i in 0..pairs.len() - 1 {
         pairs[i].size = pairs[i + 1].offset - pairs[i].offset
     }
 
@@ -515,8 +531,12 @@ fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
     pairs
 }
 
-fn action_overrides(parent_data: FancySlice, data: FancySlice, wii_memory: &WiiMemory) -> Vec<ActionOverride> {
-    let mut overrides = vec!();
+fn action_overrides(
+    parent_data: FancySlice,
+    data: FancySlice,
+    wii_memory: &WiiMemory,
+) -> Vec<ActionOverride> {
+    let mut overrides = vec![];
     for i in 0..10 {
         let action_id = data.u32_be(i * OVERRIDE_SIZE);
         let offset = data.u32_be(i * OVERRIDE_SIZE + 4);

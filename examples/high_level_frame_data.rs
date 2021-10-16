@@ -16,12 +16,27 @@ fn main() {
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
-    opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
+    opts.optopt(
+        "d",
+        "dir",
+        "full path to a brawl directory",
+        "DIRECTORY_NAME",
+    );
+    opts.optopt(
+        "m",
+        "mod",
+        "full path to a mod directory that will overwrite brawl files",
+        "DIRECTORY_NAME",
+    );
     opts.optopt("f", "fighter", "filter by fighter name", "FIGHTER_NAME");
     opts.optopt("a", "subaction", "filter by subaction", "ACTION_NAME");
     opts.optopt("i", "frame", "filter by frame", "FRAME_INDEX");
-    opts.optopt("l", "datalevel", "level to display data at", "[fighter|subaction|frame]");
+    opts.optopt(
+        "l",
+        "datalevel",
+        "level to display data at",
+        "[fighter|subaction|frame]",
+    );
 
     let matches = match opts.parse(&args[1..]) {
         Ok(m) => m,
@@ -42,8 +57,13 @@ fn main() {
 
     let fighter_filter = matches.opt_str("f");
     let subaction_filter = matches.opt_str("a");
-    let frame_filter = matches.opt_str("i").map_or(None, |x| x.parse::<usize>().ok());
-    let data_level = matches.opt_str("l").unwrap_or(String::from("fighter")).to_lowercase();
+    let frame_filter = matches
+        .opt_str("i")
+        .map_or(None, |x| x.parse::<usize>().ok());
+    let data_level = matches
+        .opt_str("l")
+        .unwrap_or(String::from("fighter"))
+        .to_lowercase();
 
     let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
     let fighters = match brawl_mod.load_fighters(true) {
@@ -78,8 +98,7 @@ fn main() {
                         if let Some(frame) = subaction.frames.get(frame_filter) {
                             println!("{:#?}", frame);
                         }
-                    }
-                    else {
+                    } else {
                         println!("{:#?}", subaction.frames);
                     }
                 }
@@ -104,7 +123,7 @@ fn main() {
 
                     if let Some(frame_filter) = frame_filter {
                         if frame_filter < subaction.frames.len() {
-                            subaction.frames = vec!(subaction.frames.remove(frame_filter));
+                            subaction.frames = vec![subaction.frames.remove(frame_filter)];
                         } else {
                             subaction.frames.clear();
                         }
@@ -125,7 +144,7 @@ fn main() {
 
                 // filter by subaction
                 if let &Some(ref subaction_filter) = &subaction_filter {
-                    let mut new_subactions = vec!();
+                    let mut new_subactions = vec![];
                     for subaction in hl_fighter.subactions {
                         if subaction.name.to_lowercase() == subaction_filter.to_lowercase() {
                             new_subactions.push(subaction);
@@ -138,7 +157,7 @@ fn main() {
                 for subaction in &mut hl_fighter.subactions {
                     if let Some(frame_filter) = frame_filter {
                         if frame_filter < subaction.frames.len() {
-                            subaction.frames = vec!(subaction.frames.remove(frame_filter));
+                            subaction.frames = vec![subaction.frames.remove(frame_filter)];
                         } else {
                             subaction.frames.clear();
                         }

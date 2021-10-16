@@ -1,9 +1,9 @@
-use crate::script::{Script, Event, Requirement, Argument, Offset};
 use crate::script;
+use crate::script::{Argument, Event, Offset, Requirement, Script};
 
+use std::f32;
 use std::iter::Iterator;
 use std::slice;
-use std::f32;
 
 pub mod variable_ast;
 
@@ -11,26 +11,29 @@ use variable_ast::VariableAst;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScriptAst {
-    pub block:  Block,
+    pub block: Block,
     pub offset: i32,
 }
 
 impl ScriptAst {
     pub fn new(script: &Script) -> ScriptAst {
-        let block = if let ProcessedBlock::Finished(events) = process_block(&mut script.events.iter().peekable()) {
+        let block = if let ProcessedBlock::Finished(events) =
+            process_block(&mut script.events.iter().peekable())
+        {
             events
         } else {
             error!("A block in the script did not terminate.");
-            Block { events: vec!() }
+            Block { events: vec![] }
         };
 
         ScriptAst {
             block,
-            offset: script.offset
+            offset: script.offset,
         }
     }
 }
 
+#[rustfmt::skip]
 fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> ProcessedBlock {
     let mut event_asts = vec!();
     while let Some(event) = events.next() {
@@ -845,37 +848,44 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
 }
 
 impl Expression {
-    fn from_args(requirement: &Requirement, flip: bool, v1: Option<&Argument>, v2: Option<&Argument>, v3: Option<&Argument>) -> Option<Expression> {
+    fn from_args(
+        requirement: &Requirement,
+        flip: bool,
+        v1: Option<&Argument>,
+        v2: Option<&Argument>,
+        v3: Option<&Argument>,
+    ) -> Option<Expression> {
         let test = match (v1, v2, v3) {
-            (None, None, None) => {
-                Expression::Nullary(requirement.clone())
-            }
+            (None, None, None) => Expression::Nullary(requirement.clone()),
             (Some(v1), None, None) => {
                 let value = Box::new(match v1 {
-                    &Argument::Scalar(v1)       => Expression::Scalar(v1),
+                    &Argument::Scalar(v1) => Expression::Scalar(v1),
                     &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
-                    &Argument::Value(v1)        => Expression::Value(v1),
+                    &Argument::Value(v1) => Expression::Value(v1),
                     _ => {
                         error!("Unhandled expression case: value: {:?}", v1);
                         return None;
                     }
                 });
-                Expression::Unary (UnaryExpression { requirement: requirement.clone(), value })
+                Expression::Unary(UnaryExpression {
+                    requirement: requirement.clone(),
+                    value,
+                })
             }
             (Some(v1), Some(&Argument::Value(v2)), Some(v3)) => {
                 let left = Box::new(match v1 {
-                    &Argument::Scalar(v1)       => Expression::Scalar(v1),
+                    &Argument::Scalar(v1) => Expression::Scalar(v1),
                     &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
-                    &Argument::Value(v1)        => Expression::Value(v1),
+                    &Argument::Value(v1) => Expression::Value(v1),
                     _ => {
                         error!("Unhandled expression case: left");
                         return None;
                     }
                 });
                 let right = Box::new(match v3 {
-                    &Argument::Scalar(v3)       => Expression::Scalar(v3),
+                    &Argument::Scalar(v3) => Expression::Scalar(v3),
                     &Argument::Variable(ref v3) => Expression::Variable(VariableAst::new(v3)),
-                    &Argument::Value(v3)        => Expression::Value(v3),
+                    &Argument::Value(v3) => Expression::Value(v3),
                     _ => {
                         error!("Unhandled expression case: right");
                         return None;
@@ -883,7 +893,11 @@ impl Expression {
                 });
 
                 match requirement {
-                    script::Requirement::Comparison => Expression::Binary (BinaryExpression { left, right, operator: ComparisonOperator::from_arg(v2) }),
+                    script::Requirement::Comparison => Expression::Binary(BinaryExpression {
+                        left,
+                        right,
+                        operator: ComparisonOperator::from_arg(v2),
+                    }),
                     // Seems to be just modders using this as a quick hack.
                     script::Requirement::Always => Expression::Nullary(requirement.clone()),
                     _ => {
@@ -898,53 +912,62 @@ impl Expression {
             }
         };
 
-        Some(if flip { Expression::Not (Box::new(test)) } else { test })
+        Some(if flip {
+            Expression::Not(Box::new(test))
+        } else {
+            test
+        })
     }
 }
 
 enum ProcessedBlock {
-    Finished     (Block),
-    EndForLoop   (Block),
-    EndIf        { then_branch: Block },
-    EndIfAndElse { then_branch: Block, else_branch: Option<Box<Block>> },
+    Finished(Block),
+    EndForLoop(Block),
+    EndIf {
+        then_branch: Block,
+    },
+    EndIfAndElse {
+        then_branch: Block,
+        else_branch: Option<Box<Block>>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum EventAst {
     ///Pause the current flow of events until the set time is reached. Synchronous timers count down when they are reached in the code.
-    SyncWait (f32),
+    SyncWait(f32),
     /// Does nothing.
     Nop,
     /// Pause the current flow of events until the set time is reached. Asynchronous Timers start counting from the beginning of the animation.
-    AsyncWait (f32),
+    AsyncWait(f32),
     /// Execute the block of code N times.
-    ForLoop (ForLoop),
+    ForLoop(ForLoop),
     /// Enter the event routine specified and return after ending.
-    Subroutine (Offset),
+    Subroutine(Offset),
     /// Return from a Subroutine.
     Return,
     /// Goto the event location specified and execute.
-    Goto (Offset),
+    Goto(Offset),
     /// An expression decides which block of code to execute.
-    IfStatement (IfStatement),
+    IfStatement(IfStatement),
     /// An `And` to an If statement.
     /// If the expression is false then execution of all events other than IfStatementOr are skipped.
     /// Execution can be resumed by an IfStatementOr
     ///
     /// Has no effect outside of an IfStatement
     /// Havent tested if it would affect execution when called within a subroutine, but I would assume it is.
-    IfStatementAnd (Expression),
+    IfStatementAnd(Expression),
     /// An `Or` to an If statement.
     /// If the expression is true then execution of all events is re-enabled
     /// Execution can be stopped by an IfStatementAnd
     ///
     /// Has no effect outside of an IfStatement
     /// Havent tested if it would affect execution when called within a subroutine, but I would assume it is.
-    IfStatementOr (Expression),
+    IfStatementOr(Expression),
     /// Begin a multiple case Switch block.
-    Switch (i32, i32),
+    Switch(i32, i32),
     /// Handler for if the variable in the switch statement equals the specified value.
-    Case (i32),
+    Case(i32),
     /// The case chosen if none of the others are executed.
     DefaultCase,
     /// End a Switch block.
@@ -965,80 +988,94 @@ pub enum EventAst {
     /// Requires the Independent Subroutines code by Mawootad.
     SetIndependentSubroutineThreadType { thread_id: i32, thread_type: i32 },
     /// Enables the given interrupt ID on any interrupt type.
-    EnableInterrupt (i32),
+    EnableInterrupt(i32),
     /// Disables the given interrupt ID on any interrupt type.
-    DisableInterrupt (i32),
+    DisableInterrupt(i32),
     /// Invert the given interrupt ID assosciated with the given interrupt type.
-    ToggleInterrupt { interrupt_type: InterruptType, interrupt_id: i32 },
+    ToggleInterrupt {
+        interrupt_type: InterruptType,
+        interrupt_id: i32,
+    },
     /// Enables all interrupts associated with the given interrupt type.
-    EnableInterruptGroup (InterruptType),
+    EnableInterruptGroup(InterruptType),
     /// Disables all interrupts associated with the given interrupt type.
-    DisableInterruptGroup (InterruptType),
+    DisableInterruptGroup(InterruptType),
     /// Remove all actions currently assosciated with an interrupt type.
-    ClearInterruptGroup (InterruptType),
+    ClearInterruptGroup(InterruptType),
     /// An interrupt with the given interrupt ID is assosciated with the interrupt type of that action.
     /// The interrupt type used, seems to be hardcoded to the action somehow.
     /// The current action will change upon test being true. (the requirement does not have to be met at the time this ID is executed - it can be used anytime after execution.)
-    CreateInterrupt (Interrupt),
+    CreateInterrupt(Interrupt),
     /// Add an additional requirement to the preceeding CreateInterrupt statement.
     /// All requirements on the interrupt must be true for the interrupt to occur.
     PreviousInterruptAddRequirement { test: Expression },
     /// Add an additonal requirement to the specified interrupt type and interrupt id.
     /// All requirements on the interrupt must be true for the interrupt to occur.
-    InterruptAddRequirement { interrupt_type: InterruptType, interrupt_id: i32, test: Expression },
+    InterruptAddRequirement {
+        interrupt_type: InterruptType,
+        interrupt_id: i32,
+        test: Expression,
+    },
     /// Allow the current action to be interrupted by another action.
     AllowInterrupts,
     /// Disallow the current action to be interrupted by another action.
     DisallowInterrupts,
     /// Change the current subaction.
-    ChangeSubaction (i32),
+    ChangeSubaction(i32),
     /// Change the current subaction, restarting the frame count.
-    ChangeSubactionRestartFrame (i32),
+    ChangeSubactionRestartFrame(i32),
     /// Changes the current frame of the animation. Does not change the frame of the subaction (i.e. timers and such are unaffected).
-    SetAnimationFrame (f32),
+    SetAnimationFrame(f32),
     /// Dictates the frame speed of the subaction. Example: setting to 2 makes the animation and timers occur twice as fast.
     FrameSpeedModifier { multiplier: f32, unk: i32 },
     /// Changes the current frame of the animation and the current frame of timers.
-    SetAnimationAndTimerFrame (f32),
+    SetAnimationAndTimerFrame(f32),
     /// Change the speed of time for various parts of the environment.
-    TimeManipulation (i32, i32),
+    TimeManipulation(i32, i32),
     /// Specify whether the character is on or off the ground.
-    SetAirGround (i32),
+    SetAirGround(i32),
     /// Determines whether or not the character will slide off the edge.
-    SetEdgeSlide (EdgeSlide),
+    SetEdgeSlide(EdgeSlide),
     /// Reverse the direction the character is facing after the animation ends.
     ReverseDirection,
     /// Create a hitbox with the specified parameters.
-    CreateHitBox (HitBoxArguments), // brawlbox calls this "Offensive Collision"
+    CreateHitBox(HitBoxArguments), // brawlbox calls this "Offensive Collision"
     /// Create a hitbox with the specified parameters on the character to be thrown. The hitbox can not hit the throwing character or the thrown character.
     /// TODO: I actually dont understand this at all, it seems characters without this still have hitboxes regardless of who throws who.
-    ThrownHitBox (HitBoxArguments),
+    ThrownHitBox(HitBoxArguments),
     /// Remove all currently present hitboxes.
     DeleteAllHitBoxes, // brawlbox calls this "Terminate Collisions"
     /// Create a hitbox with the even more parameters.
-    CreateSpecialHitBox (SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
+    CreateSpecialHitBox(SpecialHitBoxArguments), // brawlbox calls this "Special Offensive Collision"
     /// Enables a defensive collision box e.g. links shield
-    DefensiveCollision { ty: DefensiveCollisionType, unk: i32, direction: DefensiveCollisionDirection },
+    DefensiveCollision {
+        ty: DefensiveCollisionType,
+        unk: i32,
+        direction: DefensiveCollisionDirection,
+    },
     /// Repositions an already-existing hitbox.
-    MoveHitBox (MoveHitBox),
+    MoveHitBox(MoveHitBox),
     /// Changes a specific hitbox's damage to the new amount. Only guaranteed to work on a HitBox
     ChangeHitBoxDamage { hitbox_id: i32, new_damage: i32 },
     /// Changes a specific hitbox's size to the new amount. Only guaranteed to work on a HitBox
     ChangeHitBoxSize { hitbox_id: i32, new_size: i32 },
     /// Deletes a hitbox of the specified ID. Only guaranteed to work on a HitBox
-    DeleteHitBox (i32),
+    DeleteHitBox(i32),
     /// Generate a grabbox with the specified parameters.
-    CreateGrabBox (GrabBoxArguments),
+    CreateGrabBox(GrabBoxArguments),
     /// Deletes the grabbox with the specified ID.
-    DeleteGrabBox (i32),
+    DeleteGrabBox(i32),
     /// Remove all currently present grabboxes
     DeleteAllGrabBoxes,
     /// Specify the throw
-    SpecifyThrow (SpecifyThrow),
+    SpecifyThrow(SpecifyThrow),
     /// Apply the previously specified throw
-    ApplyThrow (ApplyThrow),
+    ApplyThrow(ApplyThrow),
     /// Adds the specified amount of damage to the specified hitbox.
-    AddHitBoxDamage { hitbox_id: i32, add_damage: FloatValue },
+    AddHitBoxDamage {
+        hitbox_id: i32,
+        add_damage: FloatValue,
+    },
     /// Set the state of all of the characters hurtboxes.
     ChangeHurtBoxStateAll { state: HurtBoxState },
     /// Sets the state of a characters specific hurtbox.
@@ -1055,7 +1092,7 @@ pub enum EventAst {
     /// Unknown controller event
     ControllerUnk02,
     /// Unknown controller event
-    ControllerUnk06 (bool),
+    ControllerUnk06(bool),
     /// Unknown controller event
     ControllerUnk0C,
     /// Undefined. Affects the rumble feature of the controller.
@@ -1065,15 +1102,21 @@ pub enum EventAst {
     /// Moves the character's feet if on sloped ground.
     SlopeContourStand { leg_bone_parent: i32 },
     /// Moves entire character to match sloped ground.
-    SlopeContourFull { hip_n_or_top_n: i32, trans_bone: i32 },
+    SlopeContourFull {
+        hip_n_or_top_n: i32,
+        trans_bone: i32,
+    },
     /// Generate a pre-made prop effect from the prop library.
-    GenerateArticle { article_id: i32, subaction_only: bool },
+    GenerateArticle {
+        article_id: i32,
+        subaction_only: bool,
+    },
     /// Makes the article preform an animation when set to 1.
-    ArticleEvent (i32),
+    ArticleEvent(i32),
     /// Article Animation.
-    ArticleAnimation (i32),
+    ArticleAnimation(i32),
     /// Removes an article.
-    ArticleRemove (i32),
+    ArticleRemove(i32),
     /// Makes an article visible or invisible.
     ArticleVisibility { article_id: i32, visibility: bool },
     /// Allows use of Final Smash locked articles, variables, etc. Highly unstable.
@@ -1083,45 +1126,51 @@ pub enum EventAst {
     /// Used by certain article instances to remove themselves.
     TerminateSelf,
     /// Allow or disallow grabbing ledges during the current subaction.
-    LedgeGrabEnable (LedgeGrabEnable),
+    LedgeGrabEnable(LedgeGrabEnable),
     /// Disables or enables tag display for the current subaction.
-    TagDisplay (bool),
+    TagDisplay(bool),
     /// Begins super armor or heavy armor. Set parameters to None and 0 to end the armor.
-    Armor { armor_type: ArmorType, tolerance: f32 },
+    Armor {
+        armor_type: ArmorType,
+        tolerance: f32,
+    },
     /// Adds the specified amount of damage to the character's current percentage.
-    AddDamage (f32),
+    AddDamage(f32),
     /// ???
-    Posture (i32),
+    Posture(i32),
     /// Will either set or add the velocity amounts depending on the set_ flags.
-    SetOrAddVelocity (SetOrAddVelocity),
+    SetOrAddVelocity(SetOrAddVelocity),
     /// Sets the character's current velocity.
     SetVelocity { x_vel: f32, y_vel: f32 },
     /// Adds to the character's current velocity.
-    AddVelocity { x_vel: FloatValue, y_vel: FloatValue },
+    AddVelocity {
+        x_vel: FloatValue,
+        y_vel: FloatValue,
+    },
     /// Does not allow the specified type of movement.
-    DisableMovement (DisableMovement),
+    DisableMovement(DisableMovement),
     /// This must be set to the same value as DisableMovement to work.
-    DisableMovement2 (DisableMovement),
+    DisableMovement2(DisableMovement),
     /// When set to 1, vertical speed and acceleration are reset back to 0.
-    ResetVerticalVelocityAndAcceleration (bool),
+    ResetVerticalVelocityAndAcceleration(bool),
     /// Returns to normal physics.
     NormalizePhysics,
     /// Play a specified sound effect.
-    SoundEffect1 (i32),
+    SoundEffect1(i32),
     /// Play a specified sound effect.
-    SoundEffect2 (i32),
+    SoundEffect2(i32),
     /// Play a specified sound effect. The sound effect ends with the animation.
-    SoundEffectTransient (i32),
+    SoundEffectTransient(i32),
     /// Stops the specified sound effect immediately.
-    SoundEffectStop (i32),
+    SoundEffectStop(i32),
     /// Play a specified sound effect. Is used during victory poses.
-    SoundEffectVictory (i32),
+    SoundEffectVictory(i32),
     /// Unknown.
-    SoundEffectUnk (i32),
+    SoundEffectUnk(i32),
     /// Play a specified sound effect.
-    SoundEffectOther1 (i32),
+    SoundEffectOther1(i32),
     /// Play a specified sound effect.
-    SoundEffectOther2 (i32),
+    SoundEffectOther2(i32),
     /// Play a random low voice clip.
     SoundVoiceLow,
     /// Play a random damage voice clip.
@@ -1143,15 +1192,30 @@ pub enum EventAst {
     IntVariableDecrement { variable: VariableAst },
 
     /// Set a specified value to a float variable.
-    FloatVariableSet { value: FloatValue, variable: VariableAst },
+    FloatVariableSet {
+        value: FloatValue,
+        variable: VariableAst,
+    },
     /// Add a specified value to a float variable.
-    FloatVariableAdd { value: FloatValue, variable: VariableAst },
+    FloatVariableAdd {
+        value: FloatValue,
+        variable: VariableAst,
+    },
     /// Subtract a specified value from a float variable.
-    FloatVariableSubtract { value: FloatValue, variable: VariableAst },
+    FloatVariableSubtract {
+        value: FloatValue,
+        variable: VariableAst,
+    },
     /// Multiply a specified value on a float variable.
-    FloatVariableMultiply { value: FloatValue, variable: VariableAst },
+    FloatVariableMultiply {
+        value: FloatValue,
+        variable: VariableAst,
+    },
     /// Divide a specified value on a float variable.
-    FloatVariableDivide { value: FloatValue, variable: VariableAst },
+    FloatVariableDivide {
+        value: FloatValue,
+        variable: VariableAst,
+    },
 
     /// Set a bool variable to true.
     BoolVariableSetTrue { variable: VariableAst },
@@ -1159,49 +1223,95 @@ pub enum EventAst {
     BoolVariableSetFalse { variable: VariableAst },
 
     /// Changes the visibility of certain bones attached to objects. Uses bone groups and switches set in the specified Reference of the Model Visibility section.
-    ModelChanger { reference: u8, switch_index: i32, bone_group_index: i32 },
+    ModelChanger {
+        reference: u8,
+        switch_index: i32,
+        bone_group_index: i32,
+    },
     /// Generate a generic graphical effect with the specified parameters.
-    GraphicEffect (GraphicEffect),
+    GraphicEffect(GraphicEffect),
     /// Generate a graphical effect from an external file. (usually the Ef_ file)
-    ExternalGraphicEffect (ExternalGraphicEffect),
+    ExternalGraphicEffect(ExternalGraphicEffect),
     /// Tint the screen to the specified color.
-    LimitedScreenTint (LimitedScreenTint),
+    LimitedScreenTint(LimitedScreenTint),
     /// Tint the screen to the specified color until terminated by `EndUnlimitedScreenTint`.
-    UnlimitedScreenTint (UnlimitedScreenTint),
+    UnlimitedScreenTint(UnlimitedScreenTint),
     /// Ends an unlimited screen tint with the specified ID.
-    EndUnlimitedScreenTint { tint_id: i32, transition_out_time: i32 },
+    EndUnlimitedScreenTint {
+        tint_id: i32,
+        transition_out_time: i32,
+    },
     /// Creates glow of sword. Only usable when the proper effects are loaded by their respective characters.
-    SwordGlow (SwordGlow),
+    SwordGlow(SwordGlow),
     /// Remove the sword flow in the specified time
     DeleteSwordGlow { fade_time: i32 },
     /// Moves nearby movable model parts (capes, hair, etc) with a wind specified by the parameters.
-    AestheticWindEffect (AestheticWindEffect),
+    AestheticWindEffect(AestheticWindEffect),
     /// Ends the wind effect spawned by the "Aesthetic Wind Effect" event
     EndAestheticWindEffect { unk: i32 },
     /// Shakes the screen.
     ScreenShake { magnitude: i32 },
     /// Zoom the camera on the character.
-    CameraCloseup (CameraCloseup),
+    CameraCloseup(CameraCloseup),
     /// Return the camera to its normal settings.
     CameraNormal,
     /// Remove all currently active flash effects
     RemoveFlashEffect,
     /// Generate a flash overlay effect over the characer with the specified colors and opacity.
     /// Replaces any currently active flash effects.
-    FlashEffectOverlay { red: i32, green: i32, blue: i32, alpha: i32 },
+    FlashEffectOverlay {
+        red: i32,
+        green: i32,
+        blue: i32,
+        alpha: i32,
+    },
     /// Change the color of the current flash overlay effect.
-    SetColorOfFlashEffectOverlay { transition_time: i32, red: i32, green: i32, blue: i32, alpha: i32 },
+    SetColorOfFlashEffectOverlay {
+        transition_time: i32,
+        red: i32,
+        green: i32,
+        blue: i32,
+        alpha: i32,
+    },
     /// Generate a flash lighting effect over the character with the specified colors, opacity and angle.
     /// Replaces any currently active flash effects.
-    FlashEffectLight { red: i32, green: i32, blue: i32, alpha: i32, light_source_x: f32, light_source_y: f32 },
+    FlashEffectLight {
+        red: i32,
+        green: i32,
+        blue: i32,
+        alpha: i32,
+        light_source_x: f32,
+        light_source_y: f32,
+    },
     /// Changes the color of the current flash light effect.
-    SetColorOfFlashEffectLight { transition_time: i32, red: i32, green: i32, blue: i32, alpha: i32 },
+    SetColorOfFlashEffectLight {
+        transition_time: i32,
+        red: i32,
+        green: i32,
+        blue: i32,
+        alpha: i32,
+    },
     /// Cause the character to receive the closest item in range.
-    ItemPickup { unk1: i32, unk2: Option<i32>, unk3: Option<i32>, unk4: Option<i32> },
+    ItemPickup {
+        unk1: i32,
+        unk2: Option<i32>,
+        unk3: Option<i32>,
+        unk4: Option<i32>,
+    },
     /// Cause the character to throw the currently held item.
-    ItemThrow { unk1: VariableAst, unk2: VariableAst, unk3: VariableAst, unk4: Option<VariableAst>, unk5: Option<VariableAst> },
+    ItemThrow {
+        unk1: VariableAst,
+        unk2: VariableAst,
+        unk3: VariableAst,
+        unk4: Option<VariableAst>,
+        unk5: Option<VariableAst>,
+    },
     /// Cause the character to throw the currently held item.
-    ItemThrow2 { unk1: f32, unk2: f32, unk3: VariableAst },
+    ItemThrow2 {
+        unk1: f32,
+        unk2: f32,
+        unk3: VariableAst,
+    },
     /// Cause the character to drop any currently held item.
     ItemDrop,
     /// Cause the character to consume the currently held item.
@@ -1217,24 +1327,24 @@ pub enum EventAst {
     /// Create an item in the characters hand.
     ItemCreate { unk: i32 },
     /// Determines the visibility of the currently held item.
-    ItemVisibility (bool),
+    ItemVisibility(bool),
     /// Deletes the currently held item.
     ItemDelete,
     /// Creates a beam sword trail. Probably has more uses among battering weapons.
     BeamSwordTrail { unk: i32 },
     /// Unknown event.
-    Unknown (Event)
+    Unknown(Event),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum FloatValue {
-    Variable (VariableAst),
-    Constant (f32),
+    Variable(VariableAst),
+    Constant(f32),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Block {
-    pub events: Vec<EventAst>
+    pub events: Vec<EventAst>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1245,33 +1355,33 @@ pub struct ForLoop {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Iterations {
-    Finite (i32),
-    Infinite
+    Finite(i32),
+    Infinite,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct IfStatement {
     pub test: Expression,
     pub then_branch: Block,
-    pub else_branch: Option<Box<Block>>
+    pub else_branch: Option<Box<Block>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum Expression {
-    Nullary  (Requirement),
-    Unary    (UnaryExpression),
-    Binary   (BinaryExpression),
-    Not      (Box<Expression>),
-    Variable (VariableAst),
-    Value    (i32),
-    Scalar   (f32),
+    Nullary(Requirement),
+    Unary(UnaryExpression),
+    Binary(BinaryExpression),
+    Not(Box<Expression>),
+    Variable(VariableAst),
+    Value(i32),
+    Scalar(f32),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BinaryExpression {
     pub left: Box<Expression>,
     pub right: Box<Expression>,
-    pub operator: ComparisonOperator
+    pub operator: ComparisonOperator,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -1290,7 +1400,7 @@ pub enum ComparisonOperator {
     GreaterThan,
     And,
     Or,
-    UnknownArg (i32)
+    UnknownArg(i32),
 }
 
 impl ComparisonOperator {
@@ -1302,7 +1412,7 @@ impl ComparisonOperator {
             3 => ComparisonOperator::NotEqual,
             4 => ComparisonOperator::GreaterThanOrEqual,
             5 => ComparisonOperator::GreaterThan,
-            v => ComparisonOperator::UnknownArg (v),
+            v => ComparisonOperator::UnknownArg(v),
         }
     }
 }
@@ -1312,7 +1422,7 @@ pub enum EdgeSlide {
     SlideOff,
     StayOn,
     Airbourne,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl EdgeSlide {
@@ -1321,7 +1431,7 @@ impl EdgeSlide {
             0 => EdgeSlide::SlideOff,
             1 => EdgeSlide::StayOn,
             5 => EdgeSlide::Airbourne,
-            v => EdgeSlide::Unknown (v)
+            v => EdgeSlide::Unknown(v),
         }
     }
 }
@@ -1333,7 +1443,7 @@ pub enum HurtBoxState {
     IntangibleFlashing,
     IntangibleNoFlashing,
     IntangibleQuickFlashing,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl HurtBoxState {
@@ -1344,21 +1454,21 @@ impl HurtBoxState {
             2 => HurtBoxState::IntangibleFlashing,
             3 => HurtBoxState::IntangibleNoFlashing,
             4 => HurtBoxState::IntangibleQuickFlashing,
-            v => HurtBoxState::Unknown (v)
+            v => HurtBoxState::Unknown(v),
         }
     }
 
     pub fn is_normal(&self) -> bool {
         match self {
             HurtBoxState::Normal => true,
-            _ => false
+            _ => false,
         }
     }
 
     pub fn is_invincible(&self) -> bool {
         match self {
             HurtBoxState::Invincible => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -1367,7 +1477,7 @@ impl HurtBoxState {
             HurtBoxState::IntangibleFlashing => true,
             HurtBoxState::IntangibleNoFlashing => true,
             HurtBoxState::IntangibleQuickFlashing => true,
-            _ => false
+            _ => false,
         }
     }
 }
@@ -1399,20 +1509,20 @@ pub enum AngleFlip {
     /// flip = hitbox_x < defender_x
     HitboxPosition,
     FaceZaxis,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl AngleFlip {
     fn new(value: i32) -> AngleFlip {
         match value {
-            0     => AngleFlip::AttackerPosition,
-            1     => AngleFlip::MovementDir,
-            2     => AngleFlip::LeftDir,
-            3     => AngleFlip::AttackerDir,
-            4     => AngleFlip::AttackerDirReverse,
-            5     => AngleFlip::HitboxPosition,
+            0 => AngleFlip::AttackerPosition,
+            1 => AngleFlip::MovementDir,
+            2 => AngleFlip::LeftDir,
+            3 => AngleFlip::AttackerDir,
+            4 => AngleFlip::AttackerDirReverse,
+            5 => AngleFlip::HitboxPosition,
             6 | 7 => AngleFlip::FaceZaxis,
-            v     => AngleFlip::Unknown (v),
+            v => AngleFlip::Unknown(v),
         }
     }
 }
@@ -1444,22 +1554,22 @@ pub enum HitBoxEffect {
     Plunge,
     Down,
     Flinchless,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl HitBoxEffect {
     fn new(value: i32) -> HitBoxEffect {
         match value {
-             0 => HitBoxEffect::Normal,
-             1 => HitBoxEffect::None,
-             2 => HitBoxEffect::Slash,
-             3 => HitBoxEffect::Electric,
-             4 => HitBoxEffect::Freezing,
-             5 => HitBoxEffect::Flame,
-             6 => HitBoxEffect::Coin,
-             7 => HitBoxEffect::Reverse,
-             8 => HitBoxEffect::Trip,
-             9 => HitBoxEffect::Sleep,
+            00 => HitBoxEffect::Normal,
+            01 => HitBoxEffect::None,
+            02 => HitBoxEffect::Slash,
+            03 => HitBoxEffect::Electric,
+            04 => HitBoxEffect::Freezing,
+            05 => HitBoxEffect::Flame,
+            06 => HitBoxEffect::Coin,
+            07 => HitBoxEffect::Reverse,
+            08 => HitBoxEffect::Trip,
+            09 => HitBoxEffect::Sleep,
             //10 => HitBoxEffect::Unk1,
             11 => HitBoxEffect::Bury,
             12 => HitBoxEffect::Stun,
@@ -1475,7 +1585,7 @@ impl HitBoxEffect {
             22 => HitBoxEffect::Plunge,
             23 => HitBoxEffect::Down,
             24 => HitBoxEffect::Flinchless,
-            v  => HitBoxEffect::Unknown (v),
+            v => HitBoxEffect::Unknown(v),
         }
     }
 }
@@ -1504,35 +1614,35 @@ pub enum HitBoxSound {
     Racket,
     Aura,
     NessBat,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl HitBoxSound {
     fn new(value: i32) -> HitBoxSound {
         match value {
-            0 => HitBoxSound::Unique,
-            1 => HitBoxSound::Punch,
-            2 => HitBoxSound::Kick,
-            3 => HitBoxSound::Slash,
-            4 => HitBoxSound::Coin,
-            5 => HitBoxSound::HomeRunBat,
-            6 => HitBoxSound::Paper,
-            7 => HitBoxSound::Shock,
-            8 => HitBoxSound::Burn,
-            9 => HitBoxSound::Splash,
-           11 => HitBoxSound::Explosion,
-           13 => HitBoxSound::Thud,
-           14 => HitBoxSound::Slam,
-           15 => HitBoxSound::Thwomp,
-           16 => HitBoxSound::MagicZap,
-           17 => HitBoxSound::Shell,
-           18 => HitBoxSound::Slap,
-           19 => HitBoxSound::Pan,
-           20 => HitBoxSound::Club,
-           21 => HitBoxSound::Racket,
-           22 => HitBoxSound::Aura,
-           27 => HitBoxSound::NessBat,
-            _ => HitBoxSound::Unknown (value)
+            00 => HitBoxSound::Unique,
+            01 => HitBoxSound::Punch,
+            02 => HitBoxSound::Kick,
+            03 => HitBoxSound::Slash,
+            04 => HitBoxSound::Coin,
+            05 => HitBoxSound::HomeRunBat,
+            06 => HitBoxSound::Paper,
+            07 => HitBoxSound::Shock,
+            08 => HitBoxSound::Burn,
+            09 => HitBoxSound::Splash,
+            11 => HitBoxSound::Explosion,
+            13 => HitBoxSound::Thud,
+            14 => HitBoxSound::Slam,
+            15 => HitBoxSound::Thwomp,
+            16 => HitBoxSound::MagicZap,
+            17 => HitBoxSound::Shell,
+            18 => HitBoxSound::Slap,
+            19 => HitBoxSound::Pan,
+            20 => HitBoxSound::Club,
+            21 => HitBoxSound::Racket,
+            22 => HitBoxSound::Aura,
+            27 => HitBoxSound::NessBat,
+            _ => HitBoxSound::Unknown(value),
         }
     }
 }
@@ -1564,103 +1674,103 @@ pub enum HitBoxSseType {
     Whip,
     Tail,
     Energy,
-    Unknown (i32)
+    Unknown(i32),
 }
 
 impl HitBoxSseType {
     fn new(value: i32) -> HitBoxSseType {
         match value {
-            0 => HitBoxSseType::None,
-            1 => HitBoxSseType::Head,
-            2 => HitBoxSseType::Body,
-            3 => HitBoxSseType::Butt,
-            4 => HitBoxSseType::Hand,
-            5 => HitBoxSseType::Elbow,
-            6 => HitBoxSseType::Foot,
-            7 => HitBoxSseType::Knee,
-            8 => HitBoxSseType::Throwing,
-            9 => HitBoxSseType::Weapon,
-           10 => HitBoxSseType::Sword,
-           11 => HitBoxSseType::Hammer,
-           12 => HitBoxSseType::Explosive,
-           13 => HitBoxSseType::Spin,
-           14 => HitBoxSseType::Bite,
-           15 => HitBoxSseType::Magic,
-           16 => HitBoxSseType::Pk,
-           17 => HitBoxSseType::Bow,
-         //18 => HitBoxSseType::Unk,
-           19 => HitBoxSseType::NessBat,
-           20 => HitBoxSseType::Umbrella,
-           21 => HitBoxSseType::Pimin,
-           22 => HitBoxSseType::Water,
-           23 => HitBoxSseType::Whip,
-           24 => HitBoxSseType::Tail,
-           25 => HitBoxSseType::Energy,
-            _ => HitBoxSseType::Unknown (value)
+            00 => HitBoxSseType::None,
+            01 => HitBoxSseType::Head,
+            02 => HitBoxSseType::Body,
+            03 => HitBoxSseType::Butt,
+            04 => HitBoxSseType::Hand,
+            05 => HitBoxSseType::Elbow,
+            06 => HitBoxSseType::Foot,
+            07 => HitBoxSseType::Knee,
+            08 => HitBoxSseType::Throwing,
+            09 => HitBoxSseType::Weapon,
+            10 => HitBoxSseType::Sword,
+            11 => HitBoxSseType::Hammer,
+            12 => HitBoxSseType::Explosive,
+            13 => HitBoxSseType::Spin,
+            14 => HitBoxSseType::Bite,
+            15 => HitBoxSseType::Magic,
+            16 => HitBoxSseType::Pk,
+            17 => HitBoxSseType::Bow,
+            //18 => HitBoxSseType::Unk,
+            19 => HitBoxSseType::NessBat,
+            20 => HitBoxSseType::Umbrella,
+            21 => HitBoxSseType::Pimin,
+            22 => HitBoxSseType::Water,
+            23 => HitBoxSseType::Whip,
+            24 => HitBoxSseType::Tail,
+            25 => HitBoxSseType::Energy,
+            _ => HitBoxSseType::Unknown(value),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct HitBoxArguments {
-    pub bone_index:         i16,
-    pub hitbox_id:          u8,
-    pub set_id:             u8,
-    pub damage:             FloatValue,
-    pub trajectory:         i32,
-    pub wdsk:               i16,
-    pub kbg:                i16,
-    pub shield_damage:      i16,
-    pub bkb:                i16,
-    pub size:               f32,
-    pub x_offset:           f32,
-    pub y_offset:           f32,
-    pub z_offset:           f32,
-    pub tripping_rate:      f32,
-    pub hitlag_mult:        f32,
-    pub sdi_mult:           f32,
-    pub effect:             HitBoxEffect,
-    pub unk1:               bool,
-    pub sound_level:        u8,
-    pub unk2:               bool,
-    pub sound:              HitBoxSound,
-    pub unk3:               u8,
-    pub ground:             bool,
-    pub aerial:             bool,
-    pub unk4:               u8,
-    pub sse_type:           HitBoxSseType,
-    pub clang:              bool,
-    pub unk5:               bool,
-    pub direct:             bool,
-    pub unk6:               u8,
+    pub bone_index: i16,
+    pub hitbox_id: u8,
+    pub set_id: u8,
+    pub damage: FloatValue,
+    pub trajectory: i32,
+    pub wdsk: i16,
+    pub kbg: i16,
+    pub shield_damage: i16,
+    pub bkb: i16,
+    pub size: f32,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub tripping_rate: f32,
+    pub hitlag_mult: f32,
+    pub sdi_mult: f32,
+    pub effect: HitBoxEffect,
+    pub unk1: bool,
+    pub sound_level: u8,
+    pub unk2: bool,
+    pub sound: HitBoxSound,
+    pub unk3: u8,
+    pub ground: bool,
+    pub aerial: bool,
+    pub unk4: u8,
+    pub sse_type: HitBoxSseType,
+    pub clang: bool,
+    pub unk5: bool,
+    pub direct: bool,
+    pub unk6: u8,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SpecialHitBoxArguments {
-    pub hitbox_args:       HitBoxArguments,
-    pub rehit_rate:        i32,
-    pub angle_flipping:    AngleFlip,
-    pub unk1:              bool,
+    pub hitbox_args: HitBoxArguments,
+    pub rehit_rate: i32,
+    pub angle_flipping: AngleFlip,
+    pub unk1: bool,
     pub stretches_to_bone: bool,
-    pub unk2:              bool,
+    pub unk2: bool,
     /// Can hit fighters, waddle dee/doo and pikmin
-    pub can_hit1:  bool,
+    pub can_hit1: bool,
     /// Can hit SSE enemies
-    pub can_hit2:  bool,
+    pub can_hit2: bool,
     /// Unk
-    pub can_hit3:  bool,
+    pub can_hit3: bool,
     /// Can hit ROB Gyro, Snake grenade and Mr Saturn
-    pub can_hit4:  bool,
+    pub can_hit4: bool,
     /// Unk
-    pub can_hit5:  bool,
+    pub can_hit5: bool,
     /// Unk
-    pub can_hit6:  bool,
+    pub can_hit6: bool,
     /// Can hit Stage hurtboxes not including wall/ceiling/floor
-    pub can_hit7:  bool,
+    pub can_hit7: bool,
     /// Can hit wall/ceiling/floor
-    pub can_hit8:  bool,
+    pub can_hit8: bool,
     /// Link & Toon Link Bomb, Bob-omb
-    pub can_hit9:  bool,
+    pub can_hit9: bool,
     /// Unk
     pub can_hit10: bool,
     /// Link & Toon Link Bomb, Bob-omb, ROB Gyro, Snake grenade, Bob-omb, Mr Saturn, All Stage related hurtboxes?
@@ -1669,24 +1779,24 @@ pub struct SpecialHitBoxArguments {
     pub can_hit12: bool,
     /// Unk
     pub can_hit13: bool,
-    pub enabled:              bool,
-    pub unk3:                 u8,
-    pub can_be_shielded:      bool,
-    pub can_be_reflected:     bool,
-    pub can_be_absorbed:      bool,
-    pub unk4:                 u8,
-    pub remain_grabbed:       bool,
+    pub enabled: bool,
+    pub unk3: u8,
+    pub can_be_shielded: bool,
+    pub can_be_reflected: bool,
+    pub can_be_absorbed: bool,
+    pub unk4: u8,
+    pub remain_grabbed: bool,
     pub ignore_invincibility: bool,
     pub freeze_frame_disable: bool,
-    pub unk5:                 bool,
-    pub flinchless:           bool,
+    pub unk5: bool,
+    pub flinchless: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DefensiveCollisionType {
     Block,
     Reflect,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl DefensiveCollisionType {
@@ -1694,7 +1804,7 @@ impl DefensiveCollisionType {
         match value {
             2 => DefensiveCollisionType::Block,
             3 => DefensiveCollisionType::Reflect,
-            v => DefensiveCollisionType::Unknown (v),
+            v => DefensiveCollisionType::Unknown(v),
         }
     }
 }
@@ -1703,7 +1813,7 @@ impl DefensiveCollisionType {
 pub enum DefensiveCollisionDirection {
     Front,
     FrontAndBack,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl DefensiveCollisionDirection {
@@ -1711,15 +1821,15 @@ impl DefensiveCollisionDirection {
         match value {
             1 => DefensiveCollisionDirection::Front,
             2 => DefensiveCollisionDirection::FrontAndBack,
-            v => DefensiveCollisionDirection::Unknown (v),
+            v => DefensiveCollisionDirection::Unknown(v),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct MoveHitBox {
-    pub hitbox_id:    i32,
-    pub new_bone:     i32,
+    pub hitbox_id: i32,
+    pub new_bone: i32,
     pub new_x_offset: f32,
     pub new_y_offset: f32,
     pub new_z_offset: f32,
@@ -1727,15 +1837,15 @@ pub struct MoveHitBox {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GrabBoxArguments {
-    pub hitbox_id:    i32,
-    pub bone_index:   i32,
-    pub size:         f32,
-    pub x_offset:     f32,
-    pub y_offset:     f32,
-    pub z_offset:     f32,
-    pub set_action:   i32,
-    pub target:       GrabTarget,
-    pub unk:          Option<i32>,
+    pub hitbox_id: i32,
+    pub bone_index: i32,
+    pub size: f32,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub set_action: i32,
+    pub target: GrabTarget,
+    pub unk: Option<i32>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -1744,7 +1854,7 @@ pub enum GrabTarget {
     GroundedOnly,
     AerialOnly,
     AerialAndGrounded,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl GrabTarget {
@@ -1754,7 +1864,7 @@ impl GrabTarget {
             1 => GrabTarget::GroundedOnly,
             2 => GrabTarget::AerialOnly,
             3 => GrabTarget::AerialAndGrounded,
-            v => GrabTarget::Unknown (v),
+            v => GrabTarget::Unknown(v),
         }
     }
 
@@ -1778,30 +1888,30 @@ impl GrabTarget {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SpecifyThrow {
     /// ID of throw data. Seemingly, a "0" indicates this is the throw data, while a "1" indicates this is used if the opponent escapes during the throw. "2" has also been seen (by Light Arrow)."
-    pub throw_use:   ThrowUse,
-    pub bone:        i32,
-    pub damage:      i32,
-    pub trajectory:  i32,
-    pub kbg:         i32,
-    pub wdsk:        i32,
-    pub bkb:         i32,
-    pub effect:      HitBoxEffect,
-    pub unk0:        f32,
-    pub unk1:        f32,
-    pub unk2:        f32,
-    pub unk3:        i32,
-    pub sfx:         HitBoxSound,
+    pub throw_use: ThrowUse,
+    pub bone: i32,
+    pub damage: i32,
+    pub trajectory: i32,
+    pub kbg: i32,
+    pub wdsk: i32,
+    pub bkb: i32,
+    pub effect: HitBoxEffect,
+    pub unk0: f32,
+    pub unk1: f32,
+    pub unk2: f32,
+    pub unk3: i32,
+    pub sfx: HitBoxSound,
     pub grab_target: GrabTarget,
-    pub unk4:        bool,
-    pub unk5:        bool,
-    pub i_frames:    i32,
+    pub unk4: bool,
+    pub unk5: bool,
+    pub i_frames: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum ThrowUse {
     Throw,
     GrabInterrupt,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl ThrowUse {
@@ -1809,7 +1919,7 @@ impl ThrowUse {
         match value {
             0 => ThrowUse::Throw,
             1 => ThrowUse::GrabInterrupt,
-            v => ThrowUse::Unknown (v),
+            v => ThrowUse::Unknown(v),
         }
     }
 }
@@ -1828,7 +1938,7 @@ pub enum LedgeGrabEnable {
     Disable,
     EnableInFront,
     EnableInFrontAndBehind,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl LedgeGrabEnable {
@@ -1837,16 +1947,16 @@ impl LedgeGrabEnable {
             0 => LedgeGrabEnable::Disable,
             1 => LedgeGrabEnable::EnableInFront,
             2 => LedgeGrabEnable::EnableInFrontAndBehind,
-            v => LedgeGrabEnable::Unknown (v),
+            v => LedgeGrabEnable::Unknown(v),
         }
     }
 
     pub fn enabled(&self) -> bool {
         match self {
-            LedgeGrabEnable::EnableInFront          => true,
+            LedgeGrabEnable::EnableInFront => true,
             LedgeGrabEnable::EnableInFrontAndBehind => true,
-            LedgeGrabEnable::Disable                => false,
-            LedgeGrabEnable::Unknown (_)            => false,
+            LedgeGrabEnable::Disable => false,
+            LedgeGrabEnable::Unknown(_) => false,
         }
     }
 }
@@ -1857,7 +1967,7 @@ pub enum ArmorType {
     SuperArmor,
     HeavyArmorKnockbackBased,
     HeavyArmorDamageBased,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl ArmorType {
@@ -1867,7 +1977,7 @@ impl ArmorType {
             1 => ArmorType::SuperArmor,
             2 => ArmorType::HeavyArmorKnockbackBased,
             3 => ArmorType::HeavyArmorDamageBased,
-            v => ArmorType::Unknown (v),
+            v => ArmorType::Unknown(v),
         }
     }
 }
@@ -1885,7 +1995,7 @@ pub enum DisableMovement {
     Enable,
     DisableVertical,
     DisableHorizontal,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl DisableMovement {
@@ -1894,52 +2004,52 @@ impl DisableMovement {
             0 => DisableMovement::Enable,
             1 => DisableMovement::DisableVertical,
             2 => DisableMovement::DisableHorizontal,
-            v => DisableMovement::Unknown (v),
+            v => DisableMovement::Unknown(v),
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GraphicEffect {
-    pub graphic:                  i32,
-    pub bone:                     i32,
-    pub x_offset:                 f32,
-    pub y_offset:                 f32,
-    pub z_offset:                 f32,
-    pub x_rotation:               f32,
-    pub y_rotation:               f32,
-    pub z_rotation:               f32,
-    pub scale:                    f32,
-    pub random_x_offset:          f32,
-    pub random_y_offset:          f32,
-    pub random_z_offset:          f32,
-    pub random_x_rotation:        f32,
-    pub random_y_rotation:        f32,
-    pub random_z_rotation:        f32,
-    pub terminate_with_animation: bool
+    pub graphic: i32,
+    pub bone: i32,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub x_rotation: f32,
+    pub y_rotation: f32,
+    pub z_rotation: f32,
+    pub scale: f32,
+    pub random_x_offset: f32,
+    pub random_y_offset: f32,
+    pub random_z_offset: f32,
+    pub random_x_rotation: f32,
+    pub random_y_rotation: f32,
+    pub random_z_rotation: f32,
+    pub terminate_with_animation: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExternalGraphicEffect {
-    pub file:                     i16,
-    pub graphic:                  i16,
-    pub bone:                     i32,
-    pub x_offset:                 f32,
-    pub y_offset:                 f32,
-    pub z_offset:                 f32,
-    pub x_rotation:               f32,
-    pub y_rotation:               f32,
-    pub z_rotation:               f32,
-    pub scale:                    f32,
-    pub randomize:                Option<ExternalGraphicEffectRandomize>,
+    pub file: i16,
+    pub graphic: i16,
+    pub bone: i32,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub x_rotation: f32,
+    pub y_rotation: f32,
+    pub z_rotation: f32,
+    pub scale: f32,
+    pub randomize: Option<ExternalGraphicEffectRandomize>,
     pub terminate_with_animation: bool,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ExternalGraphicEffectRandomize {
-    pub random_x_offset:   f32,
-    pub random_y_offset:   f32,
-    pub random_z_offset:   f32,
+    pub random_x_offset: f32,
+    pub random_y_offset: f32,
+    pub random_z_offset: f32,
     pub random_x_rotation: f32,
     pub random_y_rotation: f32,
     pub random_z_rotation: f32,
@@ -1968,51 +2078,51 @@ pub struct UnlimitedScreenTint {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SwordGlow {
-    pub color:                  i32,
-    pub blur_length:            i32,
+    pub color: i32,
+    pub blur_length: i32,
 
-    pub point1_bone:            i32,
-    pub point1_x_offset:        f32,
-    pub point1_y_offset:        f32,
-    pub point1_z_offset:        f32,
+    pub point1_bone: i32,
+    pub point1_x_offset: f32,
+    pub point1_y_offset: f32,
+    pub point1_z_offset: f32,
 
-    pub point2_bone:            i32,
-    pub point2_x_offset:        f32,
-    pub point2_y_offset:        f32,
-    pub point2_z_offset:        f32,
+    pub point2_bone: i32,
+    pub point2_x_offset: f32,
+    pub point2_y_offset: f32,
+    pub point2_z_offset: f32,
 
     pub delete_after_subaction: bool,
-    pub graphic_id:             i32,
-    pub bone_id:                i32,
-    pub x_offset:               f32,
-    pub y_offset:               f32,
-    pub z_offset:               f32,
-    pub x_rotation:             f32,
-    pub y_rotation:             f32,
-    pub z_rotation:             f32,
-    pub glow_length:            f32,
+    pub graphic_id: i32,
+    pub bone_id: i32,
+    pub x_offset: f32,
+    pub y_offset: f32,
+    pub z_offset: f32,
+    pub x_rotation: f32,
+    pub y_rotation: f32,
+    pub z_rotation: f32,
+    pub glow_length: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AestheticWindEffect {
-    pub unk1:    i32,
-    pub unk2:    f32,
+    pub unk1: i32,
+    pub unk2: f32,
     pub stength: f32,
-    pub speed:   f32,
-    pub size:    f32,
-    pub unk3:    f32,
-    pub unk4:    f32,
-    pub unk5:    f32,
-    pub unk6:    f32,
-    pub unk7:    f32,
-    pub unk8:    i32,
+    pub speed: f32,
+    pub size: f32,
+    pub unk3: f32,
+    pub unk4: f32,
+    pub unk5: f32,
+    pub unk6: f32,
+    pub unk7: f32,
+    pub unk8: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Interrupt {
     pub interrupt_id: Option<i32>,
-    pub action:       i32,
-    pub test:         Expression
+    pub action: i32,
+    pub test: Expression,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -2038,7 +2148,7 @@ pub enum InterruptType {
     AirJump,
     /// Only works in squat
     PassThroughPlat,
-    Unknown (i32),
+    Unknown(i32),
 }
 
 impl InterruptType {
@@ -2064,7 +2174,7 @@ impl InterruptType {
             0x11 => InterruptType::AirWalljump,
             0x12 => InterruptType::AirJump,
             0x13 => InterruptType::PassThroughPlat,
-            _ => InterruptType::Unknown (value)
+            _ => InterruptType::Unknown(value),
         }
     }
 }
@@ -2072,8 +2182,8 @@ impl InterruptType {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CameraCloseup {
     pub zoom_time: i32,
-    pub unk:       i32,
-    pub distance:  f32,
-    pub x_angle:   f32,
-    pub y_angle:   f32,
+    pub unk: i32,
+    pub distance: f32,
+    pub x_angle: f32,
+    pub y_angle: f32,
 }

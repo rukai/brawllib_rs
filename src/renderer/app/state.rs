@@ -1,7 +1,7 @@
 use std::sync::mpsc::Receiver;
 
-use winit_input_helper::WinitInputHelper;
 use winit::event::VirtualKeyCode;
+use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::Camera;
@@ -18,21 +18,21 @@ pub enum State {
     Pause,
 }
 
-pub (crate) enum InvulnerableType {
+pub(crate) enum InvulnerableType {
     Hit,
     Grab,
     TrapItem,
 }
 
 pub(crate) struct AppState {
-    pub frame_index:       usize,
-    pub wireframe:         bool,
-    pub perspective:       bool,
-    pub render_ecb:        bool,
+    pub frame_index: usize,
+    pub wireframe: bool,
+    pub perspective: bool,
+    pub render_ecb: bool,
     pub invulnerable_type: InvulnerableType,
-    pub camera:            Camera,
-    state:                 State,
-    event_rx: Receiver<AppEvent>
+    pub camera: Camera,
+    state: State,
+    event_rx: Receiver<AppEvent>,
 }
 
 impl AppState {
@@ -54,7 +54,7 @@ impl AppState {
             match event {
                 AppEvent::SetState(state) => self.state = state,
                 AppEvent::SetFrame(frame) => self.frame_index = frame,
-            }   
+            }
         }
 
         if input.key_pressed(VirtualKeyCode::Key1) {
@@ -99,15 +99,13 @@ impl AppState {
 
         if self.camera.theta > std::f32::consts::PI * 2.0 {
             self.camera.theta = 0.0;
-        }
-        else if self.camera.theta < 0.0 {
+        } else if self.camera.theta < 0.0 {
             self.camera.theta = std::f32::consts::PI * 2.0;
         }
 
         if self.camera.phi > std::f32::consts::PI - small {
             self.camera.phi = std::f32::consts::PI - small;
-        }
-        else if self.camera.phi < small {
+        } else if self.camera.phi < small {
             self.camera.phi = small;
         }
 
@@ -132,7 +130,7 @@ impl AppState {
                     self.frame_index -= 1
                 }
             }
-            State::Pause => { }
+            State::Pause => {}
         }
 
         if let State::StepForward | State::StepBackward = self.state {

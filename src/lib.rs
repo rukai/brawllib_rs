@@ -23,16 +23,22 @@
 //! }
 //! ```
 
-#[macro_use] extern crate serde_derive;
-#[macro_use] extern crate bitflags;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate bitflags;
+#[macro_use]
+extern crate log;
 
+mod action_names;
 pub mod arc;
 pub mod brawl_mod;
 pub mod bres;
 pub mod chr0;
 pub mod fighter;
+mod fighter_maps;
 pub mod high_level_fighter;
+mod init_hack_script;
 pub mod math;
 pub mod mbox;
 pub mod mdl0;
@@ -44,10 +50,7 @@ pub mod script;
 pub mod script_ast;
 pub mod script_runner;
 pub mod user_data;
+mod util;
 pub mod wii_memory;
 pub mod wii_texture_formats;
 pub mod wiird_runner;
-mod util;
-mod action_names;
-mod fighter_maps;
-mod init_hack_script;

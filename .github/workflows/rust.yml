@@ -17,7 +17,9 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-    - name: Build
+    - name: Check `cargo fmt` was run
+      run: cargo fmt --all -- --check
+    - name: Build and test
       run: |
         cargo test
         cargo test --release

@@ -1,10 +1,11 @@
 use fancy_slice::FancySlice;
 
-use crate::script::Script;
 use crate::script;
+use crate::script::Script;
 use crate::util;
 use crate::wii_memory::WiiMemory;
 
+#[rustfmt::skip]
 pub(crate) fn arc_fighter_data_common(parent_data: FancySlice, data: FancySlice, wii_memory: &WiiMemory) -> ArcFighterDataCommon {
     let global_ics           = data.i32_be(0x00);
     let global_ics_sse       = data.i32_be(0x04);
@@ -122,7 +123,7 @@ struct OffsetSizePair {
 }
 
 fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
-    let mut pairs = vec!();
+    let mut pairs = vec![];
     for i in 0..26 {
         let offset = data.i32_be(i * 4) as usize;
         if offset != 0 {
@@ -133,10 +134,10 @@ fn get_sizes(data: FancySlice) -> Vec<OffsetSizePair> {
     // TODO: Document WHY we modify these offsets, I just copied it from brawlbox
     pairs[2].offset = 1; // Set ICs offset to 1
     pairs.sort_by_key(|x| x.offset);
-    pairs[2].offset -= 1;  // Set unk4 offset to -= 1
+    pairs[2].offset -= 1; // Set unk4 offset to -= 1
 
     // fill in size for most elements
-    for i in 0..pairs.len()-1 {
+    for i in 0..pairs.len() - 1 {
         pairs[i].size = pairs[i + 1].offset - pairs[i].offset
     }
 

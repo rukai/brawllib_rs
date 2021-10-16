@@ -1,5 +1,5 @@
-use brawllib_rs::high_level_fighter::HighLevelFighter;
 use brawllib_rs::brawl_mod::BrawlMod;
+use brawllib_rs::high_level_fighter::HighLevelFighter;
 use brawllib_rs::renderer;
 use brawllib_rs::renderer::WgpuState;
 
@@ -20,8 +20,18 @@ fn main() {
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
-    opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
+    opts.optopt(
+        "d",
+        "dir",
+        "full path to a brawl directory",
+        "DIRECTORY_NAME",
+    );
+    opts.optopt(
+        "m",
+        "mod",
+        "full path to a mod directory that will overwrite brawl files",
+        "DIRECTORY_NAME",
+    );
     opts.optopt("f", "fighter", "fighter name", "FIGHTER_NAME");
     opts.optopt("a", "subaction", "subaction name", "ACTION_NAME");
 
@@ -75,7 +85,11 @@ fn main() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
                     let mut wgpu_state = futures::executor::block_on(WgpuState::new_for_gif());
                     let data = renderer::render_gif_blocking(&mut wgpu_state, &hl_fighter, i);
-                    std::fs::write(format!("output_{}_{}.gif", hl_fighter.name, subaction.name), &data).unwrap();
+                    std::fs::write(
+                        format!("output_{}_{}.gif", hl_fighter.name, subaction.name),
+                        &data,
+                    )
+                    .unwrap();
                     return;
                 }
             }

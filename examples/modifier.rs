@@ -2,8 +2,8 @@ use brawllib_rs::brawl_mod::BrawlMod;
 
 use getopts::Options;
 
-use std::path::PathBuf;
 use std::env;
+use std::path::PathBuf;
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
@@ -17,8 +17,18 @@ fn main() {
     let program = &args[0];
 
     let mut opts = Options::new();
-    opts.optopt("d", "dir", "full path to a brawl directory", "DIRECTORY_NAME");
-    opts.optopt("m", "mod", "full path to a mod directory that will overwrite brawl files", "DIRECTORY_NAME");
+    opts.optopt(
+        "d",
+        "dir",
+        "full path to a brawl directory",
+        "DIRECTORY_NAME",
+    );
+    opts.optopt(
+        "m",
+        "mod",
+        "full path to a mod directory that will overwrite brawl files",
+        "DIRECTORY_NAME",
+    );
     opts.optopt("f", "fighter", "fighter name", "FIGHTER_NAME");
 
     let matches = match opts.parse(&args[1..]) {

@@ -3,7 +3,7 @@ use fancy_slice::FancySlice;
 pub(crate) fn list_offset(data: FancySlice) -> ListOffset {
     ListOffset {
         start_offset: data.i32_be(0x0),
-        count:        data.i32_be(0x4),
+        count: data.i32_be(0x4),
     }
 }
 
@@ -20,8 +20,7 @@ pub fn parse_tag(data: &[u8]) -> String {
         let byte = data[j] as char;
         if byte.is_ascii_graphic() {
             tag.push(byte);
-        }
-        else {
+        } else {
             break;
         }
     }
