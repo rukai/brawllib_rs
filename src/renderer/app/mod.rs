@@ -12,7 +12,7 @@ use crate::renderer::wgpu_state::{CompatibleSurface, WgpuState};
 
 pub mod state;
 
-use state::{AppEvent, AppState, State};
+use state::{AppEvent, AppState};
 
 /// Opens an interactive window displaying hurtboxes and hitboxes
 /// Blocks until user closes window
@@ -32,6 +32,7 @@ pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usi
 /// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: HighLevelSubaction) {
+    use state::State;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
     use web_sys::HtmlElement;
