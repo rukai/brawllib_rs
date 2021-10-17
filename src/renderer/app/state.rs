@@ -18,13 +18,13 @@ pub enum State {
     Pause,
 }
 
-pub(crate) enum InvulnerableType {
+pub enum InvulnerableType {
     Hit,
     Grab,
     TrapItem,
 }
 
-pub(crate) struct AppState {
+pub struct AppState {
     pub frame_index: usize,
     pub wireframe: bool,
     pub perspective: bool,

@@ -4,9 +4,9 @@ use std::f32::consts;
 use crate::high_level_fighter::HighLevelSubaction;
 
 /// Uses spherical coordinates to represent the cameras location relative to a target.
-/// https://en.wikipedia.org/wiki/Spherical_coordinate_system
-/// https://threejs.org/docs/#api/en/math/Spherical
-pub(crate) struct Camera {
+/// <https://en.wikipedia.org/wiki/Spherical_coordinate_system>
+/// <https://threejs.org/docs/#api/en/math/Spherical>
+pub struct Camera {
     pub target: Point3<f32>,
     /// radius from the target to the camera
     pub radius: f32,

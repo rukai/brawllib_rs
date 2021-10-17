@@ -5,7 +5,7 @@ use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
 
-use crate::high_level_fighter::{HighLevelFighter, HighLevelSubaction};
+use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::Camera;
 use crate::renderer::draw::draw_frame;
 use crate::renderer::wgpu_state::{CompatibleSurface, WgpuState};
@@ -13,102 +13,9 @@ use crate::renderer::wgpu_state::{CompatibleSurface, WgpuState};
 pub mod state;
 
 use state::{AppEvent, AppState};
-
-/// Opens an interactive window displaying hurtboxes and hitboxes
-/// Blocks until user closes window
-pub fn render_window(high_level_fighter: &HighLevelFighter, subaction_index: usize) {
-    let event_loop = EventLoop::new();
-    let window = Window::new(&event_loop).unwrap();
-    let high_level_fighter = high_level_fighter.clone();
-    let subaction = high_level_fighter.subactions[subaction_index].clone();
-    let mut app = futures::executor::block_on(App::new(window, subaction));
-
-    event_loop.run(move |event, _, control_flow| {
-        app.update(event, control_flow);
-    });
-}
-
-// TODO: move this into an example
-/// Adds an interactive element to the webpage displaying hurtboxes and hitboxes
-#[cfg(target_arch = "wasm32")]
-pub async fn render_window_wasm(subaction: HighLevelSubaction) {
-    use state::State;
-    use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
-    use web_sys::HtmlElement;
-    use winit::platform::web::WindowExtWebSys;
-
-    let event_loop = EventLoop::new();
-    let window = Window::new(&event_loop).unwrap();
-
-    let document = web_sys::window().unwrap().document().unwrap();
-
-    let visualiser_span = document.get_element_by_id("fighter-render").unwrap();
-    visualiser_span
-        .append_child(&web_sys::Element::from(window.canvas()))
-        .unwrap();
-
-    let mut app = App::new(window, subaction).await;
-    let event_tx = app.get_event_tx();
-
-    // TODO:
-    // hmmmmmmmmmmmmmmmmmm
-    // It would be ideal if we could completely control the app from here by just sending events.
-    // Two way communication would add a lot of complexity.
-    // The tricky part is how to handle updating the current frame.
-    // Can we do that without access to the render loop?
-
-    // possible approaches:
-    // ## directly use surface?
-    // * yew
-    // * how do I get a surface for wgpu
-    //
-    // ## winit + reuse app + move rukaidata UI into brawllib via iced
-    // * send state in with event
-    // * AppState just stores state and everyone is responsible for sending in AppEvent to update it.
-    //
-    // ## winit + reuse App/AppState
-    // * send state in with event
-    // * AppState just stores state and everyone is responsible for sending in AppEvent to update it.
-    //
-    // ## winit + dont reuse App/AppState
-    // * reimplement equivalent of App for maximum flexibility
-    //
-    // wow I really cant figure out which one I want.
-    // Im thinking:
-    // 1. get this running in rukaidata so I can test things properly
-    // 2. go with: "winit + dont reuse app", then prototype really quickly to see if it works.
-    // 3. move on with my life. I really dont think I care about having to focus the app to give keyboard inputs.
-
-    let frame = document.get_element_by_id("frame").unwrap();
-    let frame_move = frame.clone();
-    frame_move.set_inner_html("Frame: 0");
-
-    let button = document.get_element_by_id("run").unwrap();
-    let button_move = button.clone();
-    button_move.set_inner_html("Run");
-    let do_thing = Closure::wrap(Box::new(move || {
-        if button_move.inner_html() == "Stop" {
-            event_tx.send(AppEvent::SetState(State::Pause)).unwrap();
-            button_move.set_inner_html("Run");
-        } else {
-            event_tx.send(AppEvent::SetState(State::Play)).unwrap();
-            button_move.set_inner_html("Stop");
-        }
-    }) as Box<dyn FnMut()>);
-    button
-        .dyn_ref::<HtmlElement>()
-        .unwrap()
-        .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
-
-    app.get_event_tx()
-        .send(AppEvent::SetState(State::Pause))
-        .unwrap();
-    event_loop.run(move |event, _, control_flow| {
-        app.update(event, control_flow);
-    });
-}
-
+/// Interactive hitbox renderer app compatible with desktop and web.
+///
+/// Implementation details:
 /// Glues together:
 /// *   AppState: All application logic goes in here
 /// *   WgpuState: All rendering logic goes in here
@@ -122,10 +29,40 @@ pub struct App {
     surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
     event_tx: Sender<AppEvent>,
+    event_loop: Option<EventLoop<()>>,
 }
 
 impl App {
-    pub async fn new(_window: Window, subaction: HighLevelSubaction) -> App {
+    /// Opens a window for the app
+    pub async fn new(subaction: HighLevelSubaction) -> Self {
+        let event_loop = EventLoop::new();
+        let window = Window::new(&event_loop).unwrap();
+        App::new_common(window, event_loop, subaction).await
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    /// Inserts a surface for the app into the provided element
+    pub async fn new_insert_into_element(
+        element: web_sys::Element,
+        subaction: HighLevelSubaction,
+    ) -> Self {
+        use winit::platform::web::WindowExtWebSys;
+
+        let event_loop = EventLoop::new();
+        let window = Window::new(&event_loop).unwrap();
+
+        element
+            .append_child(&web_sys::Element::from(window.canvas()))
+            .unwrap();
+
+        App::new_common(window, event_loop, subaction).await
+    }
+
+    async fn new_common(
+        _window: Window,
+        event_loop: EventLoop<()>,
+        subaction: HighLevelSubaction,
+    ) -> App {
         let input = WinitInputHelper::new();
         let size = _window.inner_size();
 
@@ -160,7 +97,19 @@ impl App {
             surface_configuration,
             subaction,
             event_tx,
+            event_loop: Some(event_loop),
         }
+    }
+
+    /// Starts running the app.
+    /// This function blocks until user closes window
+    pub fn run(mut self) {
+        self.event_loop
+            .take()
+            .unwrap()
+            .run(move |event, _, control_flow| {
+                self.update(event, control_flow);
+            });
     }
 
     pub fn get_event_tx(&self) -> Sender<AppEvent> {

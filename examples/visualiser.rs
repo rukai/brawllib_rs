@@ -1,6 +1,6 @@
 use brawllib_rs::brawl_mod::BrawlMod;
 use brawllib_rs::high_level_fighter::HighLevelFighter;
-use brawllib_rs::renderer;
+use brawllib_rs::renderer::app::App;
 
 use getopts::Options;
 
@@ -82,7 +82,10 @@ fn main() {
             let hl_fighter = HighLevelFighter::new(&fighter);
             for (i, subaction) in hl_fighter.subactions.iter().enumerate() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
-                    renderer::render_window(&hl_fighter, i);
+                    let subaction = hl_fighter.subactions[i].clone();
+                    let app = futures::executor::block_on(App::new(subaction));
+
+                    app.run();
                     return;
                 }
             }
