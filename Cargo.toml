@@ -1,13 +1,13 @@
 [package]
 name = "brawllib_rs"
-edition = "2018"
+edition = "2021"
+rust-version = "1.56"
 version = "0.21.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "Brawl character file parser, based on brawlbox/brawllib"
 license = "MIT"
 repository = "https://github.com/rukai/brawllib_rs"
 keywords = ["super", "smash", "bros", "brawl", "lib"]
-resolver = "2"
 categories = ["games", "game-engines"]
 
 [dependencies]
