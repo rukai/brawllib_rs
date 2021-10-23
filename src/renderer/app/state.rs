@@ -4,11 +4,12 @@ use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::HighLevelSubaction;
-use crate::renderer::camera::Camera;
+use crate::renderer::camera::{Camera, CharacterFacing};
 
 pub enum AppEvent {
     SetState(State),
     SetFrame(usize),
+    ResetCamera(CharacterFacing),
 }
 
 pub enum State {
@@ -49,11 +50,20 @@ impl AppState {
         }
     }
 
-    pub fn update(&mut self, input: &WinitInputHelper, subaction: &HighLevelSubaction) {
+    pub fn update(
+        &mut self,
+        input: &WinitInputHelper,
+        subaction: &HighLevelSubaction,
+        window_width: u16,
+        window_height: u16,
+    ) {
         for event in self.event_rx.try_iter() {
             match event {
                 AppEvent::SetState(state) => self.state = state,
                 AppEvent::SetFrame(frame) => self.frame_index = frame,
+                AppEvent::ResetCamera(facing) => {
+                    self.camera.reset(window_width, window_height, facing)
+                }
             }
         }
 

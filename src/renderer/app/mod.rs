@@ -122,7 +122,12 @@ impl App {
                 *control_flow = ControlFlow::Exit;
             }
 
-            self.app_state.update(&self.input, &self.subaction);
+            self.app_state.update(
+                &self.input,
+                &self.subaction,
+                self.surface_configuration.width as u16,
+                self.surface_configuration.height as u16,
+            );
 
             if let Some(size) = self.input.window_resized() {
                 self.surface_configuration.width = size.width;
