@@ -12,7 +12,7 @@ use crate::renderer::wgpu_state::{CompatibleSurface, WgpuState};
 
 pub mod state;
 
-use state::{AppEvent, AppState};
+use state::{AppEventIncoming, AppEventOutgoingHandler, AppState};
 /// Interactive hitbox renderer app compatible with desktop and web.
 ///
 /// Implementation details:
@@ -28,7 +28,7 @@ pub struct App {
     surface: wgpu::Surface,
     surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
-    event_tx: Sender<AppEvent>,
+    event_tx: Sender<AppEventIncoming>,
     event_loop: Option<EventLoop<()>>,
 }
 
@@ -112,10 +112,17 @@ impl App {
             });
     }
 
-    pub fn get_event_tx(&self) -> Sender<AppEvent> {
+    /// Sets a function that will be called when various internal events occur within the app
+    pub fn set_event_handler(&mut self, event_handler: AppEventOutgoingHandler) {
+        self.app_state.set_event_handler(event_handler);
+    }
+
+    /// Returns a sender that allows you to send events into the app to control its state
+    pub fn get_event_tx(&self) -> Sender<AppEventIncoming> {
         self.event_tx.clone()
     }
 
+    /// Manually update the app state, call this instead of `App::run` if you need to maintain control of the event loop.
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
         if self.input.update(&event) {
             if self.input.quit() {

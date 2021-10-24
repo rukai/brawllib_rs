@@ -6,12 +6,20 @@ use winit_input_helper::WinitInputHelper;
 use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::{Camera, CharacterFacing};
 
-pub enum AppEvent {
+pub type AppEventOutgoingHandler = Box<dyn Fn(AppEventOutgoing) -> ()>;
+
+pub enum AppEventIncoming {
     SetState(State),
     SetFrame(usize),
     ResetCamera(CharacterFacing),
 }
 
+pub enum AppEventOutgoing {
+    NewState(State),
+    NewFrame(usize),
+}
+
+#[derive(Clone)]
 pub enum State {
     Play,
     StepForward,
@@ -33,11 +41,12 @@ pub struct AppState {
     pub invulnerable_type: InvulnerableType,
     pub camera: Camera,
     state: State,
-    event_rx: Receiver<AppEvent>,
+    event_handler: Option<AppEventOutgoingHandler>,
+    event_rx: Receiver<AppEventIncoming>,
 }
 
 impl AppState {
-    pub fn new(camera: Camera, event_rx: Receiver<AppEvent>) -> AppState {
+    pub fn new(camera: Camera, event_rx: Receiver<AppEventIncoming>) -> AppState {
         AppState {
             frame_index: 0,
             wireframe: false,
@@ -46,6 +55,7 @@ impl AppState {
             invulnerable_type: InvulnerableType::Hit,
             camera,
             state: State::Play,
+            event_handler: None,
             event_rx,
         }
     }
@@ -59,9 +69,15 @@ impl AppState {
     ) {
         for event in self.event_rx.try_iter() {
             match event {
-                AppEvent::SetState(state) => self.state = state,
-                AppEvent::SetFrame(frame) => self.frame_index = frame,
-                AppEvent::ResetCamera(facing) => {
+                AppEventIncoming::SetState(state) => {
+                    self.state = state.clone();
+                    self.send_event(AppEventOutgoing::NewState(state));
+                }
+                AppEventIncoming::SetFrame(frame) => {
+                    self.frame_index = frame;
+                    self.send_event(AppEventOutgoing::NewFrame(frame));
+                }
+                AppEventIncoming::ResetCamera(facing) => {
                     self.camera.reset(window_width, window_height, facing)
                 }
             }
@@ -77,17 +93,17 @@ impl AppState {
             self.render_ecb = !self.render_ecb;
         }
         if input.key_pressed(VirtualKeyCode::Back) {
-            // TODO: Reset camera
-            self.frame_index = 0; // TODO: Probably delete this later, resetting frame_index is kind of only useful for debugging.
+            self.camera
+                .reset(window_width, window_height, CharacterFacing::Right);
         }
         if input.key_pressed(VirtualKeyCode::Space) || input.key_pressed(VirtualKeyCode::Right) {
-            self.state = State::StepForward;
+            self.set_state(State::StepForward);
         }
         if input.key_pressed(VirtualKeyCode::Left) {
-            self.state = State::StepBackward;
+            self.set_state(State::StepBackward);
         }
         if input.key_pressed(VirtualKeyCode::Return) {
-            self.state = State::Play;
+            self.set_state(State::Play);
         }
         if input.key_pressed(VirtualKeyCode::Q) {
             self.invulnerable_type = InvulnerableType::Hit;
@@ -128,23 +144,44 @@ impl AppState {
         // advance frame
         match self.state {
             State::StepForward | State::Play => {
-                self.frame_index += 1;
-                if self.frame_index >= subaction.frames.len() {
-                    self.frame_index = 0;
+                if self.frame_index == subaction.frames.len() - 1 {
+                    self.set_frame_index(0);
+                } else {
+                    self.set_frame_index(self.frame_index + 1);
                 }
             }
             State::StepBackward => {
                 if self.frame_index == 0 {
-                    self.frame_index = subaction.frames.len() - 1;
+                    self.set_frame_index(subaction.frames.len() - 1);
                 } else {
-                    self.frame_index -= 1
+                    self.set_frame_index(self.frame_index - 1);
                 }
             }
             State::Pause => {}
         }
 
         if let State::StepForward | State::StepBackward = self.state {
-            self.state = State::Pause;
+            self.set_state(State::Pause);
         }
+    }
+
+    fn set_frame_index(&mut self, frame_index: usize) {
+        self.frame_index = frame_index;
+        self.send_event(AppEventOutgoing::NewFrame(frame_index));
+    }
+
+    fn set_state(&mut self, state: State) {
+        self.state = state.clone();
+        self.send_event(AppEventOutgoing::NewState(state));
+    }
+
+    fn send_event(&self, event: AppEventOutgoing) {
+        if let Some(event_handler) = &self.event_handler {
+            event_handler(event);
+        }
+    }
+
+    pub fn set_event_handler(&mut self, event_handler: AppEventOutgoingHandler) {
+        self.event_handler = Some(event_handler);
     }
 }

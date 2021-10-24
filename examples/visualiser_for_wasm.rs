@@ -15,7 +15,7 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::HighLevelSubaction) {
-    use brawllib_rs::renderer::app::state::{AppEvent, State};
+    use brawllib_rs::renderer::app::state::{AppEventIncoming, State};
     use brawllib_rs::renderer::app::App;
     use wasm_bindgen::prelude::*;
     use wasm_bindgen::JsCast;
@@ -26,35 +26,6 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
 
     let app = App::new_insert_into_element(visualiser_span, subaction).await;
     let event_tx = app.get_event_tx();
-
-    // TODO:
-    // hmmmmmmmmmmmmmmmmmm
-    // It would be ideal if we could completely control the app from here by just sending events.
-    // Two way communication would add a lot of complexity.
-    // The tricky part is how to handle updating the current frame.
-    // Can we do that without access to the render loop?
-
-    // possible approaches:
-    // ## directly use surface?
-    // * yew
-    // * how do I get a surface for wgpu
-    //
-    // ## winit + reuse app + move rukaidata UI into brawllib via iced
-    // * send state in with event
-    // * AppState just stores state and everyone is responsible for sending in AppEvent to update it.
-    //
-    // ## winit + reuse App/AppState
-    // * send state in with event
-    // * AppState just stores state and everyone is responsible for sending in AppEvent to update it.
-    //
-    // ## winit + dont reuse App/AppState
-    // * reimplement equivalent of App for maximum flexibility
-    //
-    // wow I really cant figure out which one I want.
-    // Im thinking:
-    // 1. get this running in rukaidata so I can test things properly
-    // 2. go with: "winit + dont reuse app", then prototype really quickly to see if it works.
-    // 3. move on with my life. I really dont think I care about having to focus the app to give keyboard inputs.
 
     let frame = document.get_element_by_id("frame").unwrap();
     let frame_move = frame.clone();
