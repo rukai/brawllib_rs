@@ -36,10 +36,14 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
     button_move.set_inner_html("Run");
     let do_thing = Closure::wrap(Box::new(move || {
         if button_move.inner_html() == "Stop" {
-            event_tx.send(AppEvent::SetState(State::Pause)).unwrap();
+            event_tx
+                .send(AppEventIncoming::SetState(State::Pause))
+                .unwrap();
             button_move.set_inner_html("Run");
         } else {
-            event_tx.send(AppEvent::SetState(State::Play)).unwrap();
+            event_tx
+                .send(AppEventIncoming::SetState(State::Play))
+                .unwrap();
             button_move.set_inner_html("Stop");
         }
     }) as Box<dyn FnMut()>);
@@ -49,7 +53,7 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
         .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
 
     app.get_event_tx()
-        .send(AppEvent::SetState(State::Pause))
+        .send(AppEventIncoming::SetState(State::Pause))
         .unwrap();
 
     app.run();

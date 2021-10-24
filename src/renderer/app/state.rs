@@ -11,12 +11,20 @@ pub type AppEventOutgoingHandler = Box<dyn Fn(AppEventOutgoing) -> ()>;
 pub enum AppEventIncoming {
     SetState(State),
     SetFrame(usize),
+    SetInvulnerableType(InvulnerableType),
+    SetWireframe(bool),
+    SetRenderEcb(bool),
+    SetPerspective(bool),
     ResetCamera(CharacterFacing),
 }
 
 pub enum AppEventOutgoing {
     NewState(State),
     NewFrame(usize),
+    NewInvulnerableType(InvulnerableType),
+    NewWireframe(bool),
+    NewRenderEcb(bool),
+    NewPerspective(bool),
 }
 
 #[derive(Clone)]
@@ -27,6 +35,7 @@ pub enum State {
     Pause,
 }
 
+#[derive(Clone)]
 pub enum InvulnerableType {
     Hit,
     Grab,
@@ -77,6 +86,22 @@ impl AppState {
                     self.frame_index = frame;
                     self.send_event(AppEventOutgoing::NewFrame(frame));
                 }
+                AppEventIncoming::SetInvulnerableType(invulnerable_type) => {
+                    self.invulnerable_type = invulnerable_type.clone();
+                    self.send_event(AppEventOutgoing::NewInvulnerableType(invulnerable_type));
+                }
+                AppEventIncoming::SetWireframe(wireframe) => {
+                    self.wireframe = wireframe;
+                    self.send_event(AppEventOutgoing::NewWireframe(wireframe));
+                }
+                AppEventIncoming::SetRenderEcb(ecb) => {
+                    self.render_ecb = ecb;
+                    self.send_event(AppEventOutgoing::NewRenderEcb(ecb));
+                }
+                AppEventIncoming::SetPerspective(perspective) => {
+                    self.perspective = perspective;
+                    self.send_event(AppEventOutgoing::NewPerspective(perspective));
+                }
                 AppEventIncoming::ResetCamera(facing) => {
                     self.camera.reset(window_width, window_height, facing)
                 }
@@ -85,12 +110,15 @@ impl AppState {
 
         if input.key_pressed(VirtualKeyCode::Key1) {
             self.wireframe = !self.wireframe;
+            self.send_event(AppEventOutgoing::NewWireframe(self.wireframe));
         }
         if input.key_pressed(VirtualKeyCode::Key2) {
             self.perspective = !self.perspective;
+            self.send_event(AppEventOutgoing::NewPerspective(self.perspective));
         }
         if input.key_pressed(VirtualKeyCode::Key3) {
             self.render_ecb = !self.render_ecb;
+            self.send_event(AppEventOutgoing::NewRenderEcb(self.render_ecb));
         }
         if input.key_pressed(VirtualKeyCode::Back) {
             self.camera
@@ -107,12 +135,21 @@ impl AppState {
         }
         if input.key_pressed(VirtualKeyCode::Q) {
             self.invulnerable_type = InvulnerableType::Hit;
+            self.send_event(AppEventOutgoing::NewInvulnerableType(
+                self.invulnerable_type.clone(),
+            ));
         }
         if input.key_pressed(VirtualKeyCode::W) {
             self.invulnerable_type = InvulnerableType::Grab;
+            self.send_event(AppEventOutgoing::NewInvulnerableType(
+                self.invulnerable_type.clone(),
+            ));
         }
         if input.key_pressed(VirtualKeyCode::E) {
             self.invulnerable_type = InvulnerableType::TrapItem;
+            self.send_event(AppEventOutgoing::NewInvulnerableType(
+                self.invulnerable_type.clone(),
+            ));
         }
 
         let small = 0.00001;
