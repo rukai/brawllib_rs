@@ -33,6 +33,8 @@ pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object>
         color_ids[1] = data.i16_be(0x4E);
 
         let mut uv_ids = [0; 8];
+        // Not sure if I can actually mutate like clippy is suggesting
+        #[allow(clippy::needless_range_loop)]
         for i in 0..uv_ids.len() {
             uv_ids[i] = data.i16_be(0x50 + i * 2);
         }

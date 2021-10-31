@@ -6,7 +6,7 @@ use winit_input_helper::WinitInputHelper;
 use crate::high_level_fighter::HighLevelSubaction;
 use crate::renderer::camera::{Camera, CharacterFacing};
 
-pub type AppEventOutgoingHandler = Box<dyn Fn(AppEventOutgoing) -> ()>;
+pub type AppEventOutgoingHandler = Box<dyn Fn(AppEventOutgoing)>;
 
 pub enum AppEventIncoming {
     SetState(State),

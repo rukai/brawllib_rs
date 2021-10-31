@@ -1,0 +1,3 @@
+# TODO: I should probably investigate the codechanges needed to bring these back down to defaults
+enum-variant-size-threshold = 1000
+too-many-arguments-threshold = 12

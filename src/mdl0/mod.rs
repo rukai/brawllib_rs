@@ -50,7 +50,7 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
         None
     } else {
         Some(Mdl0Props {
-            header_len:         data.u32_be(props_offset + 0x00),
+            header_len:         data.u32_be(props_offset),
             mdl0offset:         data.i32_be(props_offset + 0x04),
             scaling_rule:       data.i32_be(props_offset + 0x08),
             tex_matrix_mode:    data.i32_be(props_offset + 0x0c),

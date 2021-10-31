@@ -47,9 +47,9 @@ impl WgpuState {
         .await
     }
 
-    pub async fn new<'a>(
+    pub async fn new(
         instance: wgpu::Instance,
-        compatible_surface: CompatibleSurface<'a>,
+        compatible_surface: CompatibleSurface<'_>,
     ) -> WgpuState {
         let surface = match compatible_surface {
             CompatibleSurface::Surface(surface) => Some(surface),

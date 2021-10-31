@@ -204,7 +204,7 @@ fn create_draws(
         let radius = hurt_box.hurt_box.radius;
 
         let model = transform_translation_frame * hurt_box.bone_matrix;
-        let transform = projection.clone() * view.clone() * model;
+        let transform = projection * view * model;
         draws.push(draw_cylinder(
             state, prev, next, radius, transform, color, wireframe,
         ));
@@ -231,9 +231,9 @@ fn create_draws(
         let prev = hitbox
             .prev_pos
             .map(|prev| Vector3::new(prev.x, prev.y, prev.z))
-            .unwrap_or(next.clone());
+            .unwrap_or(next);
         let radius = hitbox.next_size;
-        let transform = projection.clone() * view.clone() * transform_translation_frame;
+        let transform = projection * view * transform_translation_frame;
         draws.push(draw_cylinder(
             state, prev, next, radius, transform, color, wireframe,
         ));
@@ -278,7 +278,7 @@ fn create_draws(
             });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
-        let uniform = projection.clone() * view.clone() * model;
+        let uniform = projection * view * model;
 
         let indices_len = indices_array.len();
         draws.push(Draw {
@@ -291,6 +291,7 @@ fn create_draws(
 
     if render_ecb {
         // transN
+        #[allow(clippy::float_cmp)]
         let _color = if frame.ecb.transn_y == frame.ecb.bottom {
             [0.0, 1.0, 0.0, 1.0]
         } else {
@@ -339,7 +340,7 @@ fn create_draws(
             frame.y_pos + frame.ecb.transn_y,
             frame.x_pos + frame.ecb.transn_x,
         ));
-        let uniform = projection.clone() * view.clone() * model;
+        let uniform = projection * view * model;
 
         let indices_len = indices_vec.len();
         draws.push(Draw {
@@ -389,7 +390,7 @@ fn create_draws(
             });
 
         let model = Matrix4::from_translation(Vector3::new(0.0, frame.y_pos, frame.x_pos));
-        let uniform = projection.clone() * view.clone() * model;
+        let uniform = projection * view * model;
 
         let indices_len = indices_array.len();
         draws.push(Draw {
@@ -499,7 +500,7 @@ fn _draw_extent(state: &WgpuState, extent: &Extent, external_transform: &Matrix4
         });
     let indices_len = indices_array.len();
 
-    let uniform = external_transform.clone();
+    let uniform = *external_transform;
     Draw {
         uniform,
         vertices,
@@ -534,7 +535,7 @@ fn draw_cylinder(
         for ix in 0..width_segments + 1 {
             let u = ix as f32 / width_segments as f32;
             let mut y_offset = 0.0;
-            if v >= 0.0 && v <= 0.5 {
+            if (0.0..=0.5).contains(&v) {
                 y_offset += prev_distance;
             }
 

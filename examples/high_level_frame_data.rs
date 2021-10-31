@@ -53,19 +53,17 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+    let mod_path = matches.opt_str("m").map(PathBuf::from);
 
     let fighter_filter = matches.opt_str("f");
     let subaction_filter = matches.opt_str("a");
-    let frame_filter = matches
-        .opt_str("i")
-        .map_or(None, |x| x.parse::<usize>().ok());
+    let frame_filter = matches.opt_str("i").and_then(|x| x.parse::<usize>().ok());
     let data_level = matches
         .opt_str("l")
-        .unwrap_or(String::from("fighter"))
+        .unwrap_or_else(|| "fighter".into())
         .to_lowercase();
 
-    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_deref());
     let fighters = match brawl_mod.load_fighters(true) {
         Ok(fighters) => fighters,
         Err(err) => {
@@ -78,7 +76,7 @@ fn main() {
     match data_level.as_ref() {
         "frame" => {
             for fighter in fighters {
-                if let &Some(ref fighter_filter) = &fighter_filter {
+                if let Some(fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;
                     }
@@ -87,7 +85,7 @@ fn main() {
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
                 for subaction in hl_fighter.subactions {
-                    if let &Some(ref subaction_filter) = &subaction_filter {
+                    if let Some(subaction_filter) = &subaction_filter {
                         if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
                             continue;
                         }
@@ -106,7 +104,7 @@ fn main() {
         }
         "subaction" => {
             for fighter in fighters {
-                if let &Some(ref fighter_filter) = &fighter_filter {
+                if let Some(fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;
                     }
@@ -115,7 +113,7 @@ fn main() {
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
                 for mut subaction in hl_fighter.subactions {
-                    if let &Some(ref subaction_filter) = &subaction_filter {
+                    if let Some(subaction_filter) = &subaction_filter {
                         if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
                             continue;
                         }
@@ -134,7 +132,7 @@ fn main() {
         }
         "fighter" => {
             for fighter in fighters {
-                if let &Some(ref fighter_filter) = &fighter_filter {
+                if let Some(fighter_filter) = &fighter_filter {
                     if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                         continue;
                     }
@@ -143,7 +141,7 @@ fn main() {
                 let mut hl_fighter = HighLevelFighter::new(&fighter);
 
                 // filter by subaction
-                if let &Some(ref subaction_filter) = &subaction_filter {
+                if let Some(subaction_filter) = &subaction_filter {
                     let mut new_subactions = vec![];
                     for subaction in hl_fighter.subactions {
                         if subaction.name.to_lowercase() == subaction_filter.to_lowercase() {
@@ -169,7 +167,6 @@ fn main() {
         _ => {
             println!("Invalid data level");
             print_usage(program, opts);
-            return;
         }
     }
 }

@@ -6,6 +6,12 @@ pub struct WiiMemory {
     mem2: Vec<u8>,
 }
 
+impl Default for WiiMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WiiMemory {
     pub fn new() -> Self {
         WiiMemory {
@@ -15,9 +21,9 @@ impl WiiMemory {
     }
 
     pub fn write_u8(&mut self, address: usize, value: u8) {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             self.mem1[address - 0x8000_0000] = value;
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             self.mem2[address - 0x9000_0000] = value;
         } else {
             error!(
@@ -28,9 +34,9 @@ impl WiiMemory {
     }
 
     pub fn write_u16(&mut self, address: usize, value: u16) {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             BigEndian::write_u16(&mut self.mem1[address - 0x8000_0000..], value);
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             BigEndian::write_u16(&mut self.mem2[address - 0x9000_0000..], value);
         } else {
             error!(
@@ -41,9 +47,9 @@ impl WiiMemory {
     }
 
     pub fn write_u32(&mut self, address: usize, value: u32) {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             BigEndian::write_u32(&mut self.mem1[address - 0x8000_0000..], value);
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             BigEndian::write_u32(&mut self.mem2[address - 0x9000_0000..], value);
         } else {
             error!(
@@ -54,10 +60,10 @@ impl WiiMemory {
     }
 
     pub fn read_u8(&self, address: usize) -> u8 {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
-            return self.mem1[address - 0x8000_0000];
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
-            return self.mem2[address - 0x9000_0000];
+        if (0x8000_0000..0x8180_0000).contains(&address) {
+            self.mem1[address - 0x8000_0000]
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
+            self.mem2[address - 0x9000_0000]
         } else {
             error!(
                 "Failed to read value: Cannot map address 0x{:x} to wii memory",
@@ -68,9 +74,9 @@ impl WiiMemory {
     }
 
     pub fn read_u16(&self, address: usize) -> u16 {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             BigEndian::read_u16(&self.mem1[address - 0x8000_0000..])
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             BigEndian::read_u16(&self.mem2[address - 0x9000_0000..])
         } else {
             error!(
@@ -82,9 +88,9 @@ impl WiiMemory {
     }
 
     pub fn read_u32(&self, address: usize) -> u32 {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             BigEndian::read_u32(&self.mem1[address - 0x8000_0000..])
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             BigEndian::read_u32(&self.mem2[address - 0x9000_0000..])
         } else {
             error!(
@@ -96,9 +102,9 @@ impl WiiMemory {
     }
 
     pub fn read_f32(&self, address: usize) -> f32 {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             BigEndian::read_f32(&self.mem1[address - 0x8000_0000..])
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             BigEndian::read_f32(&self.mem2[address - 0x9000_0000..])
         } else {
             error!(
@@ -110,9 +116,9 @@ impl WiiMemory {
     }
 
     pub fn buffer_from(&self, address: usize) -> &[u8] {
-        if address >= 0x8000_0000 && address < 0x8180_0000 {
+        if (0x8000_0000..0x8180_0000).contains(&address) {
             &self.mem1[address - 0x8000_0000..]
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             &self.mem2[address - 0x9000_0000..]
         } else {
             error!(
@@ -123,9 +129,9 @@ impl WiiMemory {
         }
     }
     pub fn fancy_slice_from(&self, address: usize) -> FancySlice {
-        let slice = if address >= 0x8000_0000 && address < 0x8180_0000 {
+        let slice = if (0x8000_0000..0x8180_0000).contains(&address) {
             &self.mem1[address - 0x8000_0000..]
-        } else if address >= 0x9000_0000 && address < 0x9400_0000 {
+        } else if (0x9000_0000..0x9400_0000).contains(&address) {
             &self.mem2[address - 0x9000_0000..]
         } else {
             error!(

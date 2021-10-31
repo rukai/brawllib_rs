@@ -17,7 +17,7 @@ pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
     for i in 0..num_sub_headers {
         let mut arc_child = arc_child(data.relative_fancy_slice(header_index..));
         if arc_child.redirect_index == -1 {
-            let tag = util::parse_tag(&data.relative_slice(header_index + ARC_CHILD_HEADER_SIZE..));
+            let tag = util::parse_tag(data.relative_slice(header_index + ARC_CHILD_HEADER_SIZE..));
             let child_data = data.relative_fancy_slice(header_index + ARC_CHILD_HEADER_SIZE..);
             arc_child.data = match tag.as_ref() {
                 "ARC" => ArcChildData::Arc(arc(child_data, wii_memory, item)),

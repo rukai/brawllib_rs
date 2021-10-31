@@ -18,15 +18,13 @@ pub(crate) fn plt0(data: FancySlice) -> Plt0 {
 
     let user_data = if version == 3 {
         let _user_data_offset = data.i32_be(0x24);
-        let mut user_data = vec!();
-
-        // TODO
-        user_data.push(UserData {
-            name: "TODO".into(),
-            value: UserDataValue::Int(42),
-        });
-
-        user_data
+        vec!(
+            // TODO
+            UserData {
+                name: "TODO".into(),
+                value: UserDataValue::Int(42),
+            }
+        )
     } else if version == 1 {
         vec!()
     } else {
@@ -61,7 +59,7 @@ impl Plt0 {
         let mut output = vec![];
 
         let size = PLT0_HEADER_SIZE + self.color_data.len() * 2;
-        let version = if self.user_data.len() > 0 { 3 } else { 1 };
+        let version = if !self.user_data.is_empty() { 3 } else { 1 };
         let num_entries = self.color_data.len();
 
         // create PLT0 header
@@ -75,7 +73,7 @@ impl Plt0 {
         output.extend(&u16::to_be_bytes(num_entries as u16));
         output.extend(&u16::to_be_bytes(0)); // padding
         output.extend(&i32::to_be_bytes(self.orig_path_offset));
-        if self.user_data.len() > 0 {
+        if !self.user_data.is_empty() {
             output.extend(&i32::to_be_bytes(0x44)); // TODO: I just guessed this is a constant?
         }
         output.extend(&[0; 0x1c]); // padding
@@ -84,7 +82,7 @@ impl Plt0 {
         for _user_data in &self.user_data {
             output.push(0x42); // TODO
         }
-        if self.user_data.len() > 0 {
+        if !self.user_data.is_empty() {
             while output.len() % 0x20 != 0 {
                 output.push(0x00);
             }

@@ -47,9 +47,9 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+    let mod_path = matches.opt_str("m").map(PathBuf::from);
 
-    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_deref());
 
     let fighters = match brawl_mod.load_fighters(true) {
         Ok(fighters) => fighters,
@@ -69,7 +69,7 @@ fn main() {
     println!("Or if there are 3 hitboxes occupying the exact same space.");
     println!("This is bad because sometimes it doesnt work correctly, resulting in a hitbox hitting that should never be possible e.g. https://twitter.com/ShaydonJohn/status/1147308339753127936");
     for fighter in fighters.iter() {
-        let fighter = HighLevelFighter::new(&fighter);
+        let fighter = HighLevelFighter::new(fighter);
         'subactions: for subaction in &fighter.subactions {
             for frame in &subaction.frames {
                 // group hitboxes together that have a matching size and position
@@ -77,6 +77,7 @@ fn main() {
                 for hitbox in &frame.hit_boxes {
                     let mut hitbox_matched = false;
                     for hitbox_group in &mut hitbox_groups {
+                        #[allow(clippy::float_cmp)]
                         if hitbox_group[0].next_size == hitbox.next_size
                             && hitbox_group[0].next_pos == hitbox.next_pos
                             && hitbox_group[0].prev_size == hitbox.prev_size
@@ -111,7 +112,7 @@ fn main() {
     println!("This was used by PMDT before action overrides were understood.");
     println!("All of these cases should be replaced with action overrides so that move staling is properly handled.");
     for fighter in fighters {
-        let fighter = HighLevelFighter::new(&fighter);
+        let fighter = HighLevelFighter::new(fighter);
         for subaction in &fighter.subactions {
             if subaction.bad_interrupts {
                 println!("{} {}", fighter.name, subaction.name);

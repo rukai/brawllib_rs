@@ -112,17 +112,15 @@ impl Fighter {
             // But when I do, I'll need to rethink how I abstract characters with and without combined Motion + Etc
             let data = FancySlice::new(data);
             arc::arc(data, wii_memory, false)
+        } else if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
+            let data = FancySlice::new(data);
+            arc::arc(data, wii_memory, false)
         } else {
-            if let Some(data) = fighter_data.data.get(&motion_etc_file_name) {
-                let data = FancySlice::new(data);
-                arc::arc(data, wii_memory, false)
-            } else {
-                error!(
-                    "Failed to load {}, Missing motion file: {} or {}",
-                    fighter_data.cased_name, motion_file_name, motion_etc_file_name
-                );
-                return None;
-            }
+            error!(
+                "Failed to load {}, Missing motion file: {} or {}",
+                fighter_data.cased_name, motion_file_name, motion_etc_file_name
+            );
+            return None;
         };
 
         let mut models = vec![];
@@ -216,11 +214,8 @@ impl Fighter {
     /// retrieves the ArcSakurai
     pub fn get_fighter_sakurai(&self) -> Option<&ArcSakurai> {
         for sub_arc in &self.moveset.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai(ref sakurai) => {
-                    return Some(sakurai);
-                }
-                _ => {}
+            if let ArcChildData::Sakurai(sakurai) = &sub_arc.data {
+                return Some(sakurai);
             }
         }
         None
@@ -229,11 +224,8 @@ impl Fighter {
     /// retrieves the common ArcSakurai
     pub fn get_fighter_sakurai_common(&self) -> Option<&ArcSakurai> {
         for sub_arc in &self.moveset_common.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai(ref sakurai) => {
-                    return Some(sakurai);
-                }
-                _ => {}
+            if let ArcChildData::Sakurai(sakurai) = &sub_arc.data {
+                return Some(sakurai);
             }
         }
         None
@@ -242,15 +234,12 @@ impl Fighter {
     /// retrieves the fighter data
     pub fn get_fighter_data(&self) -> Option<&ArcFighterData> {
         for sub_arc in &self.moveset.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai(ref data) => {
-                    for section in &data.sections {
-                        if let &SectionData::FighterData(ref fighter_data_ref) = &section.data {
-                            return Some(fighter_data_ref);
-                        }
+            if let ArcChildData::Sakurai(ref data) = &sub_arc.data {
+                for section in &data.sections {
+                    if let SectionData::FighterData(fighter_data_ref) = &section.data {
+                        return Some(fighter_data_ref);
                     }
                 }
-                _ => {}
             }
         }
         None
@@ -259,16 +248,12 @@ impl Fighter {
     /// retrieves the fighter data common
     pub fn get_fighter_data_common(&self) -> Option<&ArcFighterDataCommon> {
         for sub_arc in &self.moveset_common.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai(ref data) => {
-                    for section in &data.sections {
-                        if let &SectionData::FighterDataCommon(ref fighter_data_ref) = &section.data
-                        {
-                            return Some(fighter_data_ref);
-                        }
+            if let ArcChildData::Sakurai(data) = &sub_arc.data {
+                for section in &data.sections {
+                    if let SectionData::FighterDataCommon(fighter_data_ref) = &section.data {
+                        return Some(fighter_data_ref);
                     }
                 }
-                _ => {}
             }
         }
         None
@@ -278,15 +263,12 @@ impl Fighter {
     pub fn get_fighter_data_common_scripts(&self) -> Vec<&SectionScript> {
         let mut scripts = vec![];
         for sub_arc in &self.moveset_common.children {
-            match &sub_arc.data {
-                &ArcChildData::Sakurai(ref data) => {
-                    for section in &data.sections {
-                        if let &SectionData::Script(ref script) = &section.data {
-                            scripts.push(script);
-                        }
+            if let ArcChildData::Sakurai(data) = &sub_arc.data {
+                for section in &data.sections {
+                    if let SectionData::Script(script) = &section.data {
+                        scripts.push(script);
                     }
                 }
-                _ => {}
             }
         }
         scripts
@@ -297,27 +279,24 @@ impl Fighter {
         if let Some(model) = self.models.get(0) {
             for sub_arc in model.children.iter() {
                 match &sub_arc.data {
-                    &ArcChildData::Arc(_) => {
+                    ArcChildData::Arc(_) => {
                         panic!("Not expecting arc at this level")
                     }
-                    &ArcChildData::Bres(ref bres) => {
+                    ArcChildData::Bres(bres) => {
                         for bres_child in bres.children.iter() {
                             match &bres_child.data {
-                                &BresChildData::Bres(ref model) => {
+                                BresChildData::Bres(model) => {
                                     for model_child in model.iter() {
                                         // A check like this would be useful but it doesnt account for cloned mod fighters.
                                         // `if model_child.name.to_lowercase() == format!("Fit{}00", self.cased_name).to_lowercase() { }`
                                         // Instead, the first model is the characters model, so we just return it immediately.
 
-                                        match &model_child.data {
-                                            &BresChildData::Mdl0(ref model) => {
-                                                return model.bones.as_ref();
-                                            }
-                                            _ => {}
+                                        if let BresChildData::Mdl0(model) = &model_child.data {
+                                            return model.bones.as_ref();
                                         }
                                     }
                                 }
-                                &BresChildData::Mdl0(_) => {
+                                BresChildData::Mdl0(_) => {
                                     panic!("Not expecting Mdl at this level");
                                 }
                                 _ => {}
@@ -341,7 +320,7 @@ impl Fighter {
         } else if self.motion.name.ends_with("MotionEtc") {
             for sub_arc in &self.motion.children {
                 match &sub_arc.data {
-                    &ArcChildData::Arc(ref arc) => {
+                    ArcChildData::Arc(arc) => {
                         if arc.name.ends_with("Motion") {
                             return Fighter::get_animations_fit_motion(arc);
                         }
@@ -358,16 +337,16 @@ impl Fighter {
         let mut chr0s: Vec<&Chr0> = vec![];
         for sub_arc in &motion.children {
             match &sub_arc.data {
-                &ArcChildData::Bres(ref bres) => {
+                ArcChildData::Bres(ref bres) => {
                     for bres_child in bres.children.iter() {
                         match &bres_child.data {
-                            &BresChildData::Bres(ref children) => {
+                            BresChildData::Bres(children) => {
                                 for bres_child in children.iter() {
                                     match &bres_child.data {
-                                        &BresChildData::Bres(_) => {
+                                        BresChildData::Bres(_) => {
                                             panic!("Not expecting bres at this level");
                                         }
-                                        &BresChildData::Chr0(ref chr0) => {
+                                        BresChildData::Chr0(chr0) => {
                                             chr0s.push(chr0);
                                         }
                                         _ => {}
@@ -381,7 +360,7 @@ impl Fighter {
                         }
                     }
                 }
-                &ArcChildData::Arc(_) => {
+                ArcChildData::Arc(_) => {
                     //panic!("Not expecting arc at this level"); // TODO: Whats here
                 }
                 _ => {}

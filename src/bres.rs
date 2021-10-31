@@ -76,7 +76,7 @@ impl Bres {
         let mut leaf_children_output: Vec<Vec<u8>> = vec![];
         let mut leaf_children_size = 0;
         let mut to_process = vec![&self.children];
-        while to_process.len() > 0 {
+        while !to_process.is_empty() {
             let children = to_process.remove(0);
             let resource_header_offset = BRES_HEADER_SIZE + ROOT_HEADER_SIZE + root_output.len();
 

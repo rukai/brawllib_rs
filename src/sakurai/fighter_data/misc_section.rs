@@ -46,7 +46,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     }
 
     let bone_refs = BoneRefs {
-        unk0:    parent_data.i32_be(bone_refs_offset as usize + 0x00),
+        unk0:    parent_data.i32_be(bone_refs_offset as usize),
         unk1:    parent_data.i32_be(bone_refs_offset as usize + 0x04),
         unk2:    parent_data.i32_be(bone_refs_offset as usize + 0x08),
         unk3:    parent_data.i32_be(bone_refs_offset as usize + 0x0c),
@@ -73,7 +73,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     let mut ecbs = vec!();
     for i in 0..ecbs_list.count {
         let pointer  = parent_data.i32_be(ecbs_list.start_offset as usize + i as usize * ECB_SIZE); // TODO: Is this indirection for anything? Maybe the list is supposed to occur here instead?
-        let ecb_type = parent_data.i32_be(pointer as usize + 0x00);
+        let ecb_type = parent_data.i32_be(pointer as usize);
         if ecb_type == 0 {
             let ecb_bones_offset = parent_data.i32_be(pointer as usize + 0x04);
             let ecb_bones_count  = parent_data.i32_be(pointer as usize + 0x08);

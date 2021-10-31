@@ -23,6 +23,9 @@
 //! }
 //! ```
 
+// We use 0 prefices for lining up constants across multiple lines
+#![allow(clippy::zero_prefixed_literal)]
+
 #[macro_use]
 extern crate serde_derive;
 #[macro_use]

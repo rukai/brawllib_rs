@@ -49,10 +49,10 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+    let mod_path = matches.opt_str("m").map(PathBuf::from);
     let fighter_filter = matches.opt_str("f");
 
-    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_deref());
 
     let fighters = match brawl_mod.load_fighters(true) {
         Ok(fighters) => fighters,
@@ -63,7 +63,7 @@ fn main() {
     };
 
     for fighter in fighters {
-        if let &Some(ref fighter_filter) = &fighter_filter {
+        if let Some(fighter_filter) = &fighter_filter {
             if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
                 continue;
             }

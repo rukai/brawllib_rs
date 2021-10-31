@@ -155,7 +155,7 @@ pub struct CallStack<'a> {
 
 pub struct Call<'a> {
     pub block: &'a Block,
-    pub else_branch: Option<&'a Box<Block>>,
+    pub else_branch: Option<&'a Block>,
     pub index: usize,
     pub subroutine: bool,
     pub external: bool,
@@ -566,10 +566,8 @@ impl<'a> ScriptRunner<'a> {
 
         // The hitbox existed last frame so should be interpolated.
         // (Unless it gets overwritten, but that will be handled when that happens)
-        for hitbox in &mut self.hitboxes {
-            if let Some(ref mut hitbox) = hitbox {
-                hitbox.interpolate = true;
-            }
+        for hitbox in &mut self.hitboxes.iter_mut().flatten() {
+            hitbox.interpolate = true;
         }
 
         for interrupt in self.interrupts.clone() {
@@ -712,7 +710,7 @@ impl<'a> ScriptRunner<'a> {
                     } else {
                         // when execution is disabled we run events that may resume execution, otherwise we do nothing
                         let new_execution = match event {
-                            &EventAst::IfStatementOr(ref test) => {
+                            EventAst::IfStatementOr(test) => {
                                 self.evaluate_expression(test).unwrap_bool()
                                     && self.call_stacks[i].calls.last().unwrap().if_statement
                             }
@@ -767,13 +765,13 @@ impl<'a> ScriptRunner<'a> {
         section_scripts: &'b [SectionScriptAst],
     ) -> StepEventResult<'b> {
         match event {
-            &EventAst::SyncWait(ref value) => {
+            EventAst::SyncWait(value) => {
                 return StepEventResult::WaitUntil(self.frame_index + *value);
             }
-            &EventAst::AsyncWait(ref value) => {
+            EventAst::AsyncWait(value) => {
                 return StepEventResult::WaitUntil(*value);
             }
-            &EventAst::ForLoop(ref for_loop) => {
+            EventAst::ForLoop(for_loop) => {
                 match for_loop.iterations {
                     Iterations::Finite(iterations) => {
                         return StepEventResult::NewForLoop {
@@ -789,7 +787,7 @@ impl<'a> ScriptRunner<'a> {
                     }
                 }
             }
-            &EventAst::Subroutine(ref offset) => {
+            EventAst::Subroutine(offset) => {
                 if !external {
                     if let Some(script) = section_scripts
                         .iter()
@@ -811,8 +809,8 @@ impl<'a> ScriptRunner<'a> {
                 // If that turns out to be a bad idea document why.
                 for script in all_scripts.iter() {
                     if script.offset == offset.offset {
-                        if script.block.events.len() > 0
-                            && &script.block.events[0] as *const _ == event as *const _
+                        if !script.block.events.is_empty()
+                            && std::ptr::eq(&script.block.events[0], event)
                         {
                             error!("Avoided hard Subroutine infinite loop (attempted to jump to the same location)");
                         } else {
@@ -825,10 +823,10 @@ impl<'a> ScriptRunner<'a> {
                 }
                 error!("Couldnt find Subroutine offset");
             }
-            &EventAst::Return => {
+            EventAst::Return => {
                 return StepEventResult::Return;
             }
-            &EventAst::Goto(ref offset) => {
+            EventAst::Goto(offset) => {
                 if !external {
                     if let Some(script) = section_scripts
                         .iter()
@@ -860,9 +858,9 @@ impl<'a> ScriptRunner<'a> {
                 }
                 error!("Avoided Goto infinite loop");
             }
-            &EventAst::IfStatement(ref if_statement) => {
+            EventAst::IfStatement(if_statement) => {
                 let then_branch = &if_statement.then_branch;
-                let else_branch = if_statement.else_branch.as_ref();
+                let else_branch = if_statement.else_branch.as_deref();
                 let execute = self.evaluate_expression(&if_statement.test).unwrap_bool();
                 return StepEventResult::NewIfStatement {
                     then_branch,
@@ -870,30 +868,27 @@ impl<'a> ScriptRunner<'a> {
                     execute,
                 };
             }
-            &EventAst::IfStatementAnd(ref test) => {
+            EventAst::IfStatementAnd(test) => {
                 if !self.evaluate_expression(test).unwrap_bool() {
                     return StepEventResult::IfStatementDisableExecution;
                 }
             }
-            &EventAst::IfStatementOr(_) => {} // This is handled in the !execution branch
-            &EventAst::Switch(_, _) => {}     // TODO
-            &EventAst::EndSwitch => {}
-            &EventAst::Case(_) => {}
-            &EventAst::DefaultCase => {}
-            &EventAst::LoopRest => {
+            EventAst::IfStatementOr(_) => {} // This is handled in the !execution branch
+            EventAst::Switch(_, _) => {}     // TODO
+            EventAst::EndSwitch => {}
+            EventAst::Case(_) => {}
+            EventAst::DefaultCase => {}
+            EventAst::LoopRest => {
                 error!("LoopRest: This means the code is expected to infinite loop")
             } // TODO: Handle infinite loops better
-            &EventAst::CallEveryFrame {
-                thread_id,
-                ref offset,
-            } => {
+            EventAst::CallEveryFrame { thread_id, offset } => {
                 if !external {
                     if let Some(script) = section_scripts
                         .iter()
                         .find(|x| x.callers.contains(&offset.origin))
                     {
                         return StepEventResult::CallEveryFrame {
-                            thread_id,
+                            thread_id: *thread_id,
                             block: &script.script.block,
                             external: true,
                         };
@@ -908,26 +903,26 @@ impl<'a> ScriptRunner<'a> {
                 for script in all_scripts.iter() {
                     if script.offset == offset.offset {
                         return StepEventResult::CallEveryFrame {
-                            thread_id,
+                            thread_id: *thread_id,
                             block: &script.block,
                             external,
                         };
                     }
                 }
             }
-            &EventAst::RemoveCallEveryFrame { thread_id } => {
-                self.call_every_frame.remove(&thread_id);
+            EventAst::RemoveCallEveryFrame { thread_id } => {
+                self.call_every_frame.remove(thread_id);
             }
-            &EventAst::IndependentSubroutine { .. } => {} // TODO
-            &EventAst::RemoveIndependentSubroutine { .. } => {} // TODO
-            &EventAst::SetIndependentSubroutineThreadType { .. } => {} // TODO
-            &EventAst::DisableInterrupt(_) => {}          // TODO
-            &EventAst::EnableInterrupt(_) => {}           // TODO
-            &EventAst::ToggleInterrupt { .. } => {}       // TODO
-            &EventAst::EnableInterruptGroup(_) => {}      // TODO
-            &EventAst::DisableInterruptGroup(_) => {}     // TODO
-            &EventAst::ClearInterruptGroup(_) => {}       // TODO
-            &EventAst::CreateInterrupt(ref interrupt) => {
+            EventAst::IndependentSubroutine { .. } => {} // TODO
+            EventAst::RemoveIndependentSubroutine { .. } => {} // TODO
+            EventAst::SetIndependentSubroutineThreadType { .. } => {} // TODO
+            EventAst::DisableInterrupt(_) => {}          // TODO
+            EventAst::EnableInterrupt(_) => {}           // TODO
+            EventAst::ToggleInterrupt { .. } => {}       // TODO
+            EventAst::EnableInterruptGroup(_) => {}      // TODO
+            EventAst::DisableInterruptGroup(_) => {}     // TODO
+            EventAst::ClearInterruptGroup(_) => {}       // TODO
+            EventAst::CreateInterrupt(interrupt) => {
                 // If the interrupt would succeed on the first frame then ignore it.
                 // This is a super hacky hack to get moves like DK's dash attack working.
                 if !(self.frame_index == 0.0
@@ -938,7 +933,7 @@ impl<'a> ScriptRunner<'a> {
                     self.bad_interrupts.push(interrupt.clone());
                 }
             }
-            &EventAst::PreviousInterruptAddRequirement { ref test } => {
+            EventAst::PreviousInterruptAddRequirement { test } => {
                 if let Some(interrupt) = self.interrupts.last_mut() {
                     let left = Box::new(interrupt.test.clone());
                     let right = Box::new(test.clone());
@@ -950,53 +945,53 @@ impl<'a> ScriptRunner<'a> {
                     });
                 }
             }
-            &EventAst::InterruptAddRequirement { .. } => {} // TODO
-            &EventAst::AllowInterrupts => {
+            EventAst::InterruptAddRequirement { .. } => {} // TODO
+            EventAst::AllowInterrupts => {
                 self.interruptible = true;
             }
-            &EventAst::DisallowInterrupts => {
+            EventAst::DisallowInterrupts => {
                 self.interruptible = false;
             }
-            &EventAst::ChangeSubaction(v0) => {
-                self.change_subaction = ChangeSubaction::ChangeSubaction(v0);
+            EventAst::ChangeSubaction(v0) => {
+                self.change_subaction = ChangeSubaction::ChangeSubaction(*v0);
             }
-            &EventAst::ChangeSubactionRestartFrame(v0) => {
-                self.change_subaction = ChangeSubaction::ChangeSubactionRestartFrame(v0);
+            EventAst::ChangeSubactionRestartFrame(v0) => {
+                self.change_subaction = ChangeSubaction::ChangeSubactionRestartFrame(*v0);
             }
 
             // timing
-            &EventAst::SetAnimationFrame(v0) => {
-                self.animation_index = v0;
+            EventAst::SetAnimationFrame(v0) => {
+                self.animation_index = *v0;
             }
-            &EventAst::SetAnimationAndTimerFrame(v0) => {
-                self.animation_index = v0;
-                self.frame_index = v0;
+            EventAst::SetAnimationAndTimerFrame(v0) => {
+                self.animation_index = *v0;
+                self.frame_index = *v0;
             }
-            &EventAst::FrameSpeedModifier { multiplier, .. } => {
-                self.frame_speed_modifier = multiplier;
+            EventAst::FrameSpeedModifier { multiplier, .. } => {
+                self.frame_speed_modifier = *multiplier;
             }
-            &EventAst::TimeManipulation(_, _) => {}
+            EventAst::TimeManipulation(_, _) => {}
 
             // misc state
-            &EventAst::SetAirGround(v0) => {
-                self.airbourne = v0 == 0; // TODO: Seems like brawlbox is incomplete here e.g 36
+            EventAst::SetAirGround(v0) => {
+                self.airbourne = *v0 == 0; // TODO: Seems like brawlbox is incomplete here e.g 36
             }
-            &EventAst::SetEdgeSlide(ref v0) => {
+            EventAst::SetEdgeSlide(v0) => {
                 self.edge_slide = v0.clone();
             }
-            &EventAst::ReverseDirection => {
+            EventAst::ReverseDirection => {
                 self.reverse_direction = !self.reverse_direction;
             }
 
             // hitboxes
-            &EventAst::CreateHitBox(ref args) => {
+            EventAst::CreateHitBox(args) => {
                 if args.hitbox_id < self.hitboxes.len() as u8 {
                     // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
                     // In this case interpolation should not occur.
                     let interpolate =
-                        if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
-                            match prev_hitbox.values {
-                                CollisionBoxValues::Hit(ref prev_hitbox) => {
+                        if let Some(prev_hitbox) = &self.hitboxes[args.hitbox_id as usize] {
+                            match &prev_hitbox.values {
+                                CollisionBoxValues::Hit(prev_hitbox) => {
                                     args.set_id == prev_hitbox.set_id
                                 }
                                 _ => false,
@@ -1032,15 +1027,15 @@ impl<'a> ScriptRunner<'a> {
                     );
                 }
             }
-            &EventAst::ThrownHitBox(_) => {}
-            &EventAst::CreateSpecialHitBox(ref args) => {
+            EventAst::ThrownHitBox(_) => {}
+            EventAst::CreateSpecialHitBox(args) => {
                 if args.hitbox_args.hitbox_id < self.hitboxes.len() as u8 {
                     // Need to check this here, as hitboxes can be deleted in the current frame but still exist in the previous frame.
                     // In this case interpolation should not occur.
                     let index = args.hitbox_args.hitbox_id as usize;
-                    let interpolate = if let Some(ref prev_hitbox) = self.hitboxes[index] {
-                        match prev_hitbox.values {
-                            CollisionBoxValues::Hit(ref prev_hitbox) => {
+                    let interpolate = if let Some(prev_hitbox) = &self.hitboxes[index] {
+                        match &prev_hitbox.values {
+                            CollisionBoxValues::Hit(prev_hitbox) => {
                                 args.hitbox_args.set_id == prev_hitbox.set_id
                             }
                             _ => false,
@@ -1082,56 +1077,56 @@ impl<'a> ScriptRunner<'a> {
                     );
                 }
             }
-            &EventAst::DeleteAllHitBoxes => {
+            EventAst::DeleteAllHitBoxes => {
                 for hitbox in self.hitboxes.iter_mut() {
                     if hitbox.as_ref().map(|x| x.is_hit()).unwrap_or(false) {
                         *hitbox = None;
                     }
                 }
             }
-            &EventAst::DefensiveCollision { .. } => {}
-            &EventAst::MoveHitBox(ref move_hitbox) => {
-                if let Some(ref mut hitbox) = self.hitboxes[move_hitbox.hitbox_id as usize] {
+            EventAst::DefensiveCollision { .. } => {}
+            EventAst::MoveHitBox(move_hitbox) => {
+                if let Some(hitbox) = &mut self.hitboxes[move_hitbox.hitbox_id as usize] {
                     hitbox.bone_index = move_hitbox.new_bone as i16;
                     hitbox.x_offset = move_hitbox.new_x_offset;
                     hitbox.y_offset = move_hitbox.new_y_offset;
                     hitbox.z_offset = move_hitbox.new_z_offset;
                 }
             }
-            &EventAst::ChangeHitBoxDamage {
+            EventAst::ChangeHitBoxDamage {
                 hitbox_id,
                 new_damage,
             } => {
-                if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
-                        hitbox.damage = new_damage as f32;
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
+                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
+                        hitbox.damage = *new_damage as f32;
                     }
                 }
             }
-            &EventAst::ChangeHitBoxSize {
+            EventAst::ChangeHitBoxSize {
                 hitbox_id,
                 new_size,
             } => {
-                if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
-                        hitbox.size = new_size as f32;
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
+                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
+                        hitbox.size = *new_size as f32;
                     }
                 }
             }
-            &EventAst::DeleteHitBox(hitbox_id) => {
+            EventAst::DeleteHitBox(hitbox_id) => {
                 // Shock claims this doesnt work on special hitboxes but it seems to work fine here:
                 // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
-                if self.hitboxes[hitbox_id as usize]
+                if self.hitboxes[*hitbox_id as usize]
                     .as_ref()
                     .map(|x| x.is_hit())
                     .unwrap_or(false)
                 {
-                    self.hitboxes[hitbox_id as usize] = None;
+                    self.hitboxes[*hitbox_id as usize] = None;
                 }
             }
-            &EventAst::CreateGrabBox(ref args) => {
+            EventAst::CreateGrabBox(args) => {
                 let mut interpolate = false;
-                if let Some(ref prev_hitbox) = self.hitboxes[args.hitbox_id as usize] {
+                if let Some(prev_hitbox) = &self.hitboxes[args.hitbox_id as usize] {
                     // TODO: Should a grabbox interpolate from an existing hitbox and vice versa
                     if let CollisionBoxValues::Grab(_) = prev_hitbox.values {
                         interpolate = true;
@@ -1147,24 +1142,24 @@ impl<'a> ScriptRunner<'a> {
                     );
                 }
             }
-            &EventAst::DeleteGrabBox(hitbox_id) => {
-                if self.hitboxes[hitbox_id as usize]
+            EventAst::DeleteGrabBox(hitbox_id) => {
+                if self.hitboxes[*hitbox_id as usize]
                     .as_ref()
                     .map(|x| x.is_grab())
                     .unwrap_or(false)
                 {
-                    self.hitboxes[hitbox_id as usize] = None;
+                    self.hitboxes[*hitbox_id as usize] = None;
                 }
             }
-            &EventAst::DeleteAllGrabBoxes => {
+            EventAst::DeleteAllGrabBoxes => {
                 for hitbox in self.hitboxes.iter_mut() {
                     if hitbox.as_ref().map(|x| x.is_grab()).unwrap_or(false) {
                         *hitbox = None;
                     }
                 }
             }
-            &EventAst::SpecifyThrow(ref throw) => {
-                match throw.throw_use {
+            EventAst::SpecifyThrow(throw) => {
+                match &throw.throw_use {
                     ThrowUse::Throw => {
                         self.throw = Some(throw.clone());
                     }
@@ -1175,95 +1170,95 @@ impl<'a> ScriptRunner<'a> {
                     ThrowUse::Unknown(_) => {}
                 }
             }
-            &EventAst::ApplyThrow(_) => {
+            EventAst::ApplyThrow(_) => {
                 self.throw_activate = true;
             }
-            &EventAst::AddHitBoxDamage {
+            EventAst::AddHitBoxDamage {
                 hitbox_id,
-                ref add_damage,
+                add_damage,
             } => {
-                let add_damage = self.get_float_value(&add_damage);
-                if let Some(ref mut hitbox) = &mut self.hitboxes[hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(ref mut hitbox) = hitbox.values {
+                let add_damage = self.get_float_value(add_damage);
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
+                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
                         hitbox.damage += add_damage;
                     }
                 }
             }
 
             // hurtboxes
-            &EventAst::ChangeHurtBoxStateAll { ref state } => {
+            EventAst::ChangeHurtBoxStateAll { state } => {
                 self.hurtbox_state_all = state.clone();
             }
-            &EventAst::ChangeHurtBoxStateSpecific { bone, ref state } => {
+            EventAst::ChangeHurtBoxStateSpecific { bone, state } => {
                 match state {
                     HurtBoxState::Invincible => {
                         // Setting HurtBoxState::Invincible state with this command is broken.
                         // It either has no effect or sets the state to Normal.
                         // I havent confirmed which, so the current implementation just does nothing.
                     }
-                    _ => {
+                    state => {
                         self.hurtbox_states
-                            .insert(high_level_fighter::get_bone_index(bone), state.clone());
+                            .insert(high_level_fighter::get_bone_index(*bone), state.clone());
                     }
                 }
             }
-            &EventAst::UnchangeHurtBoxStateSpecific => {
+            EventAst::UnchangeHurtBoxStateSpecific => {
                 self.hurtbox_states.clear();
             }
 
             // controller
-            &EventAst::ControllerClearBuffer => {}
-            &EventAst::ControllerUnk01 => {}
-            &EventAst::ControllerUnk02 => {}
-            &EventAst::ControllerUnk06(_) => {}
-            &EventAst::ControllerUnk0C => {}
-            &EventAst::Rumble { unk1, unk2 } => self.rumble = Some((unk1, unk2)),
-            &EventAst::RumbleLoop { unk1, unk2 } => self.rumble_loop = Some((unk1, unk2)),
+            EventAst::ControllerClearBuffer => {}
+            EventAst::ControllerUnk01 => {}
+            EventAst::ControllerUnk02 => {}
+            EventAst::ControllerUnk06(_) => {}
+            EventAst::ControllerUnk0C => {}
+            EventAst::Rumble { unk1, unk2 } => self.rumble = Some((*unk1, *unk2)),
+            EventAst::RumbleLoop { unk1, unk2 } => self.rumble_loop = Some((*unk1, *unk2)),
 
             // misc
-            &EventAst::SlopeContourStand { leg_bone_parent } => {
-                if leg_bone_parent == 0 {
+            EventAst::SlopeContourStand { leg_bone_parent } => {
+                if *leg_bone_parent == 0 {
                     self.slope_contour_stand = None;
                 } else {
-                    self.slope_contour_stand = Some(leg_bone_parent);
+                    self.slope_contour_stand = Some(*leg_bone_parent);
                 }
             }
-            &EventAst::SlopeContourFull {
+            EventAst::SlopeContourFull {
                 hip_n_or_top_n,
                 trans_bone,
             } => {
-                if hip_n_or_top_n == 0 && trans_bone == 0 {
+                if *hip_n_or_top_n == 0 && *trans_bone == 0 {
                     self.slope_contour_full = None;
                 } else {
-                    self.slope_contour_full = Some((hip_n_or_top_n, trans_bone));
+                    self.slope_contour_full = Some((*hip_n_or_top_n, *trans_bone));
                 }
             }
-            &EventAst::GenerateArticle { .. } => {}
-            &EventAst::ArticleEvent(_) => {}
-            &EventAst::ArticleAnimation(_) => {}
-            &EventAst::ArticleRemove(_) => {}
-            &EventAst::ArticleVisibility { .. } => {}
-            &EventAst::FinalSmashEnter => {}
-            &EventAst::FinalSmashExit => {}
-            &EventAst::TerminateSelf => {}
-            &EventAst::Posture(_) => {}
-            &EventAst::LedgeGrabEnable(ref enable) => {
+            EventAst::GenerateArticle { .. } => {}
+            EventAst::ArticleEvent(_) => {}
+            EventAst::ArticleAnimation(_) => {}
+            EventAst::ArticleRemove(_) => {}
+            EventAst::ArticleVisibility { .. } => {}
+            EventAst::FinalSmashEnter => {}
+            EventAst::FinalSmashExit => {}
+            EventAst::TerminateSelf => {}
+            EventAst::Posture(_) => {}
+            EventAst::LedgeGrabEnable(enable) => {
                 self.ledge_grab_enable = enable.clone();
             }
-            &EventAst::TagDisplay(display) => {
-                self.tag_display = display;
+            EventAst::TagDisplay(display) => {
+                self.tag_display = *display;
             }
-            &EventAst::Armor {
-                ref armor_type,
+            EventAst::Armor {
+                armor_type,
                 tolerance,
             } => {
                 self.armor_type = armor_type.clone();
-                self.armor_tolerance = tolerance;
+                self.armor_tolerance = *tolerance;
             }
-            &EventAst::AddDamage(damage) => {
+            EventAst::AddDamage(damage) => {
                 self.damage += damage;
             }
-            &EventAst::SetOrAddVelocity(ref values) => {
+            EventAst::SetOrAddVelocity(values) => {
                 if values.x_set {
                     self.x_vel = values.x_vel;
                     self.x_vel_modify = VelModify::Set(values.x_vel);
@@ -1280,17 +1275,14 @@ impl<'a> ScriptRunner<'a> {
                     self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + values.y_vel);
                 }
             }
-            &EventAst::SetVelocity { x_vel, y_vel } => {
-                self.x_vel = x_vel;
-                self.y_vel = y_vel;
+            EventAst::SetVelocity { x_vel, y_vel } => {
+                self.x_vel = *x_vel;
+                self.y_vel = *y_vel;
 
-                self.x_vel_modify = VelModify::Set(x_vel);
-                self.y_vel_modify = VelModify::Set(y_vel);
+                self.x_vel_modify = VelModify::Set(*x_vel);
+                self.y_vel_modify = VelModify::Set(*y_vel);
             }
-            &EventAst::AddVelocity {
-                ref x_vel,
-                ref y_vel,
-            } => {
+            EventAst::AddVelocity { x_vel, y_vel } => {
                 let x_vel = self.get_float_value(x_vel);
                 let y_vel = self.get_float_value(y_vel);
 
@@ -1300,108 +1292,84 @@ impl<'a> ScriptRunner<'a> {
                 self.x_vel_modify = VelModify::Add(self.x_vel_modify.value() + x_vel);
                 self.y_vel_modify = VelModify::Add(self.y_vel_modify.value() + y_vel);
             }
-            &EventAst::DisableMovement(ref disable_movement) => {
+            EventAst::DisableMovement(disable_movement) => {
                 self.disable_movement = disable_movement.clone();
             }
-            &EventAst::DisableMovement2(_) => {} // TODO: What!?!?
-            &EventAst::ResetVerticalVelocityAndAcceleration(reset) => {
-                if reset {
+            EventAst::DisableMovement2(_) => {} // TODO: What!?!?
+            EventAst::ResetVerticalVelocityAndAcceleration(reset) => {
+                if *reset {
                     self.y_vel = 0.0;
 
                     self.y_vel_modify = VelModify::Set(0.0);
                 }
             }
-            &EventAst::NormalizePhysics => {} // TODO
+            EventAst::NormalizePhysics => {} // TODO
 
             // sound
-            &EventAst::SoundEffect1(_) => {}
-            &EventAst::SoundEffect2(_) => {}
-            &EventAst::SoundEffectTransient(_) => {}
-            &EventAst::SoundEffectStop(_) => {}
-            &EventAst::SoundEffectVictory(_) => {}
-            &EventAst::SoundEffectUnk(_) => {}
-            &EventAst::SoundEffectOther1(_) => {}
-            &EventAst::SoundEffectOther2(_) => {}
-            &EventAst::SoundVoiceLow => {}
-            &EventAst::SoundVoiceDamage => {}
-            &EventAst::SoundVoiceOttotto => {}
-            &EventAst::SoundVoiceEating => {}
+            EventAst::SoundEffect1(_) => {}
+            EventAst::SoundEffect2(_) => {}
+            EventAst::SoundEffectTransient(_) => {}
+            EventAst::SoundEffectStop(_) => {}
+            EventAst::SoundEffectVictory(_) => {}
+            EventAst::SoundEffectUnk(_) => {}
+            EventAst::SoundEffectOther1(_) => {}
+            EventAst::SoundEffectOther2(_) => {}
+            EventAst::SoundVoiceLow => {}
+            EventAst::SoundVoiceDamage => {}
+            EventAst::SoundVoiceOttotto => {}
+            EventAst::SoundVoiceEating => {}
 
             // variables
-            &EventAst::IntVariableSet {
-                value,
-                ref variable,
-            } => {
-                self.set_variable_int(variable, value);
+            EventAst::IntVariableSet { value, variable } => {
+                self.set_variable_int(variable, *value);
             }
-            &EventAst::IntVariableAdd {
-                value,
-                ref variable,
-            } => {
+            EventAst::IntVariableAdd { value, variable } => {
                 let old_value = self.get_variable_int(variable);
-                self.set_variable_int(variable, old_value + value);
+                self.set_variable_int(variable, old_value + *value);
             }
-            &EventAst::IntVariableSubtract {
-                value,
-                ref variable,
-            } => {
+            EventAst::IntVariableSubtract { value, variable } => {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value - value);
             }
-            &EventAst::IntVariableIncrement { ref variable } => {
+            EventAst::IntVariableIncrement { variable } => {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value + 1);
             }
-            &EventAst::IntVariableDecrement { ref variable } => {
+            EventAst::IntVariableDecrement { variable } => {
                 let old_value = self.get_variable_int(variable);
                 self.set_variable_int(variable, old_value - 1);
             }
-            &EventAst::FloatVariableSet {
-                ref value,
-                ref variable,
-            } => {
+            EventAst::FloatVariableSet { value, variable } => {
                 let value = self.get_float_value(value);
                 self.set_variable_float(variable, value);
             }
-            &EventAst::FloatVariableAdd {
-                ref value,
-                ref variable,
-            } => {
+            EventAst::FloatVariableAdd { value, variable } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value + value);
             }
-            &EventAst::FloatVariableSubtract {
-                ref value,
-                ref variable,
-            } => {
+            EventAst::FloatVariableSubtract { value, variable } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value - value);
             }
-            &EventAst::FloatVariableMultiply {
-                ref value,
-                ref variable,
-            } => {
+            EventAst::FloatVariableMultiply { value, variable } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value * value);
             }
-            &EventAst::FloatVariableDivide {
-                ref value,
-                ref variable,
-            } => {
+            EventAst::FloatVariableDivide { value, variable } => {
                 let value = self.get_float_value(value);
                 let old_value = self.get_variable_float(variable);
                 self.set_variable_float(variable, old_value / value);
             }
-            &EventAst::BoolVariableSetTrue { ref variable } => match variable.data_type() {
+            EventAst::BoolVariableSetTrue { variable } => match variable.data_type() {
                 VariableDataType::Int => self.set_variable_int_inner(variable, 1),
                 VariableDataType::Float => self.set_variable_float_inner(variable, 1.0),
                 VariableDataType::Bool => self.set_variable_bool_inner(variable, true),
                 VariableDataType::Unknown { .. } => {}
             },
-            &EventAst::BoolVariableSetFalse { ref variable } => match variable.data_type() {
+            EventAst::BoolVariableSetFalse { variable } => match variable.data_type() {
                 VariableDataType::Int => self.set_variable_int_inner(variable, 0),
                 VariableDataType::Float => self.set_variable_float_inner(variable, 0.0),
                 VariableDataType::Bool => self.set_variable_bool_inner(variable, false),
@@ -1409,48 +1377,48 @@ impl<'a> ScriptRunner<'a> {
             },
 
             // graphics
-            &EventAst::GraphicEffect(_) => {}
-            &EventAst::ExternalGraphicEffect(_) => {}
-            &EventAst::LimitedScreenTint(_) => {}
-            &EventAst::UnlimitedScreenTint(_) => {}
-            &EventAst::EndUnlimitedScreenTint { .. } => {}
-            &EventAst::SwordGlow(_) => {}
-            &EventAst::DeleteSwordGlow { .. } => {}
-            &EventAst::AestheticWindEffect(_) => {}
-            &EventAst::EndAestheticWindEffect { .. } => {}
-            &EventAst::ScreenShake { .. } => {}
-            //&EventAst::ModelChanger { reference, switch_index, bone_group_index } => {
-            &EventAst::ModelChanger { .. } => {
+            EventAst::GraphicEffect(_) => {}
+            EventAst::ExternalGraphicEffect(_) => {}
+            EventAst::LimitedScreenTint(_) => {}
+            EventAst::UnlimitedScreenTint(_) => {}
+            EventAst::EndUnlimitedScreenTint { .. } => {}
+            EventAst::SwordGlow(_) => {}
+            EventAst::DeleteSwordGlow { .. } => {}
+            EventAst::AestheticWindEffect(_) => {}
+            EventAst::EndAestheticWindEffect { .. } => {}
+            EventAst::ScreenShake { .. } => {}
+            //EventAst::ModelChanger { reference, switch_index, bone_group_index } => {
+            EventAst::ModelChanger { .. } => {
                 // TODO: Model visibility change
             }
-            &EventAst::CameraCloseup(_) => {}
-            &EventAst::CameraNormal => {}
-            &EventAst::RemoveFlashEffect => {}
-            &EventAst::FlashEffectOverlay { .. } => {}
-            &EventAst::SetColorOfFlashEffectOverlay { .. } => {}
-            &EventAst::FlashEffectLight { .. } => {}
-            &EventAst::SetColorOfFlashEffectLight { .. } => {}
+            EventAst::CameraCloseup(_) => {}
+            EventAst::CameraNormal => {}
+            EventAst::RemoveFlashEffect => {}
+            EventAst::FlashEffectOverlay { .. } => {}
+            EventAst::SetColorOfFlashEffectOverlay { .. } => {}
+            EventAst::FlashEffectLight { .. } => {}
+            EventAst::SetColorOfFlashEffectLight { .. } => {}
 
             // items
-            &EventAst::ItemPickup { .. } => {}
-            &EventAst::ItemThrow { .. } => {}
-            &EventAst::ItemThrow2 { .. } => {}
-            &EventAst::ItemDrop => {}
-            &EventAst::ItemConsume { .. } => {}
-            &EventAst::ItemSetProperty { .. } => {}
-            &EventAst::FireWeapon => {}
-            &EventAst::FireProjectile => {}
-            &EventAst::Item1F { .. } => {}
-            &EventAst::ItemCreate { .. } => {}
-            &EventAst::ItemVisibility(_) => {}
-            &EventAst::ItemDelete => {}
-            &EventAst::BeamSwordTrail { .. } => {}
+            EventAst::ItemPickup { .. } => {}
+            EventAst::ItemThrow { .. } => {}
+            EventAst::ItemThrow2 { .. } => {}
+            EventAst::ItemDrop => {}
+            EventAst::ItemConsume { .. } => {}
+            EventAst::ItemSetProperty { .. } => {}
+            EventAst::FireWeapon => {}
+            EventAst::FireProjectile => {}
+            EventAst::Item1F { .. } => {}
+            EventAst::ItemCreate { .. } => {}
+            EventAst::ItemVisibility(_) => {}
+            EventAst::ItemDelete => {}
+            EventAst::BeamSwordTrail { .. } => {}
 
             // do nothing
-            &EventAst::Unknown(ref event) => {
+            EventAst::Unknown(event) => {
                 debug!("unknown event: {:#?}", event);
             }
-            &EventAst::Nop => {}
+            EventAst::Nop => {}
         }
         StepEventResult::None
     }
@@ -1458,7 +1426,7 @@ impl<'a> ScriptRunner<'a> {
     #[rustfmt::skip]
     fn evaluate_expression(&mut self, expression: &Expression) -> ExprResult {
         match expression {
-            &Expression::Nullary (ref requirement) => {
+            Expression::Nullary (requirement) => {
                 ExprResult::Bool (match requirement {
                     Requirement::CharacterExists => true,
                     Requirement::OnGround => true,
@@ -1469,7 +1437,7 @@ impl<'a> ScriptRunner<'a> {
                     _ => false
                 })
             }
-            &Expression::Unary (ref unary) => {
+            Expression::Unary (unary) => {
                 ExprResult::Bool (match unary.requirement {
                     Requirement::CharacterExists => true,
                     Requirement::OnGround => true,
@@ -1481,9 +1449,10 @@ impl<'a> ScriptRunner<'a> {
                     _ => false
                 })
             }
-            &Expression::Binary (ref binary) => {
+            #[allow(clippy::float_cmp)]
+            Expression::Binary (binary) => {
                 let result = match &binary.operator {
-                    &ComparisonOperator::LessThan => {
+                    ComparisonOperator::LessThan => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          < right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) < right,
@@ -1492,7 +1461,7 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::LessThanOrEqual => {
+                    ComparisonOperator::LessThanOrEqual => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          <= right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) <= right,
@@ -1501,7 +1470,7 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::Equal => {
+                    ComparisonOperator::Equal => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          == right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) == right,
@@ -1510,7 +1479,7 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::NotEqual => {
+                    ComparisonOperator::NotEqual => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          != right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) != right,
@@ -1519,7 +1488,7 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::GreaterThanOrEqual => {
+                    ComparisonOperator::GreaterThanOrEqual => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          >= right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) >= right,
@@ -1528,7 +1497,7 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::GreaterThan => {
+                    ComparisonOperator::GreaterThan => {
                         match (self.evaluate_expression(&binary.left), self.evaluate_expression(&binary.right)) {
                             (ExprResult::Float (left), ExprResult::Float (right)) => left          > right,
                             (ExprResult::Int (left),   ExprResult::Float (right)) => (left as f32) > right,
@@ -1537,14 +1506,14 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    &ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left).unwrap_bool() || self.evaluate_expression(&*binary.right).unwrap_bool(),
-                    &ComparisonOperator::And                => self.evaluate_expression(&*binary.left).unwrap_bool() && self.evaluate_expression(&*binary.right).unwrap_bool(),
-                    &ComparisonOperator::UnknownArg (_)     => false,
+                    ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left).unwrap_bool() || self.evaluate_expression(&*binary.right).unwrap_bool(),
+                    ComparisonOperator::And                => self.evaluate_expression(&*binary.left).unwrap_bool() && self.evaluate_expression(&*binary.right).unwrap_bool(),
+                    ComparisonOperator::UnknownArg (_)     => false,
                 };
                 ExprResult::Bool (result)
             }
-            &Expression::Not (ref expression) => ExprResult::Bool (!self.evaluate_expression(expression).unwrap_bool()),
-            &Expression::Variable (ref variable) => {
+            Expression::Not (expression) => ExprResult::Bool (!self.evaluate_expression(expression).unwrap_bool()),
+            Expression::Variable (variable) => {
                 match variable.data_type() {
                     VariableDataType::Int            => ExprResult::Int   (self.get_variable_int_inner(variable)),
                     VariableDataType::Float          => ExprResult::Float (self.get_variable_float_inner(variable)),
@@ -1552,8 +1521,8 @@ impl<'a> ScriptRunner<'a> {
                     VariableDataType::Unknown { .. } => ExprResult::Bool (false), // can't be handled properly so just give a dummy value
                 }
             }
-            &Expression::Value (int) => ExprResult::Int (int),
-            &Expression::Scalar (float) => ExprResult::Float (float),
+            Expression::Value (int) => ExprResult::Int (*int),
+            Expression::Scalar (float) => ExprResult::Float (*float),
         }
     }
 
@@ -1844,7 +1813,7 @@ enum StepEventResult<'a> {
     },
     NewIfStatement {
         then_branch: &'a Block,
-        else_branch: Option<&'a Box<Block>>,
+        else_branch: Option<&'a Block>,
         execute: bool,
     },
     IfStatementDisableExecution,

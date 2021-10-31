@@ -201,7 +201,7 @@ impl HighLevelFighter {
                         format!("{}_{}", actual_name, count)
                     };
 
-                    let animation_flags = subaction_flags.animation_flags.clone();
+                    let animation_flags = subaction_flags.animation_flags;
 
                     let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
                     let subaction_scripts = vec![
@@ -222,7 +222,7 @@ impl HighLevelFighter {
                         &common_scripts,
                         &scripts_section,
                         &init_hack_script,
-                        &fighter_data,
+                        fighter_data,
                         actual_name.clone(),
                     );
                     let mut iasa = None;
@@ -252,7 +252,7 @@ impl HighLevelFighter {
                                 script_runner.animation_index * chr0.num_frames as f32 / num_frames; // map frame count between [0, chr0.num_frames]
                             let (animation_xyz_offset, frame_bones) =
                                 HighLevelFighter::transform_bones(
-                                    &first_bone,
+                                    first_bone,
                                     &fighter_data.misc.bone_refs,
                                     Matrix4::<f32>::identity(),
                                     Matrix4::<f32>::identity(),
@@ -262,7 +262,7 @@ impl HighLevelFighter {
                                     fighter_data.attributes.size,
                                 );
                             let animation_xyz_offset =
-                                animation_xyz_offset.unwrap_or(Vector3::new(0.0, 0.0, 0.0));
+                                animation_xyz_offset.unwrap_or_else(|| Vector3::new(0.0, 0.0, 0.0));
                             // TODO: should DisableMovement affect xyz_offset from transform_bones?????
                             // script runner x-axis is equivalent to model z-axis
 
@@ -314,7 +314,7 @@ impl HighLevelFighter {
                                 let mut prev_size = None;
                                 let mut prev_values = None;
                                 if next.interpolate {
-                                    if let &Some(ref prev_hit_boxes) = &prev_hit_boxes {
+                                    if let Some(prev_hit_boxes) = &prev_hit_boxes {
                                         for prev_hit_box in prev_hit_boxes {
                                             if prev_hit_box.hitbox_id == next.hitbox_id {
                                                 // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
@@ -460,7 +460,7 @@ impl HighLevelFighter {
                                 interruptible: script_runner.interruptible,
                                 landing_lag: script_runner.landing_lag,
                                 edge_slide: script_runner.edge_slide.clone(),
-                                reverse_direction: script_runner.reverse_direction.clone(),
+                                reverse_direction: script_runner.reverse_direction,
                                 airbourne: script_runner.airbourne,
                                 hitbox_sets_rehit: script_runner.hitbox_sets_rehit,
                                 slope_contour_stand: script_runner.slope_contour_stand,
@@ -502,7 +502,7 @@ impl HighLevelFighter {
                         _ => None,
                     };
 
-                    let bad_interrupts = script_runner.bad_interrupts.len() > 0;
+                    let bad_interrupts = !script_runner.bad_interrupts.is_empty();
 
                     HighLevelSubaction {
                         name,
@@ -641,7 +641,7 @@ impl HighLevelSubaction {
     /// Furthest point of a hitbox, starting from the bps
     /// Furthest values across all frames
     pub fn hit_box_extent(&self) -> Extent {
-        let mut extent = Extent::new();
+        let mut extent = Extent::default();
         for frame in &self.frames {
             let mut new_extent = frame.hit_box_extent();
             new_extent.up += frame.y_pos;
@@ -656,7 +656,7 @@ impl HighLevelSubaction {
     /// Furthest point of a hurtbox, starting from the bps
     /// Furthest values across all frames
     pub fn hurt_box_extent(&self) -> Extent {
-        let mut extent = Extent::new();
+        let mut extent = Extent::default();
         for frame in &self.frames {
             let mut new_extent = frame.hurt_box_extent();
             new_extent.up += frame.y_pos;
@@ -671,7 +671,7 @@ impl HighLevelSubaction {
     /// Furthest point of a ledge grab box, starting from the bps
     /// Furthest values across all frames
     pub fn ledge_grab_box_extent(&self) -> Extent {
-        let mut extent = Extent::new();
+        let mut extent = Extent::default();
         for frame in &self.frames {
             if let Some(ref ledge_grab_box) = frame.ledge_grab_box {
                 let mut new_extent = ledge_grab_box.clone();
@@ -743,7 +743,7 @@ pub struct HighLevelFrame {
 impl HighLevelFrame {
     /// Furthest point of a hitbox, starting from the bps
     pub fn hit_box_extent(&self) -> Extent {
-        let mut extent = Extent::new();
+        let mut extent = Extent::default();
         for hit_box in &self.hit_boxes {
             if let (Some(pos), Some(size)) = (hit_box.prev_pos, hit_box.prev_size) {
                 let new_extent = Extent {
@@ -770,9 +770,9 @@ impl HighLevelFrame {
 
     /// Furthest point of a hurtbox, starting from the bps
     pub fn hurt_box_extent(&self) -> Extent {
-        let mut extent = Extent::new();
+        let mut extent = Extent::default();
         for hurt_box in &self.hurt_boxes {
-            let bone_matrix = hurt_box.bone_matrix.clone();
+            let bone_matrix = hurt_box.bone_matrix;
             let prev = hurt_box.hurt_box.offset;
             let next = hurt_box.hurt_box.stretch;
             let radius = hurt_box.hurt_box.radius;
@@ -790,7 +790,7 @@ impl HighLevelFrame {
         transform: Matrix4<f32>,
     ) -> Extent {
         let scale = Matrix4::from_scale(radius);
-        let transform = transform * Matrix4::from_translation(sphere_location.clone()) * scale;
+        let transform = transform * Matrix4::from_translation(sphere_location) * scale;
 
         let mut s = Matrix4::from_scale(1.0);
         s.w.w = -1.0;
@@ -804,12 +804,12 @@ impl HighLevelFrame {
                 right: (r.z.w - (r.z.w * r.z.w - r.w.w * r.z.z).sqrt()) / r.w.w,
             }
         } else {
-            Extent::new()
+            Extent::default()
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Extent {
     pub left: f32,
     pub right: f32,
@@ -819,15 +819,6 @@ pub struct Extent {
 }
 
 impl Extent {
-    pub fn new() -> Extent {
-        Extent {
-            left: 0.0,
-            right: 0.0,
-            up: 0.0,
-            down: 0.0,
-        }
-    }
-
     pub fn extend(&mut self, other: &Extent) {
         if other.left < self.left && !self.left.is_nan() {
             self.left = other.left;
@@ -973,7 +964,7 @@ impl CollisionBoxValues {
             size: args.size,
             set_action: args.set_action,
             target: args.target.clone(),
-            unk: args.unk.clone(),
+            unk: args.unk,
         })
     }
 

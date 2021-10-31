@@ -46,18 +46,16 @@ impl BrawlMod {
                 Err(err) => bail!("Cannot read brawl mod directory: {}", err),
             };
 
-            for dir in dir_reader {
-                if let Ok(dir) = dir {
-                    let path = dir.path().join("pf/fighter");
-                    if path.exists() {
-                        mod_fighter_dir = Some(match fs::read_dir(path) {
-                            Ok(dir) => dir,
-                            Err(err) => {
-                                bail!("Cannot read fighter directory in the brawl mod: {}", err)
-                            }
-                        });
-                        break;
-                    }
+            for dir in dir_reader.flatten() {
+                let path = dir.path().join("pf/fighter");
+                if path.exists() {
+                    mod_fighter_dir = Some(match fs::read_dir(path) {
+                        Ok(dir) => dir,
+                        Err(err) => {
+                            bail!("Cannot read fighter directory in the brawl mod: {}", err)
+                        }
+                    });
+                    break;
                 }
             }
         }
@@ -109,37 +107,33 @@ impl BrawlMod {
 
         let mut gct_files: Vec<GCTFile> = vec![];
         if let Some(mod_path) = &self.mod_path {
-            for entry in fs::read_dir(mod_path).unwrap() {
-                if let Ok(entry) = entry {
-                    if entry.path().is_dir() {
-                        let child_dir = entry.path();
-                        for entry in fs::read_dir(child_dir).unwrap() {
-                            if let Ok(entry) = entry {
-                                let name = entry.file_name().into_string().unwrap();
-                                if name.ends_with(".gct") || name.ends_with(".GCT") {
-                                    let codeset_path = entry.path();
-                                    if codeset_path.exists() {
-                                        match std::fs::read(&codeset_path) {
-                                            Ok(data) => {
-                                                if data.len() < 8 {
-                                                    bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
-                                                }
-                                                if let Some(matching_file) =
-                                                    gct_files.iter().find(|x| x.name == name)
-                                                {
-                                                    assert_eq!(matching_file.data, data);
-                                                } else {
-                                                    gct_files.push(GCTFile { name, data });
-                                                }
-                                            }
-                                            Err(err) => bail!(
-                                                "Cannot read WiiRD codeset {:?}: {}",
-                                                codeset_path,
-                                                err
-                                            ),
-                                        };
+            for entry in fs::read_dir(mod_path).unwrap().flatten() {
+                if entry.path().is_dir() {
+                    let child_dir = entry.path();
+                    for entry in fs::read_dir(child_dir).unwrap().flatten() {
+                        let name = entry.file_name().into_string().unwrap();
+                        if name.ends_with(".gct") || name.ends_with(".GCT") {
+                            let codeset_path = entry.path();
+                            if codeset_path.exists() {
+                                match std::fs::read(&codeset_path) {
+                                    Ok(data) => {
+                                        if data.len() < 8 {
+                                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+                                        }
+                                        if let Some(matching_file) =
+                                            gct_files.iter().find(|x| x.name == name)
+                                        {
+                                            assert_eq!(matching_file.data, data);
+                                        } else {
+                                            gct_files.push(GCTFile { name, data });
+                                        }
                                     }
-                                }
+                                    Err(err) => bail!(
+                                        "Cannot read WiiRD codeset {:?}: {}",
+                                        codeset_path,
+                                        err
+                                    ),
+                                };
                             }
                         }
                     }

@@ -72,7 +72,7 @@ pub(crate) fn fragment_scripts(
         }
     }
 
-    if fragments.len() > 0 {
+    if !fragments.is_empty() {
         // the fragment scripts may refer to their own fragment scripts
         let mut all = known_scripts.to_vec();
         all.push(&fragments);
@@ -173,7 +173,7 @@ fn arguments(data: FancySlice, origin: u32, num_arguments: usize) -> Vec<Argumen
 
                 Argument::Variable (Variable { memory_type, data_type, address })
             }
-            6 => Requirement::new(value as u32),
+            6 => Argument::new(value as u32),
             _ => Argument::Unknown (ty, value),
         };
         arguments.push(argument);
@@ -356,7 +356,7 @@ pub enum Requirement {
     Unknown(u32),
 }
 
-impl Requirement {
+impl Argument {
     fn new(value: u32) -> Argument {
         let flip = value >> 31 == 1;
         let ty = match value & 0xFFFF {

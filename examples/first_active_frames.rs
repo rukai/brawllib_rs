@@ -47,9 +47,9 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+    let mod_path = matches.opt_str("m").map(PathBuf::from);
 
-    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_deref());
 
     let fighters = match brawl_mod.load_fighters(true) {
         Ok(fighters) => fighters,
@@ -87,7 +87,7 @@ fn main() {
     }
 
     let mut header = String::from("Attack");
-    let mut fighter_names: Vec<_> = fighter_map.keys().collect();
+    let mut fighter_names: Vec<_> = fighter_map.keys().cloned().collect();
     fighter_names.sort();
     for name in &fighter_names {
         header.push_str(&format!(",{}", name));
@@ -121,40 +121,38 @@ fn main() {
     for (name, subaction_name) in moves {
         let mut row = name.to_string();
         for name in &fighter_names {
-            if let Some(facts) = fighter_map[name.clone()].get(subaction_name) {
+            if let Some(facts) = fighter_map[name].get(subaction_name) {
                 if let Some(first_active_frame) = facts.first_active_frame {
                     row.push_str(&format!(",{}", first_active_frame))
-                } else {
-                    if subaction_name == "AttackS4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()]
-                            .get("AttackS4S")
-                            .and_then(|x| x.first_active_frame)
-                        {
-                            row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        } else {
-                            row.push_str(",Unknown");
-                        }
-                    } else if subaction_name == "AttackLw4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()]
-                            .get("AttackLw4")
-                            .and_then(|x| x.first_active_frame)
-                        {
-                            row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        } else {
-                            row.push_str(",Unknown");
-                        }
-                    } else if subaction_name == "AttackHi4Start" {
-                        if let Some(first_active_frame) = fighter_map[name.clone()]
-                            .get("AttackHi4")
-                            .and_then(|x| x.first_active_frame)
-                        {
-                            row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
-                        } else {
-                            row.push_str(",Unknown");
-                        }
+                } else if subaction_name == "AttackS4Start" {
+                    if let Some(first_active_frame) = fighter_map[name]
+                        .get("AttackS4S")
+                        .and_then(|x| x.first_active_frame)
+                    {
+                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
                     } else {
                         row.push_str(",Unknown");
                     }
+                } else if subaction_name == "AttackLw4Start" {
+                    if let Some(first_active_frame) = fighter_map[name]
+                        .get("AttackLw4")
+                        .and_then(|x| x.first_active_frame)
+                    {
+                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
+                    } else {
+                        row.push_str(",Unknown");
+                    }
+                } else if subaction_name == "AttackHi4Start" {
+                    if let Some(first_active_frame) = fighter_map[name]
+                        .get("AttackHi4")
+                        .and_then(|x| x.first_active_frame)
+                    {
+                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
+                    } else {
+                        row.push_str(",Unknown");
+                    }
+                } else {
+                    row.push_str(",Unknown");
                 }
             } else {
                 row.push_str(",Unknown");

@@ -16,10 +16,9 @@ pub(crate) struct ListOffset {
 
 pub fn parse_tag(data: &[u8]) -> String {
     let mut tag = String::new();
-    for j in 0..4 {
-        let byte = data[j] as char;
+    for byte in data.iter().take(4) {
         if byte.is_ascii_graphic() {
-            tag.push(byte);
+            tag.push(*byte as char);
         } else {
             break;
         }

@@ -261,20 +261,16 @@ pub enum KeyframeHolder {
 impl KeyframeHolder {
     pub fn get_value(&self, loop_value: bool, frame: i32, default: f32) -> Vector3<f32> {
         match self {
-            &KeyframeHolder::Isotropic(ref keyframe) => {
+            KeyframeHolder::Isotropic(keyframe) => {
                 let value = keyframe.get_value(loop_value, frame);
                 Vector3::new(value, value, value)
             }
-            &KeyframeHolder::Individual {
-                ref x,
-                ref y,
-                ref z,
-            } => Vector3::new(
+            KeyframeHolder::Individual { x, y, z } => Vector3::new(
                 x.get_value(loop_value, frame),
                 y.get_value(loop_value, frame),
                 z.get_value(loop_value, frame),
             ),
-            &KeyframeHolder::None => Vector3::new(default, default, default),
+            KeyframeHolder::None => Vector3::new(default, default, default),
         }
     }
 }
@@ -293,8 +289,8 @@ pub enum Keyframe {
 impl Keyframe {
     pub fn get_value(&self, loop_value: bool, frame: i32) -> f32 {
         match self {
-            &Keyframe::Fixed(value) => value,
-            &Keyframe::Interpolated4(ref header) => {
+            Keyframe::Fixed(value) => *value,
+            Keyframe::Interpolated4(header) => {
                 let children = header.children.iter().map(|child| InterpolatedNEntry {
                     value: header.base + header.step * child.step() as f32,
                     frame_index: child.frame_index() as i32,
@@ -302,7 +298,7 @@ impl Keyframe {
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
-            &Keyframe::Interpolated6(ref header) => {
+            Keyframe::Interpolated6(header) => {
                 let children = header.children.iter().map(|child| InterpolatedNEntry {
                     value: header.base + header.step * child.step as f32,
                     frame_index: child.frame_index(),
@@ -310,7 +306,7 @@ impl Keyframe {
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
-            &Keyframe::Interpolated12(ref header) => {
+            Keyframe::Interpolated12(header) => {
                 let children = header.children.iter().map(|child| InterpolatedNEntry {
                     value: child.value,
                     frame_index: child.frame_index as i32,
@@ -318,7 +314,7 @@ impl Keyframe {
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
-            &Keyframe::Linear1(ref header) => {
+            Keyframe::Linear1(header) => {
                 // TODO: Pretty sure I need to interpolate these still to handle non integer frame indexes (currently frame is a usize though so lol)
                 //let mut children = vec!();
                 //for (i, child_step) in header.children_steps.iter().enumerate() {
@@ -333,10 +329,10 @@ impl Keyframe {
                 //return Keyframe::get_value_interpolated_n_entry(&children, loop_value, frame);
                 header.base + header.step as f32 * header.children_steps[frame as usize] as f32
             }
-            &Keyframe::Linear2(ref header) => {
+            Keyframe::Linear2(header) => {
                 header.base + header.step * header.children_steps[frame as usize] as f32
             }
-            &Keyframe::Linear4(ref values) => values[frame as usize],
+            Keyframe::Linear4(values) => values[frame as usize],
         }
     }
 
@@ -357,7 +353,7 @@ impl Keyframe {
             // All cases I have seen is with trailing children that have frame_index of 0.
             // Maybe when the animation was modified the modding tool was not able to delete children yet?
             // So I will just ignore these trailing frame_index == 0 children
-            if let &Some(ref prev) = &prev {
+            if let Some(prev) = &prev {
                 if child.frame_index < prev.frame_index {
                     assert_eq!(child.frame_index, 0);
                     break;
@@ -420,13 +416,12 @@ impl Keyframe {
                 } else {
                     let time = offset as f32 / span as f32;
                     let time_inv = time - 1.0;
-                    let result = prev.value
+
+                    prev.value
                         + (offset as f32
                             * time_inv
                             * (time_inv * prev_tangent + time * next_tangent))
-                        + ((time * time) * (3.0 - 2.0 * time) * value_diff);
-
-                    result
+                        + ((time * time) * (3.0 - 2.0 * time) * value_diff)
                 }
             }
             (Some(child), None) | (None, Some(child)) => child.value,
@@ -544,7 +539,7 @@ const LINEAR_4_ENTRY_SIZE: usize = 0x4;
 #[rustfmt::skip]
 fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe {
     match format {
-        &Chr0Format::Interpolated4 => {
+        Chr0Format::Interpolated4 => {
             let entries     = data.u16_be(0x0);
             let unk         = data.u16_be(0x2);
             let frame_scale = data.f32_be(0x4);
@@ -558,7 +553,7 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             }
             Keyframe::Interpolated4 (Interpolated4Header { entries, unk, frame_scale, step, base, children })
         }
-        &Chr0Format::Interpolated6 => {
+        Chr0Format::Interpolated6 => {
             let num_frames  = data.u16_be(0x0);
             let unk         = data.u16_be(0x2);
             let frame_scale = data.f32_be(0x4);
@@ -574,7 +569,7 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             }
             Keyframe::Interpolated6 (Interpolated6Header { num_frames, unk, frame_scale, step, base, children })
         }
-        &Chr0Format::Interpolated12 => {
+        Chr0Format::Interpolated12 => {
             let num_frames  = data.u16_be(0x0);
             let unk         = data.u16_be(0x2);
             let frame_scale = data.f32_be(0x4);
@@ -589,13 +584,13 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             }
             Keyframe::Interpolated12 (Interpolated12Header { num_frames, unk, frame_scale, children })
         }
-        &Chr0Format::Linear1 => {
+        Chr0Format::Linear1 => {
             let step = data.f32_be(0x0);
             let base = data.f32_be(0x4);
-            let children_steps = data.relative_slice(LINEAR_1_HEADER_SIZE .. LINEAR_1_HEADER_SIZE + num_frames as usize).iter().cloned().collect();
+            let children_steps = data.relative_slice(LINEAR_1_HEADER_SIZE .. LINEAR_1_HEADER_SIZE + num_frames as usize).to_vec();
             Keyframe::Linear1 (Linear1Header { step, base, children_steps })
         }
-        &Chr0Format::Linear2 => {
+        Chr0Format::Linear2 => {
             let step = data.f32_be(0x0);
             let base = data.f32_be(0x4);
 
@@ -605,13 +600,13 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             }
             Keyframe::Linear2 (Linear2Header { step, base, children_steps })
         }
-        &Chr0Format::Linear4 => {
+        Chr0Format::Linear4 => {
             let mut values = vec!();
             for i in 0..num_frames as usize {
                 values.push(data.f32_be(LINEAR_4_ENTRY_SIZE * i));
             }
             Keyframe::Linear4 (values)
         }
-        &Chr0Format::None => panic!("this function should not be called with a format of None"),
+        Chr0Format::None => panic!("this function should not be called with a format of None"),
     }
 }

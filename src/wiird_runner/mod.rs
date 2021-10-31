@@ -99,17 +99,16 @@ pub fn process(codeset: &[u8], buffer: &mut [u8], buffer_ram_location: u32) -> W
                     pointer_address + address
                 };
 
-                if execute {
-                    if mem_address >= buffer_ram_location
-                        && mem_address < buffer_ram_location + buffer.len() as u32
-                    {
-                        // write to wii ram
-                        memory.write_u32(mem_address as usize, value);
+                if execute
+                    && mem_address >= buffer_ram_location
+                    && mem_address < buffer_ram_location + buffer.len() as u32
+                {
+                    // write to wii ram
+                    memory.write_u32(mem_address as usize, value);
 
-                        // also write to the provided buffer if it would have been written to on a wii.
-                        let buffer_offset = mem_address - buffer_ram_location;
-                        BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
-                    }
+                    // also write to the provided buffer if it would have been written to on a wii.
+                    let buffer_offset = mem_address - buffer_ram_location;
+                    BigEndian::write_u32(&mut buffer[buffer_offset as usize..], value);
                 }
 
                 offset += 8;

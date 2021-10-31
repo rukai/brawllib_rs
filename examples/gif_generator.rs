@@ -50,7 +50,7 @@ fn main() {
         print_usage(program, opts);
         return;
     };
-    let mod_path = matches.opt_str("m").map(|x| PathBuf::from(x));
+    let mod_path = matches.opt_str("m").map(PathBuf::from);
 
     let fighter_name = if let Some(fighter_name) = matches.opt_str("f") {
         fighter_name
@@ -68,7 +68,7 @@ fn main() {
         return;
     };
 
-    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_ref().map(|x| x.as_path()));
+    let brawl_mod = BrawlMod::new(&brawl_path, mod_path.as_deref());
 
     let fighters = match brawl_mod.load_fighters(true) {
         Ok(fighters) => fighters,

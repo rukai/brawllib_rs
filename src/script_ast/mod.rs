@@ -416,7 +416,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 {
                     let unk = if let Some(&Value(value)) = args.get(8) { Some(value) } else { None };
 
-                    assert!(v0 >= 0 && v0 <= 0xFF, "grab boxes shouldn't include any extra data with the hitbox_id");
+                    assert!((0..=0xFF).contains(&v0), "grab boxes shouldn't include any extra data with the hitbox_id");
 
                     EventAst::CreateGrabBox(GrabBoxArguments {
                         hitbox_id:    v0,
@@ -859,9 +859,9 @@ impl Expression {
             (None, None, None) => Expression::Nullary(requirement.clone()),
             (Some(v1), None, None) => {
                 let value = Box::new(match v1 {
-                    &Argument::Scalar(v1) => Expression::Scalar(v1),
-                    &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
-                    &Argument::Value(v1) => Expression::Value(v1),
+                    Argument::Scalar(v1) => Expression::Scalar(*v1),
+                    Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
+                    Argument::Value(v1) => Expression::Value(*v1),
                     _ => {
                         error!("Unhandled expression case: value: {:?}", v1);
                         return None;
@@ -872,20 +872,20 @@ impl Expression {
                     value,
                 })
             }
-            (Some(v1), Some(&Argument::Value(v2)), Some(v3)) => {
+            (Some(v1), Some(Argument::Value(v2)), Some(v3)) => {
                 let left = Box::new(match v1 {
-                    &Argument::Scalar(v1) => Expression::Scalar(v1),
-                    &Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
-                    &Argument::Value(v1) => Expression::Value(v1),
+                    Argument::Scalar(v1) => Expression::Scalar(*v1),
+                    Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
+                    Argument::Value(v1) => Expression::Value(*v1),
                     _ => {
                         error!("Unhandled expression case: left");
                         return None;
                     }
                 });
                 let right = Box::new(match v3 {
-                    &Argument::Scalar(v3) => Expression::Scalar(v3),
-                    &Argument::Variable(ref v3) => Expression::Variable(VariableAst::new(v3)),
-                    &Argument::Value(v3) => Expression::Value(v3),
+                    Argument::Scalar(v3) => Expression::Scalar(*v3),
+                    Argument::Variable(ref v3) => Expression::Variable(VariableAst::new(v3)),
+                    Argument::Value(v3) => Expression::Value(*v3),
                     _ => {
                         error!("Unhandled expression case: right");
                         return None;
@@ -896,7 +896,7 @@ impl Expression {
                     script::Requirement::Comparison => Expression::Binary(BinaryExpression {
                         left,
                         right,
-                        operator: ComparisonOperator::from_arg(v2),
+                        operator: ComparisonOperator::from_arg(*v2),
                     }),
                     // Seems to be just modders using this as a quick hack.
                     script::Requirement::Always => Expression::Nullary(requirement.clone()),
@@ -1459,26 +1459,20 @@ impl HurtBoxState {
     }
 
     pub fn is_normal(&self) -> bool {
-        match self {
-            HurtBoxState::Normal => true,
-            _ => false,
-        }
+        matches!(self, HurtBoxState::Normal)
     }
 
     pub fn is_invincible(&self) -> bool {
-        match self {
-            HurtBoxState::Invincible => true,
-            _ => false,
-        }
+        matches!(self, HurtBoxState::Invincible)
     }
 
     pub fn is_intangible(&self) -> bool {
-        match self {
-            HurtBoxState::IntangibleFlashing => true,
-            HurtBoxState::IntangibleNoFlashing => true,
-            HurtBoxState::IntangibleQuickFlashing => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            HurtBoxState::IntangibleFlashing
+                | HurtBoxState::IntangibleNoFlashing
+                | HurtBoxState::IntangibleQuickFlashing
+        )
     }
 }
 
@@ -1869,19 +1863,14 @@ impl GrabTarget {
     }
 
     pub fn grounded(&self) -> bool {
-        match self {
-            GrabTarget::GroundedOnly => true,
-            GrabTarget::AerialAndGrounded => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            GrabTarget::GroundedOnly | GrabTarget::AerialAndGrounded
+        )
     }
 
     pub fn aerial(&self) -> bool {
-        match self {
-            GrabTarget::AerialOnly => true,
-            GrabTarget::AerialAndGrounded => true,
-            _ => false,
-        }
+        matches!(self, GrabTarget::AerialOnly | GrabTarget::AerialAndGrounded)
     }
 }
 

@@ -344,7 +344,7 @@ fn subaction_flags(parent_data: FancySlice, data: FancySlice, num: usize) -> Vec
     let mut result = vec![];
     let num = num + 1;
     for i in 0..num {
-        let in_translation_time = data.u8(i * SUB_ACTION_FLAGS_SIZE + 0);
+        let in_translation_time = data.u8(i * SUB_ACTION_FLAGS_SIZE);
         let animation_flags_int = data.u8(i * SUB_ACTION_FLAGS_SIZE + 1);
         //  padding               data.u16_be(i * SUB_ACTION_FLAGS_SIZE + 2..);
         let string_offset = data.i32_be(i * SUB_ACTION_FLAGS_SIZE + 4);
@@ -374,7 +374,7 @@ pub struct SubactionFlags {
 }
 
 fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> ModelVisibility {
-    let reference_offset = parent_data.i32_be(model_visibility_start as usize + 0x00);
+    let reference_offset = parent_data.i32_be(model_visibility_start as usize);
     let bone_switch_count = parent_data.i32_be(model_visibility_start as usize + 0x04);
     let defaults_offset = parent_data.i32_be(model_visibility_start as usize + 0x08);
     let defaults_count = parent_data.i32_be(model_visibility_start as usize + 0x0c);
@@ -486,7 +486,7 @@ fn action_flags(data: FancySlice, num: usize) -> Vec<ActionFlags> {
     let mut result = vec![];
     for i in 0..num {
         result.push(ActionFlags {
-            flag1: data.u32_be(i * ACTION_FLAGS_SIZE + 0x0),
+            flag1: data.u32_be(i * ACTION_FLAGS_SIZE),
             flag2: data.u32_be(i * ACTION_FLAGS_SIZE + 0x4),
             flag3: data.u32_be(i * ACTION_FLAGS_SIZE + 0x8),
             flag4: data.u32_be(i * ACTION_FLAGS_SIZE + 0xc),
