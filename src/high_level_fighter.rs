@@ -204,7 +204,7 @@ impl HighLevelFighter {
                     let animation_flags = subaction_flags.animation_flags;
 
                     let chr0 = fighter_animations.iter().find(|x| x.name == actual_name);
-                    let subaction_scripts = vec![
+                    let subaction_scripts = [
                         &scripts.script_main,
                         &scripts.script_gfx,
                         &scripts.script_sfx,
@@ -297,57 +297,55 @@ impl HighLevelFighter {
                                 &script_runner,
                                 fighter_data.attributes.size,
                             );
-                            let hit_boxes: Vec<_> = script_runner
-                                .hitboxes
-                                .iter()
-                                .filter(|x| x.is_some())
-                                .map(|x| x.clone().unwrap())
-                                .collect();
+                            let hit_boxes: Vec<_> =
+                                script_runner.hitboxes.iter().flatten().cloned().collect();
                             let hit_boxes = gen_hit_boxes(
                                 &frame_bones,
                                 &hit_boxes,
                                 fighter_data.attributes.size,
                             );
-                            let mut hl_hit_boxes = vec![];
-                            for next in &hit_boxes {
-                                let mut prev_pos = None;
-                                let mut prev_size = None;
-                                let mut prev_values = None;
-                                if next.interpolate {
-                                    if let Some(prev_hit_boxes) = &prev_hit_boxes {
-                                        for prev_hit_box in prev_hit_boxes {
-                                            if prev_hit_box.hitbox_id == next.hitbox_id {
-                                                // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                                prev_pos = Some(
-                                                    prev_hit_box.hitbox_position
-                                                        - Vector3::new(0.0, y_vel, x_vel),
-                                                );
-                                                prev_size = Some(prev_hit_box.size);
-                                                prev_values = Some(prev_hit_box.values.clone());
+                            let mut hl_hit_boxes: Vec<_> = hit_boxes
+                                .iter()
+                                .map(|next| {
+                                    let mut prev_pos = None;
+                                    let mut prev_size = None;
+                                    let mut prev_values = None;
+                                    if next.interpolate {
+                                        if let Some(prev_hit_boxes) = &prev_hit_boxes {
+                                            for prev_hit_box in prev_hit_boxes {
+                                                if prev_hit_box.hitbox_id == next.hitbox_id {
+                                                    // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
+                                                    prev_pos = Some(
+                                                        prev_hit_box.hitbox_position
+                                                            - Vector3::new(0.0, y_vel, x_vel),
+                                                    );
+                                                    prev_size = Some(prev_hit_box.size);
+                                                    prev_values = Some(prev_hit_box.values.clone());
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // abuse the hitbox interpolation fields to create stretch hitboxes
-                                if next.values.stretches_to_bone() {
-                                    prev_pos = Some(next.bone_position);
-                                    prev_size = Some(next.size);
-                                    prev_values = Some(next.values.clone());
-                                }
+                                    // abuse the hitbox interpolation fields to create stretch hitboxes
+                                    if next.values.stretches_to_bone() {
+                                        prev_pos = Some(next.bone_position);
+                                        prev_size = Some(next.size);
+                                        prev_values = Some(next.values.clone());
+                                    }
 
-                                hl_hit_boxes.push(HighLevelHitBox {
-                                    hitbox_id: next.hitbox_id,
+                                    HighLevelHitBox {
+                                        hitbox_id: next.hitbox_id,
 
-                                    prev_pos,
-                                    prev_size,
-                                    prev_values,
+                                        prev_pos,
+                                        prev_size,
+                                        prev_values,
 
-                                    next_pos: next.hitbox_position,
-                                    next_size: next.size,
-                                    next_values: next.values.clone(),
-                                });
-                            }
+                                        next_pos: next.hitbox_position,
+                                        next_size: next.size,
+                                        next_values: next.values.clone(),
+                                    }
+                                })
+                                .collect();
                             hl_hit_boxes.sort_by_key(|x| x.hitbox_id);
 
                             let mut option_ecb = None;

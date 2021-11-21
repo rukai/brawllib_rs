@@ -19,29 +19,29 @@ pub(crate) fn bres(data: FancySlice) -> Bres {
 }
 
 fn bres_group(data: FancySlice) -> Vec<BresChild> {
-    let mut children = vec![];
-    for resource in resources::resources(data.relative_fancy_slice(ROOT_HEADER_SIZE..)) {
-        let child_data =
-            data.relative_fancy_slice(ROOT_HEADER_SIZE + resource.data_offset as usize..);
+    resources::resources(data.relative_fancy_slice(ROOT_HEADER_SIZE..))
+        .into_iter()
+        .map(|resource| {
+            let child_data =
+                data.relative_fancy_slice(ROOT_HEADER_SIZE + resource.data_offset as usize..);
 
-        let tag = util::parse_tag(child_data.relative_slice(..));
-        let child_data = match tag.as_ref() {
-            "CHR0" => BresChildData::Chr0(chr0(child_data)),
-            "MDL0" => BresChildData::Mdl0(mdl0(child_data)),
-            "PLT0" => BresChildData::Plt0(plt0(child_data)),
-            "" => BresChildData::Bres(bres_group(
-                data.relative_fancy_slice(resource.data_offset as usize..),
-            )), // TODO: I suspect the match on "" is succeeding by accident
-            _ => BresChildData::Unknown(tag),
-        };
+            let tag = util::parse_tag(child_data.relative_slice(..));
+            let child_data = match tag.as_ref() {
+                "CHR0" => BresChildData::Chr0(chr0(child_data)),
+                "MDL0" => BresChildData::Mdl0(mdl0(child_data)),
+                "PLT0" => BresChildData::Plt0(plt0(child_data)),
+                "" => BresChildData::Bres(bres_group(
+                    data.relative_fancy_slice(resource.data_offset as usize..),
+                )), // TODO: I suspect the match on "" is succeeding by accident
+                _ => BresChildData::Unknown(tag),
+            };
 
-        children.push(BresChild {
-            name: resource.string,
-            data: child_data,
-        });
-    }
-
-    children
+            BresChild {
+                name: resource.string,
+                data: child_data,
+            }
+        })
+        .collect()
 }
 
 // Brawlbox has this split into three structs: BRESHeader, BRESEntry and ROOTHeader
