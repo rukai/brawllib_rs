@@ -149,6 +149,7 @@ impl WgpuState {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
+            multiview: None,
         });
         const UNIFORM_SIZE: usize = mem::size_of::<Matrix4<f32>>();
         const UNIFORM_COUNT: usize = 1000;
