@@ -11,15 +11,15 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     let ledge_grab_list       = util::list_offset(data.relative_fancy_slice(0x14..));
     let unk7_list             = util::list_offset(data.relative_fancy_slice(0x1c..));
     let bone_refs_offset      = data.i32_be(0x24);
-    let item_bones            = data.i32_be(0x28);
-    let sound_data_offset     = data.i32_be(0x2c);
-    let unk12_offset          = data.i32_be(0x30);
-    let multi_jump_offset     = data.i32_be(0x34);
-    let glide_offset          = data.i32_be(0x38);
+    let _item_bones           = data.i32_be(0x28);
+    let _sound_data_offset    = data.i32_be(0x2c);
+    let _unk12_offset         = data.i32_be(0x30);
+    let _multi_jump_offset    = data.i32_be(0x34);
+    let _glide_offset         = data.i32_be(0x38);
     let crawl_offset          = data.i32_be(0x3c);
     let ecbs_offset           = data.i32_be(0x40);
     let tether_offset         = data.i32_be(0x44);
-    let unk18_offset          = data.i32_be(0x48);
+    let _unk18_offset         = data.i32_be(0x48);
 
     let mut final_smash_auras = vec!();
     for i in 0..final_smash_aura_list.count {
@@ -97,7 +97,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     } else {
         Some(Tether {
             num_hang_frame: parent_data.i32_be(tether_offset as usize),
-            unk1:           parent_data.f32_be(tether_offset as usize + 0x4),
+            _unk1:          parent_data.f32_be(tether_offset as usize + 0x4),
         })
     };
 
@@ -107,15 +107,15 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
         ledge_grab_boxes,
         unk7s,
         bone_refs,
-        item_bones,
-        sound_data_offset,
-        unk12_offset,
-        multi_jump_offset,
-        glide_offset,
+        _item_bones,
+        _sound_data_offset,
+        _unk12_offset,
+        _multi_jump_offset,
+        _glide_offset,
         crawl,
         ecbs,
         tether,
-        unk18_offset,
+        _unk18_offset,
     }
 }
 
@@ -185,21 +185,21 @@ fn ledge_grab_box(data: FancySlice) -> LedgeGrabBox {
 
 #[rustfmt::skip]
 fn unk7(data: FancySlice) -> Unk7 {
-    let unk1  = data.u8(0x00);
-    let unk2  = data.u8(0x01);
-    let unk3  = data.u8(0x02);
-    let unk4  = data.u8(0x03);
-    let unk5  = data.u8(0x04);
-    let unk6  = data.u8(0x05);
-    let unk7  = data.u8(0x06);
-    let unk8  = data.u8(0x07);
-    let unk9  = data.f32_be(0x08);
-    let unk10 = data.f32_be(0x0c);
-    let unk11 = data.f32_be(0x10);
-    let unk12 = data.f32_be(0x14);
-    let unk13 = data.f32_be(0x18);
-    let unk14 = data.f32_be(0x1c);
-    Unk7 { unk1, unk2, unk3, unk4, unk5, unk6, unk7, unk8, unk9, unk10, unk11, unk12, unk13, unk14 }
+    let _unk1  = data.u8(0x00);
+    let _unk2  = data.u8(0x01);
+    let _unk3  = data.u8(0x02);
+    let _unk4  = data.u8(0x03);
+    let _unk5  = data.u8(0x04);
+    let _unk6  = data.u8(0x05);
+    let _unk7  = data.u8(0x06);
+    let _unk8  = data.u8(0x07);
+    let _unk9  = data.f32_be(0x08);
+    let _unk10 = data.f32_be(0x0c);
+    let _unk11 = data.f32_be(0x10);
+    let _unk12 = data.f32_be(0x14);
+    let _unk13 = data.f32_be(0x18);
+    let _unk14 = data.f32_be(0x1c);
+    Unk7 { _unk1, _unk2, _unk3, _unk4, _unk5, _unk6, _unk7, _unk8, _unk9, _unk10, _unk11, _unk12, _unk13, _unk14 }
 }
 
 #[derive(Clone, Debug)]
@@ -209,15 +209,15 @@ pub struct MiscSection {
     pub ledge_grab_boxes: Vec<LedgeGrabBox>,
     pub unk7s: Vec<Unk7>,
     pub bone_refs: BoneRefs,
-    item_bones: i32,
-    sound_data_offset: i32,
-    unk12_offset: i32,
-    multi_jump_offset: i32,
-    glide_offset: i32,
+    _item_bones: i32,
+    _sound_data_offset: i32,
+    _unk12_offset: i32,
+    _multi_jump_offset: i32,
+    _glide_offset: i32,
     pub crawl: Option<Crawl>,
     pub ecbs: Vec<ECB>,
     pub tether: Option<Tether>,
-    unk18_offset: i32,
+    _unk18_offset: i32,
 }
 
 pub const FINAL_SMASH_AURA_SIZE: usize = 0x14;
@@ -275,23 +275,23 @@ pub struct LedgeGrabBox {
 pub const UNK7_SIZE: usize = 0x20;
 #[derive(Clone, Debug)]
 pub struct Unk7 {
-    unk1: u8,
-    unk2: u8,
-    unk3: u8,
-    unk4: u8,
+    _unk1: u8,
+    _unk2: u8,
+    _unk3: u8,
+    _unk4: u8,
 
-    unk5: u8,
-    unk6: u8,
-    unk7: u8,
-    unk8: u8,
+    _unk5: u8,
+    _unk6: u8,
+    _unk7: u8,
+    _unk8: u8,
 
-    unk9: f32,
-    unk10: f32,
-    unk11: f32,
-    unk12: f32,
+    _unk9: f32,
+    _unk10: f32,
+    _unk11: f32,
+    _unk12: f32,
 
-    unk13: f32,
-    unk14: f32,
+    _unk13: f32,
+    _unk14: f32,
 }
 
 #[derive(Clone, Debug)]
@@ -327,5 +327,5 @@ pub struct ECB {
 #[derive(Clone, Debug)]
 pub struct Tether {
     pub num_hang_frame: i32,
-    unk1: f32,
+    _unk1: f32,
 }

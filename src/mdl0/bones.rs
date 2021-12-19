@@ -19,14 +19,14 @@ pub(crate) fn bones(data: FancySlice, resources: Vec<Resource>) -> Bone {
 fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
     let data = data_root.relative_fancy_slice(offset as usize..);
 
-    let header_len    = data.i32_be(0x00);
+    let _header_len   = data.i32_be(0x00);
     let mdl0_offset   = data.i32_be(0x04);
     let string_offset = data.i32_be(0x08);
     let index         = data.i32_be(0x0c);
     let node_id       = data.i32_be(0x10);
     let flags_int     = data.u32_be(0x14);
     let billboard_int = data.u32_be(0x18);
-    let bb_index      = data.u32_be(0x1c);
+    let _bb_index     = data.u32_be(0x1c);
 
     let scale = Vector3::<f32>::new(
         data.f32_be(0x20),
@@ -49,7 +49,7 @@ fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
     let first_child_offset = data.i32_be(0x60);
     let next_offset        = data.i32_be(0x64);
     let _prev_offset       = data.i32_be(0x68);
-    let user_data_offset   = data.i32_be(0x6c);
+    let _user_data_offset   = data.i32_be(0x6c);
 
     let transform0         = data.f32_be(0x70);
     let transform1         = data.f32_be(0x74);
@@ -155,19 +155,19 @@ fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
 
     siblings.push(Bone {
         name,
-        header_len,
-        mdl0_offset,
-        string_offset,
+        _header_len,
+        _mdl0_offset: mdl0_offset,
+        _string_offset: string_offset,
         index,
         node_id,
         flags,
         billboard,
-        bb_index,
+        _bb_index,
         scale,
         rot,
         translate,
         extents,
-        user_data_offset,
+        _user_data_offset,
         transform,
         transform_inv,
         children,
@@ -178,20 +178,20 @@ fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
 #[derive(Debug, Clone)]
 pub struct Bone {
     pub name: String,
-    header_len: i32,
-    mdl0_offset: i32,
-    string_offset: i32,
+    _header_len: i32,
+    _mdl0_offset: i32,
+    _string_offset: i32,
     pub index: i32,
     pub node_id: i32,
     pub flags: BoneFlags,
     pub billboard: BoneBillboard,
-    bb_index: u32,
+    _bb_index: u32,
     // these values are depdendent on the parent bone
     pub scale: Vector3<f32>,
     pub rot: Vector3<f32>,
     pub translate: Vector3<f32>,
     pub extents: MBox,
-    user_data_offset: i32,
+    _user_data_offset: i32,
     // these matrices are calculated from scale, rot and translate but are independent of the parent bone
     pub transform: Matrix4<f32>,
     pub transform_inv: Matrix4<f32>,

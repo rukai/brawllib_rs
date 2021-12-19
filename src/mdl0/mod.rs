@@ -70,13 +70,13 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
     let mut definitions = None;
     let mut bones = None;
     let mut vertices = None;
-    let mut normals = None;
-    let mut colors = None;
-    let mut uv = None;
+    let mut _normals = None;
+    let mut _colors = None;
+    let mut _uv = None;
     let mut fur_vectors = None;
     let mut fur_layer_coords = None;
-    let mut materials = None;
-    let mut shaders = None;
+    let mut _materials = None;
+    let mut _shaders = None;
     let mut objects = None;
     let mut texture_refs = None; // TODO: Bleh I think the naming of this and children is wrong
     let mut palette_refs = None;
@@ -92,19 +92,19 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
             match i {
                 0x6 if fur_version => { fur_vectors = Some(resources) }
                 0x7 if fur_version => { fur_layer_coords = Some(resources) }
-                0x8 if fur_version => { materials = Some(resources) }
-                0x9 if fur_version => { shaders = Some(resources) }
+                0x8 if fur_version => { _materials = Some(resources) }
+                0x9 if fur_version => { _shaders = Some(resources) }
                 0xA if fur_version => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0xB if fur_version => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0xC if fur_version => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0x0 => { definitions = Some(definitions::definitions(data.relative_fancy_slice(resources_offset as usize..), resources)) }
                 0x1 => { bones = Some(bones::bones(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0x2 => { vertices = Some(vertices::vertices(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
-                0x3 => { normals = Some(resources) }
-                0x4 => { colors = Some(resources) }
-                0x5 => { uv = Some(resources) }
-                0x6 => { materials = Some(resources) }
-                0x7 => { shaders = Some(resources) }
+                0x3 => { _normals = Some(resources) }
+                0x4 => { _colors = Some(resources) }
+                0x5 => { _uv = Some(resources) }
+                0x6 => { _materials = Some(resources) }
+                0x7 => { _shaders = Some(resources) }
                 0x8 => { objects = Some(objects::objects(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0x9 => { texture_refs = Some(textures::textures(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
                 0xA => { palette_refs = Some(palettes::palettes(data.relative_fancy_slice(resources_offset as usize ..), resources)) }
@@ -120,13 +120,13 @@ pub(crate) fn mdl0(data: FancySlice) -> Mdl0 {
         definitions,
         bones,
         vertices,
-        normals,
-        colors,
-        uv,
+        _normals,
+        _colors,
+        _uv,
         fur_vectors,
         fur_layer_coords,
-        materials,
-        shaders,
+        _materials,
+        _shaders,
         objects,
         texture_refs,
         palette_refs,
@@ -141,13 +141,13 @@ pub struct Mdl0 {
     pub definitions: Option<Definitions>,
     pub bones: Option<Bone>,
     pub vertices: Option<Vec<Vertices>>,
-    normals: Option<Vec<Resource>>,
-    colors: Option<Vec<Resource>>,
-    uv: Option<Vec<Resource>>,
+    _normals: Option<Vec<Resource>>,
+    _colors: Option<Vec<Resource>>,
+    _uv: Option<Vec<Resource>>,
     fur_vectors: Option<Vec<Resource>>,
     fur_layer_coords: Option<Vec<Resource>>,
-    materials: Option<Vec<Resource>>,
-    shaders: Option<Vec<Resource>>,
+    _materials: Option<Vec<Resource>>,
+    _shaders: Option<Vec<Resource>>,
     pub objects: Option<Vec<Object>>,
     pub texture_refs: Option<Vec<Texture>>,
     pub palette_refs: Option<Vec<Palette>>,

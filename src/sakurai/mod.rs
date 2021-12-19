@@ -150,7 +150,7 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) 
     fragment_scripts.sort_by_key(|x| x.offset);
 
     ArcSakurai {
-        lookup_entries,
+        _lookup_entries: lookup_entries,
         sections,
         external_subroutines,
         fragment_scripts,
@@ -160,7 +160,7 @@ pub(crate) fn arc_sakurai(data: FancySlice, wii_memory: &WiiMemory, item: bool) 
 const ARC_SAKURAI_HEADER_SIZE: usize = 0x20;
 #[derive(Clone, Debug)]
 pub struct ArcSakurai {
-    lookup_entries: Vec<i32>,
+    _lookup_entries: Vec<i32>,
     pub sections: Vec<ArcSakuraiSection>,
     pub external_subroutines: Vec<ExternalSubroutine>,
     pub fragment_scripts: Vec<Script>,

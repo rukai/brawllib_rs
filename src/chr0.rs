@@ -7,16 +7,16 @@ use crate::resources;
 
 #[rustfmt::skip]
 pub(crate) fn chr0(data: FancySlice) -> Chr0 {
-    let size             = data.i32_be(0x4);
-    let version          = data.i32_be(0x8);
-    let bres_offset      = data.i32_be(0xc);
-    let resources_offset = data.i32_be(0x10);
-    let string_offset    = data.i32_be(0x14);
-    let orig_path_offset = data.i32_be(0x18);
-    let num_frames       = data.u16_be(0x1c);
-    let num_children     = data.u16_be(0x1e);
-    let loop_value       = data.i32_be(0x20);
-    let scaling_rule     = data.i32_be(0x24);
+    let _size             = data.i32_be(0x4);
+    let version           = data.i32_be(0x8);
+    let _bres_offset      = data.i32_be(0xc);
+    let resources_offset  = data.i32_be(0x10);
+    let string_offset     = data.i32_be(0x14);
+    let _orig_path_offset = data.i32_be(0x18);
+    let num_frames        = data.u16_be(0x1c);
+    let _num_children     = data.u16_be(0x1e);
+    let loop_value        = data.i32_be(0x20);
+    let _scaling_rule     = data.i32_be(0x24);
     if version == 0 || version == 4 {
         // Current implementation only handles version 4
         // version 0 seems to be the same as version 4
@@ -47,7 +47,7 @@ pub(crate) fn chr0(data: FancySlice) -> Chr0 {
 
         children.push(Chr0Child {
             name: resource.string,
-            code,
+            _code: code,
             scale,
             rot,
             translation,
@@ -56,14 +56,14 @@ pub(crate) fn chr0(data: FancySlice) -> Chr0 {
 
     Chr0 {
         name,
-        size,
-        version,
-        bres_offset,
-        orig_path_offset,
+        _size,
+        _version: version,
+        _bres_offset,
+        _orig_path_offset,
         num_frames,
-        num_children,
+        _num_children,
         loop_value: loop_value != 0,
-        scaling_rule,
+        _scaling_rule,
         children,
     }
 }
@@ -71,14 +71,14 @@ pub(crate) fn chr0(data: FancySlice) -> Chr0 {
 #[derive(Clone, Debug)]
 pub struct Chr0 {
     pub name: String,
-    size: i32,
-    version: i32,
-    bres_offset: i32,
-    orig_path_offset: i32,
+    _size: i32,
+    _version: i32,
+    _bres_offset: i32,
+    _orig_path_offset: i32,
     pub num_frames: u16,
-    num_children: u16,
+    _num_children: u16,
     pub loop_value: bool,
-    scaling_rule: i32,
+    _scaling_rule: i32,
     pub children: Vec<Chr0Child>,
 }
 
@@ -89,7 +89,7 @@ pub struct Chr0Child {
     pub scale: KeyframeHolder,
     pub rot: KeyframeHolder,
     pub translation: KeyframeHolder,
-    code: Chr0ChildCode,
+    _code: Chr0ChildCode,
 }
 
 impl Chr0Child {

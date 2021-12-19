@@ -7,26 +7,26 @@ pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object>
     let mut objects = vec!();
     for resource in resources {
         let data = data.relative_fancy_slice(resource.data_offset as usize ..);
-        let _total_length           = data.i32_be(0x00);
-        let _mdl0_offset            = data.i32_be(0x04);
-        let single_bind_node_id     = data.i32_be(0x08);
-        let vertex_format1          = data.u32_be(0x0c);
-        let vertex_format2          = data.u32_be(0x10);
-        let vertex_specs            = data.u32_be(0x14);
-        let definitions_buffer_size = data.i32_be(0x18);
-        let definitions_size        = data.i32_be(0x1c); // amount of the buffer_size that is actually used
-        let definitions_offset      = data.i32_be(0x20); // relative to this struct
-        let primitives_buffer_size  = data.i32_be(0x24);
-        let primitives_size         = data.i32_be(0x28); // amount of the buffer_size that is actually used
-        let primitives_offset       = data.i32_be(0x2c); // relative to this struct
-        let array_flags             = data.u32_be(0x30);
-        let modifier                = data.u32_be(0x34);
-        let string_offset           = data.u32_be(0x38);
-        let index                   = data.u32_be(0x3c);
-        let num_vertices            = data.u32_be(0x40);
-        let num_faces               = data.u32_be(0x44);
-        let vertex_id               = data.i16_be(0x48);
-        let normal_id               = data.i16_be(0x4A);
+        let _total_length            = data.i32_be(0x00);
+        let _mdl0_offset             = data.i32_be(0x04);
+        let single_bind_node_id      = data.i32_be(0x08);
+        let vertex_format1           = data.u32_be(0x0c);
+        let vertex_format2           = data.u32_be(0x10);
+        let vertex_specs             = data.u32_be(0x14);
+        let _definitions_buffer_size = data.i32_be(0x18);
+        let _definitions_size        = data.i32_be(0x1c); // amount of the buffer_size that is actually used
+        let _definitions_offset      = data.i32_be(0x20); // relative to this struct
+        let _primitives_buffer_size  = data.i32_be(0x24);
+        let _primitives_size         = data.i32_be(0x28); // amount of the buffer_size that is actually used
+        let _primitives_offset       = data.i32_be(0x2c); // relative to this struct
+        let _array_flags             = data.u32_be(0x30);
+        let modifier                 = data.u32_be(0x34);
+        let string_offset            = data.u32_be(0x38);
+        let index                    = data.u32_be(0x3c);
+        let num_vertices             = data.u32_be(0x40);
+        let num_faces                = data.u32_be(0x44);
+        let vertex_id                = data.i16_be(0x48);
+        let normal_id                = data.i16_be(0x4A);
 
         let mut color_ids = [0; 2];
         color_ids[0] = data.i16_be(0x4C);
@@ -58,13 +58,13 @@ pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object>
             vertex_format1,
             vertex_format2,
             vertex_specs,
-            definitions_buffer_size,
-            definitions_size,
-            definitions_offset,
-            primitives_buffer_size,
-            primitives_size,
-            primitives_offset,
-            array_flags,
+            _definitions_buffer_size,
+            _definitions_size,
+            _definitions_offset,
+            _primitives_buffer_size,
+            _primitives_size,
+            _primitives_offset,
+            _array_flags,
             modifier,
             name,
             index,
@@ -120,14 +120,14 @@ pub struct Object {
     vertex_specs: u32,
 
     // TODO: Use these fields to put the data into a vec
-    definitions_buffer_size: i32,
-    definitions_size: i32,
-    definitions_offset: i32,
+    _definitions_buffer_size: i32,
+    _definitions_size: i32,
+    _definitions_offset: i32,
 
     // TODO: Use these fields to put the data into a vec
-    primitives_buffer_size: i32,
-    primitives_size: i32,
-    primitives_offset: i32,
+    _primitives_buffer_size: i32,
+    _primitives_size: i32,
+    _primitives_offset: i32,
 
     // TODO: havent implemented getters for this field as I want to rewrite to split into seperate fields instead
 
@@ -152,7 +152,7 @@ pub struct Object {
     /// 0000 0100 0000 0000 0000 0000 Tex5
     /// 0000 1000 0000 0000 0000 0000 Tex6
     /// 0001 0000 0000 0000 0000 0000 Tex7
-    array_flags: u32,
+    _array_flags: u32,
 
     pub modifier: Modifier,
     pub name: Option<String>,

@@ -16,7 +16,7 @@ pub(crate) fn resources(data: FancySlice) -> Vec<Resource> {
 
         resources.push(Resource {
             //id:          data.u16_be(child_index as usize),
-            flag:          data.u16_be(child_index as usize + 0x2),
+            _flag:          data.u16_be(child_index as usize + 0x2),
             //left_index:  data.u16_be(child_index as usize + 0x4),
             //right_index: data.u16_be(child_index as usize + 0x6),
             data_offset:   data.i32_be(child_index + 0xc),
@@ -32,7 +32,7 @@ pub(crate) const RESOURCE_HEADER_SIZE: usize = 0x8;
 pub(crate) const RESOURCE_SIZE: usize = 0x10;
 #[derive(Clone, Debug)]
 pub struct Resource {
-    flag: u16,
+    _flag: u16,
     pub data_offset: i32,
     pub string: String,
 }

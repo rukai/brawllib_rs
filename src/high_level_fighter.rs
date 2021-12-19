@@ -47,33 +47,33 @@ impl HighLevelFighter {
         let fragment_scripts_fighter: Vec<_> = fighter_sakurai
             .fragment_scripts
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let subaction_main: Vec<_> = fighter_data
             .subaction_main
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let subaction_gfx: Vec<_> = fighter_data
             .subaction_gfx
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let subaction_sfx: Vec<_> = fighter_data
             .subaction_sfx
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let subaction_other: Vec<_> = fighter_data
             .subaction_other
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
 
         let fragment_scripts_common: Vec<_> = fighter_sakurai_common
             .fragment_scripts
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
 
         let scripts_section: Vec<_> = fighter_data_common_scripts
@@ -84,22 +84,22 @@ impl HighLevelFighter {
         let entry_actions_common: Vec<_> = fighter_data_common
             .entry_actions
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let entry_actions: Vec<_> = fighter_data
             .entry_actions
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let exit_actions_common: Vec<_> = fighter_data_common
             .exit_actions
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
         let exit_actions: Vec<_> = fighter_data
             .exit_actions
             .iter()
-            .map(|x| ScriptAst::new(x))
+            .map(ScriptAst::new)
             .collect();
 
         let mut fighter_scripts = vec![];

@@ -13,32 +13,32 @@ pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_me
     let subaction_flags_start        = data.i32_be(0);
     let model_visibility_start       = data.i32_be(4);
     let attribute_start              = data.i32_be(8);
-    let sse_attribute_start          = data.i32_be(12);
+    let _sse_attribute_start         = data.i32_be(12);
     let misc_section_offset          = data.i32_be(16);
-    let common_action_flags_start    = data.i32_be(20);
+    let _common_action_flags_start   = data.i32_be(20);
     let action_flags_start           = data.i32_be(24);
     let _unknown0                    = data.i32_be(28);
-    let action_interrupts            = data.i32_be(32);
+    let _action_interrupts           = data.i32_be(32);
     let entry_actions_start          = data.i32_be(36);
     let exit_actions_start           = data.i32_be(40);
-    let action_pre_start             = data.i32_be(44);
+    let _action_pre_start            = data.i32_be(44);
     let subaction_main_start         = data.i32_be(48);
     let subaction_gfx_start          = data.i32_be(52);
     let subaction_sfx_start          = data.i32_be(56);
     let subaction_other_start        = data.i32_be(60);
-    let anchored_item_positions      = data.i32_be(64);
-    let gooey_bomb_positions         = data.i32_be(68);
-    let bone_ref1                    = data.i32_be(72);
-    let bone_ref2                    = data.i32_be(76);
+    let _anchored_item_positions     = data.i32_be(64);
+    let _gooey_bomb_positions        = data.i32_be(68);
+    let _bone_ref1                   = data.i32_be(72);
+    let _bone_ref2                   = data.i32_be(76);
     let entry_action_overrides_start = data.i32_be(80);
     let exit_action_overrides_start  = data.i32_be(84);
     let _unknown1                    = data.i32_be(88);
-    let samus_arm_cannon_positions   = data.i32_be(92);
+    let _samus_arm_cannon_positions  = data.i32_be(92);
     let _unknown2                    = data.i32_be(96);
-    let static_articles_start        = data.i32_be(100);
-    let entry_articles_start         = data.i32_be(104);
-    let flags1                       = data.u32_be(116);
-    let flags2                       = data.i32_be(120);
+    let _static_articles_start       = data.i32_be(100);
+    let _entry_articles_start        = data.i32_be(104);
+    let _flags1                      = data.u32_be(116);
+    let _flags2                      = data.i32_be(120);
 
     let sizes = get_sizes(data);
 
@@ -87,21 +87,21 @@ pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_me
         subaction_sfx,
         subaction_other,
         model_visibility,
-        sse_attribute_start,
-        common_action_flags_start,
-        action_interrupts,
-        action_pre_start,
-        anchored_item_positions,
-        gooey_bomb_positions,
-        bone_ref1,
-        bone_ref2,
+        _sse_attribute_start,
+        _common_action_flags_start,
+        _action_interrupts,
+        _action_pre_start,
+        _anchored_item_positions,
+        _gooey_bomb_positions,
+        _bone_ref1,
+        _bone_ref2,
         entry_action_overrides,
         exit_action_overrides,
-        samus_arm_cannon_positions,
-        static_articles_start,
-        entry_articles_start,
-        flags1,
-        flags2,
+        _samus_arm_cannon_positions,
+        _static_articles_start,
+        _entry_articles_start,
+        _flags1,
+        _flags2,
     }
 }
 
@@ -216,19 +216,19 @@ pub struct ArcFighterData {
     pub model_visibility: ModelVisibility,
     pub entry_action_overrides: Vec<ActionOverride>,
     pub exit_action_overrides: Vec<ActionOverride>,
-    sse_attribute_start: i32,
-    common_action_flags_start: i32,
-    action_interrupts: i32,
-    action_pre_start: i32,
-    anchored_item_positions: i32,
-    gooey_bomb_positions: i32,
-    bone_ref1: i32,
-    bone_ref2: i32,
-    samus_arm_cannon_positions: i32,
-    static_articles_start: i32,
-    entry_articles_start: i32,
-    flags1: u32,
-    flags2: i32,
+    _sse_attribute_start: i32,
+    _common_action_flags_start: i32,
+    _action_interrupts: i32,
+    _action_pre_start: i32,
+    _anchored_item_positions: i32,
+    _gooey_bomb_positions: i32,
+    _bone_ref1: i32,
+    _bone_ref2: i32,
+    _samus_arm_cannon_positions: i32,
+    _static_articles_start: i32,
+    _entry_articles_start: i32,
+    _flags1: u32,
+    _flags2: i32,
 }
 
 #[derive(Serialize, Clone, Debug)]
