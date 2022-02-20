@@ -53,7 +53,7 @@ pub(crate) fn draw_frame(
         subaction,
         frame_index,
         camera,
-    ); // 2.5ms
+    );
 
     let uniform_size = mem::size_of::<Matrix4<f32>>();
     let size_padded = 256;

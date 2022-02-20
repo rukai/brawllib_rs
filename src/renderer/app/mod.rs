@@ -51,8 +51,13 @@ impl App {
         let event_loop = EventLoop::new();
         let window = Window::new(&event_loop).unwrap();
 
+        let canvas = window.canvas();
+        canvas
+            .style()
+            .set_css_text("display: block; width: 100%; height: 100%");
+
         element
-            .append_child(&web_sys::Element::from(window.canvas()))
+            .append_child(&web_sys::Element::from(canvas))
             .unwrap();
 
         App::new_common(window, event_loop, subaction).await
@@ -128,7 +133,6 @@ impl App {
             if self.input.quit() {
                 *control_flow = ControlFlow::Exit;
             }
-
             self.app_state.update(
                 &self.input,
                 &self.subaction,
