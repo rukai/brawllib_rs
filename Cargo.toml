@@ -42,3 +42,8 @@ bincode = "1"
 
 [profile.release]
 debug-assertions = true
+
+[workspace]
+members = [
+    "run-wasm",
+]

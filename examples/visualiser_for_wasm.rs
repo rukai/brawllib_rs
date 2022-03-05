@@ -1,6 +1,6 @@
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
-    println!("Use the run_web_visualiser.sh script to run this example");
+    println!("Run via `cargo run-wasm --example visualiser_for_wasm`");
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -22,16 +22,25 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
     use web_sys::HtmlElement;
 
     let document = web_sys::window().unwrap().document().unwrap();
-    let visualiser_span = document.get_element_by_id("fighter-render").unwrap();
 
-    let app = App::new_insert_into_element(visualiser_span, subaction).await;
+    let body = document.body().unwrap();
+    let parent_div = document.create_element("div").unwrap();
+    parent_div
+        .dyn_ref::<HtmlElement>()
+        .unwrap()
+        .style()
+        .set_css_text("margin: auto; width: 50%; aspect-ratio: 4 / 3;");
+    body.append_child(&parent_div).unwrap();
+
+    let app = App::new_insert_into_element(parent_div, subaction).await;
     let event_tx = app.get_event_tx();
 
-    let frame = document.get_element_by_id("frame").unwrap();
-    let frame_move = frame.clone();
-    frame_move.set_inner_html("Frame: 0");
+    let frame = document.create_element("p").unwrap();
+    frame.set_inner_html("Frame: 0");
+    body.append_child(&frame).unwrap();
 
-    let button = document.get_element_by_id("run").unwrap();
+    let button = document.create_element("button").unwrap();
+    body.append_child(&button).unwrap();
     let button_move = button.clone();
     button_move.set_inner_html("Run");
     let do_thing = Closure::wrap(Box::new(move || {
