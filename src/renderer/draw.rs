@@ -90,7 +90,7 @@ pub(crate) fn draw_frame(
                         r: 0.0,
                         g: 0.0,
                         b: 0.0,
-                        a: 1.0,
+                        a: 0.0,
                     }),
                     store: true,
                 },
