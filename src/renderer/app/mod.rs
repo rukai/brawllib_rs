@@ -73,7 +73,17 @@ impl App {
 
         let instance = wgpu::Instance::new(wgpu::Backends::all());
         let surface = unsafe { instance.create_surface(&_window) };
-        let wgpu_state = WgpuState::new(instance, CompatibleSurface::Surface(&surface)).await;
+        let wgpu_state = WgpuState::new(
+            instance,
+            CompatibleSurface::Surface(&surface),
+            wgpu::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.0,
+            },
+        )
+        .await;
 
         let surface_configuration = wgpu::SurfaceConfiguration {
             format: wgpu_state.format,

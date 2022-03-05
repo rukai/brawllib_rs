@@ -18,7 +18,6 @@ pub(crate) struct Vertex {
     pub _pos: [f32; 4],
     pub _color: [f32; 4],
 }
-
 pub struct WgpuState {
     pub(crate) device: wgpu::Device,
     pub(crate) queue: wgpu::Queue,
@@ -29,6 +28,7 @@ pub struct WgpuState {
     pub(crate) multisampled_framebuffer_descriptor: wgpu::TextureDescriptor<'static>,
     pub(crate) multisampled_framebuffer: wgpu::Texture,
     pub(crate) format: wgpu::TextureFormat,
+    pub(crate) background_color: wgpu::Color,
 }
 
 pub enum CompatibleSurface<'a> {
@@ -43,6 +43,12 @@ impl WgpuState {
         WgpuState::new(
             instance,
             CompatibleSurface::Headless(wgpu::TextureFormat::Rgba8UnormSrgb),
+            wgpu::Color {
+                r: 0.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            },
         )
         .await
     }
@@ -50,6 +56,7 @@ impl WgpuState {
     pub async fn new(
         instance: wgpu::Instance,
         compatible_surface: CompatibleSurface<'_>,
+        background_color: wgpu::Color,
     ) -> WgpuState {
         let surface = match compatible_surface {
             CompatibleSurface::Surface(surface) => Some(surface),
@@ -204,6 +211,7 @@ impl WgpuState {
             multisampled_framebuffer_descriptor,
             multisampled_framebuffer,
             format,
+            background_color,
         }
     }
 

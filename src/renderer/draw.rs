@@ -86,12 +86,7 @@ pub(crate) fn draw_frame(
                     Some(framebuffer)
                 },
                 ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.0,
-                        g: 0.0,
-                        b: 0.0,
-                        a: 0.0,
-                    }),
+                    load: wgpu::LoadOp::Clear(state.background_color),
                     store: true,
                 },
             }],
