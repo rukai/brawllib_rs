@@ -172,11 +172,8 @@ impl AppState {
             self.camera.phi = small;
         }
 
-        self.camera.radius -= input.scroll_diff() * 2.0;
-        let min_camera_radius = 0.0000001;
-        if self.camera.radius < min_camera_radius {
-            self.camera.radius = min_camera_radius;
-        }
+        self.camera.radius_mult -= input.scroll_diff() / 10.0;
+        self.camera.radius_mult = self.camera.radius_mult.max(0.001);
 
         // advance frame
         match self.state {

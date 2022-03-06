@@ -13,12 +13,14 @@ pub enum CharacterFacing {
 /// <https://threejs.org/docs/#api/en/math/Spherical>
 pub struct Camera {
     pub target: Point3<f32>,
-    /// radius from the target to the camera
-    pub radius: f32,
     /// polar angle from the y (up) axis
     pub phi: f32,
     /// equator angle around the y (up) axis.
     pub theta: f32,
+    /// Radius modifier set by the user to allow for zooming the camera
+    pub radius_mult: f32,
+    /// optimal radius from the target to the camera such that the fighter fits exactly within the cameras view
+    radius_base: f32,
     extent: Extent,
 }
 
@@ -65,11 +67,16 @@ impl Camera {
 
         Camera {
             target,
-            radius: camera_distance,
+            radius_base: camera_distance,
             phi: std::f32::consts::PI / 2.0,
+            radius_mult: 1.0,
             theta,
             extent,
         }
+    }
+
+    pub fn radius(&self) -> f32 {
+        self.radius_base * self.radius_mult
     }
 
     pub fn reset(&mut self, window_width: u16, window_height: u16, facing: CharacterFacing) {

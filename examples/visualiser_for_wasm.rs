@@ -43,17 +43,40 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
     body.append_child(&button).unwrap();
     let button_move = button.clone();
     button_move.set_inner_html("Run");
+    let event_tx_move = event_tx.clone();
     let do_thing = Closure::wrap(Box::new(move || {
         if button_move.inner_html() == "Stop" {
-            event_tx
+            event_tx_move
                 .send(AppEventIncoming::SetState(State::Pause))
                 .unwrap();
             button_move.set_inner_html("Run");
         } else {
-            event_tx
+            event_tx_move
                 .send(AppEventIncoming::SetState(State::Play))
                 .unwrap();
             button_move.set_inner_html("Stop");
+        }
+    }) as Box<dyn FnMut()>);
+    button
+        .dyn_ref::<HtmlElement>()
+        .unwrap()
+        .set_onclick(Some(do_thing.as_ref().unchecked_ref()));
+
+    let button = document.create_element("button").unwrap();
+    body.append_child(&button).unwrap();
+    let button_move = button.clone();
+    button_move.set_inner_html("Perspective");
+    let do_thing = Closure::wrap(Box::new(move || {
+        if button_move.inner_html() == "Orthographic" {
+            event_tx
+                .send(AppEventIncoming::SetPerspective(false))
+                .unwrap();
+            button_move.set_inner_html("Perspective");
+        } else {
+            event_tx
+                .send(AppEventIncoming::SetPerspective(true))
+                .unwrap();
+            button_move.set_inner_html("Orthographic");
         }
     }) as Box<dyn FnMut()>);
     button

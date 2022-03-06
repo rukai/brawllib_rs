@@ -136,9 +136,9 @@ fn create_draws(
     let fov_rad = fov * consts::PI / 180.0;
 
     let camera_offset = Vector3::new(
-        camera.radius * camera.phi.sin() * camera.theta.sin(),
-        camera.radius * camera.phi.cos(),
-        camera.radius * camera.phi.sin() * camera.theta.cos(),
+        camera.radius() * camera.phi.sin() * camera.theta.sin(),
+        camera.radius() * camera.phi.cos(),
+        camera.radius() * camera.phi.sin() * camera.theta.cos(),
     );
     let camera_location = camera.target + camera_offset;
     let view = Matrix4::look_at_rh(camera_location, camera.target, Vector3::new(0.0, 1.0, 0.0));
@@ -156,10 +156,10 @@ fn create_draws(
         }
 
         cgmath::ortho(
-            -width / 2.0,
-            width / 2.0,
-            -height / 2.0,
-            height / 2.0,
+            -width / 2.0 * camera.radius_mult,
+            width / 2.0 * camera.radius_mult,
+            -height / 2.0 * camera.radius_mult,
+            height / 2.0 * camera.radius_mult,
             -1000.0,
             1000.0,
         )
