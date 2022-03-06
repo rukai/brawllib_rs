@@ -93,7 +93,11 @@ pub(crate) fn draw_frame(
             depth_stencil_attachment: None,
             label: None,
         });
-        rpass.set_pipeline(&state.render_pipeline);
+        if wireframe {
+            rpass.set_pipeline(&state.render_pipeline_line);
+        } else {
+            rpass.set_pipeline(&state.render_pipeline_fill);
+        }
 
         for (i, draw) in draws.iter().enumerate() {
             rpass.set_bind_group(0, &state.bind_groups[i], &[]);

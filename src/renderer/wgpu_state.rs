@@ -22,7 +22,8 @@ pub struct WgpuState {
     pub(crate) device: wgpu::Device,
     pub(crate) queue: wgpu::Queue,
     pub(crate) _bind_group_layout: wgpu::BindGroupLayout,
-    pub(crate) render_pipeline: wgpu::RenderPipeline,
+    pub(crate) render_pipeline_fill: wgpu::RenderPipeline,
+    pub(crate) render_pipeline_line: wgpu::RenderPipeline,
     pub(crate) uniforms_buffer: wgpu::Buffer,
     pub(crate) bind_groups: Vec<wgpu::BindGroup>,
     pub(crate) multisampled_framebuffer_descriptor: wgpu::TextureDescriptor<'static>,
@@ -77,9 +78,15 @@ impl WgpuState {
             CompatibleSurface::Headless(format) => format,
         };
 
+        // Once we move to webgpu backend instead of webgl we can enable this
+        #[cfg(not(target_arch = "wasm32"))]
+        let features = wgpu::Features::empty().union(wgpu::Features::POLYGON_MODE_LINE);
+        #[cfg(target_arch = "wasm32")]
+        let features = wgpu::Features::empty();
+
         let device_descriptor = wgpu::DeviceDescriptor {
             limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
-            features: wgpu::Features::empty(),
+            features,
             label: None,
         };
         let (device, queue) = adapter
@@ -112,52 +119,24 @@ impl WgpuState {
             push_constant_ranges: &[],
         });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: None,
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_module,
-                entry_point: "vs_main",
-                buffers: &[wgpu::VertexBufferLayout {
-                    array_stride: mem::size_of::<Vertex>() as u64,
-                    step_mode: wgpu::VertexStepMode::Vertex,
-                    attributes: &[
-                        wgpu::VertexAttribute {
-                            shader_location: 0,
-                            format: wgpu::VertexFormat::Float32x4,
-                            offset: 0,
-                        },
-                        wgpu::VertexAttribute {
-                            shader_location: 1,
-                            format: wgpu::VertexFormat::Float32x4,
-                            offset: 4 * 4,
-                        },
-                    ],
-                }],
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_module,
-                entry_point: "fs_main",
-                targets: &[wgpu::ColorTargetState {
-                    format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
-                    write_mask: wgpu::ColorWrites::ALL,
-                }],
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: None,
-                ..Default::default()
-            },
-            depth_stencil: None,
-            multisample: wgpu::MultisampleState {
-                count: SAMPLE_COUNT,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-        });
+        let render_pipeline_line = WgpuState::render_pipeline(
+            &device,
+            format,
+            &shader_module,
+            &pipeline_layout,
+            // Once we move to webgpu backend instead of webgl we can enable this
+            #[cfg(not(target_arch = "wasm32"))]
+            wgpu::PolygonMode::Line,
+            #[cfg(target_arch = "wasm32")]
+            wgpu::PolygonMode::Fill,
+        );
+        let render_pipeline_fill = WgpuState::render_pipeline(
+            &device,
+            format,
+            &shader_module,
+            &pipeline_layout,
+            wgpu::PolygonMode::Fill,
+        );
         const UNIFORM_SIZE: usize = mem::size_of::<Matrix4<f32>>();
         const UNIFORM_COUNT: usize = 1000;
         const UNIFORM_SIZE_PADDED: usize = 256;
@@ -205,7 +184,8 @@ impl WgpuState {
             device,
             queue,
             _bind_group_layout: bind_group_layout,
-            render_pipeline,
+            render_pipeline_fill,
+            render_pipeline_line,
             uniforms_buffer,
             bind_groups,
             multisampled_framebuffer_descriptor,
@@ -213,6 +193,62 @@ impl WgpuState {
             format,
             background_color,
         }
+    }
+
+    fn render_pipeline(
+        device: &wgpu::Device,
+        format: wgpu::TextureFormat,
+        shader_module: &wgpu::ShaderModule,
+        pipeline_layout: &wgpu::PipelineLayout,
+        polygon_mode: wgpu::PolygonMode,
+    ) -> wgpu::RenderPipeline {
+        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: None,
+            layout: Some(pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: shader_module,
+                entry_point: "vs_main",
+                buffers: &[wgpu::VertexBufferLayout {
+                    array_stride: mem::size_of::<Vertex>() as u64,
+                    step_mode: wgpu::VertexStepMode::Vertex,
+                    attributes: &[
+                        wgpu::VertexAttribute {
+                            shader_location: 0,
+                            format: wgpu::VertexFormat::Float32x4,
+                            offset: 0,
+                        },
+                        wgpu::VertexAttribute {
+                            shader_location: 1,
+                            format: wgpu::VertexFormat::Float32x4,
+                            offset: 4 * 4,
+                        },
+                    ],
+                }],
+            },
+            fragment: Some(wgpu::FragmentState {
+                module: shader_module,
+                entry_point: "fs_main",
+                targets: &[wgpu::ColorTargetState {
+                    format,
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+            }),
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: None,
+                polygon_mode,
+                ..Default::default()
+            },
+            depth_stencil: None,
+            multisample: wgpu::MultisampleState {
+                count: SAMPLE_COUNT,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            },
+            multiview: None,
+        })
     }
 
     pub fn poll(&self) {
