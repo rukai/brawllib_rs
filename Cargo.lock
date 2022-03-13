@@ -132,6 +132,7 @@ dependencies = [
  "futures",
  "getopts",
  "gif",
+ "instant",
  "log",
  "mint",
  "raw-window-handle",

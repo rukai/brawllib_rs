@@ -1,5 +1,6 @@
+use instant::Instant;
 use std::sync::mpsc::Receiver;
-
+use std::time::Duration;
 use winit::event::VirtualKeyCode;
 use winit_input_helper::WinitInputHelper;
 
@@ -49,6 +50,7 @@ pub struct AppState {
     pub render_ecb: bool,
     pub invulnerable_type: InvulnerableType,
     pub camera: Camera,
+    last_frame: Instant,
     state: State,
     event_handler: Option<AppEventOutgoingHandler>,
     event_rx: Receiver<AppEventIncoming>,
@@ -66,6 +68,7 @@ impl AppState {
             state: State::Play,
             event_handler: None,
             event_rx,
+            last_frame: Instant::now(),
         }
     }
 
@@ -177,7 +180,19 @@ impl AppState {
 
         // advance frame
         match self.state {
-            State::StepForward | State::Play => {
+            State::Play => {
+                if self.last_frame.elapsed() > Duration::from_secs(1) / 65 {
+                    if self.frame_index == subaction.frames.len() - 1 {
+                        self.set_frame_index(0);
+                    } else {
+                        self.set_frame_index(self.frame_index + 1);
+                    }
+                    self.last_frame = Instant::now();
+                } else {
+                    log::error!("{:?}", self.last_frame.elapsed());
+                }
+            }
+            State::StepForward => {
                 if self.frame_index == subaction.frames.len() - 1 {
                     self.set_frame_index(0);
                 } else {
