@@ -50,10 +50,15 @@ pub struct AppState {
     pub render_ecb: bool,
     pub invulnerable_type: InvulnerableType,
     pub camera: Camera,
-    last_frame: Instant,
     state: State,
     event_handler: Option<AppEventOutgoingHandler>,
     event_rx: Receiver<AppEventIncoming>,
+    last_instant: Instant,
+    time_passed: Duration,
+    #[cfg(debug_assertions)]
+    frames: u32,
+    #[cfg(debug_assertions)]
+    frames_start: Instant,
 }
 
 impl AppState {
@@ -68,7 +73,12 @@ impl AppState {
             state: State::Play,
             event_handler: None,
             event_rx,
-            last_frame: Instant::now(),
+            last_instant: Instant::now(),
+            time_passed: Duration::ZERO,
+            #[cfg(debug_assertions)]
+            frames: 0,
+            #[cfg(debug_assertions)]
+            frames_start: Instant::now(),
         }
     }
 
@@ -181,15 +191,34 @@ impl AppState {
         // advance frame
         match self.state {
             State::Play => {
-                if self.last_frame.elapsed() > Duration::from_secs(1) / 65 {
+                let frame = Duration::from_secs(1) / 60;
+
+                self.time_passed += self.last_instant.elapsed();
+                self.last_instant = Instant::now();
+
+                if self.time_passed > frame {
+                    #[cfg(debug_assertions)]
+                    self.tick_fps();
+
                     if self.frame_index == subaction.frames.len() - 1 {
                         self.set_frame_index(0);
                     } else {
                         self.set_frame_index(self.frame_index + 1);
                     }
-                    self.last_frame = Instant::now();
-                } else {
-                    log::error!("{:?}", self.last_frame.elapsed());
+                    self.time_passed = self.time_passed.saturating_sub(frame);
+                }
+
+                if self.time_passed > frame * 5 {
+                    // If we are this far out of sync its either because:
+                    // * The app was in State::Pause and we have now moved to State::Play.
+                    // * The app was suspended while in State::Play, I think being in an unused browser tab would cause this.
+                    // * A large stutter occured.
+                    //
+                    // All of these cases can be handled well by just throwing away all the time that passed.
+                    //
+                    // One false positive case is when time_passed slowly drifts towards the cutoff point and then there is a single frame delay.
+                    // Not ideal but also good enough for our use case.
+                    self.time_passed = Duration::ZERO;
                 }
             }
             State::StepForward => {
@@ -198,6 +227,7 @@ impl AppState {
                 } else {
                     self.set_frame_index(self.frame_index + 1);
                 }
+                self.set_state(State::Pause);
             }
             State::StepBackward => {
                 if self.frame_index == 0 {
@@ -205,13 +235,20 @@ impl AppState {
                 } else {
                     self.set_frame_index(self.frame_index - 1);
                 }
+                self.set_state(State::Pause);
             }
             State::Pause => {}
         }
+    }
 
-        if let State::StepForward | State::StepBackward = self.state {
-            self.set_state(State::Pause);
+    #[cfg(debug_assertions)]
+    fn tick_fps(&mut self) {
+        if self.frames_start.elapsed() > Duration::from_secs(1) {
+            log::info!("fps: {}", self.frames);
+            self.frames = 0;
+            self.frames_start = Instant::now();
         }
+        self.frames += 1;
     }
 
     fn set_frame_index(&mut self, frame_index: usize) {
