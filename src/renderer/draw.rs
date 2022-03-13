@@ -174,24 +174,24 @@ fn create_draws(
 
     for hurt_box in &frame.hurt_boxes {
         let color = if hurt_box.state.is_intangible() {
-            [0.0, 0.0, 1.0, 0.3]
+            [0.0, 0.0, 1.0, 0.15]
         } else if hurt_box.state.is_invincible() {
-            [0.0, 1.0, 0.0, 0.3]
+            [0.0, 1.0, 0.0, 0.15]
         } else {
             match invulnerable_type {
-                InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.3],
+                InvulnerableType::Hit => [1.0, 1.0, 0.0, 0.15],
                 InvulnerableType::Grab => {
                     if hurt_box.hurt_box.grabbable {
-                        [1.0, 1.0, 0.0, 0.3]
+                        [1.0, 1.0, 0.0, 0.15]
                     } else {
-                        [0.0, 0.0, 1.0, 0.3]
+                        [0.0, 0.0, 1.0, 0.15]
                     }
                 }
                 InvulnerableType::TrapItem => {
                     if hurt_box.hurt_box.trap_item_hittable {
-                        [1.0, 1.0, 0.0, 0.3]
+                        [1.0, 1.0, 0.0, 0.15]
                     } else {
-                        [0.0, 0.0, 1.0, 0.3]
+                        [0.0, 0.0, 1.0, 0.15]
                     }
                 }
             }
@@ -218,12 +218,12 @@ fn create_draws(
         }
 
         let color = match hitbox.hitbox_id {
-            0 => [0.93725, 0.39216, 0.00000, 0.3], // orange
-            1 => [1.00000, 0.00000, 0.00000, 0.3], // red
-            2 => [1.00000, 0.00000, 1.00000, 0.3], // purple
-            3 => [0.09412, 0.83922, 0.78823, 0.3], // turqoise
-            4 => [0.14118, 0.83992, 0.09412, 0.3], // green
-            _ => [1.00000, 1.00000, 1.00000, 0.3], // white
+            0 => [0.93725, 0.39216, 0.00000, 0.2], // orange
+            1 => [1.00000, 0.00000, 0.00000, 0.2], // red
+            2 => [1.00000, 0.00000, 1.00000, 0.2], // purple
+            3 => [0.09412, 0.83922, 0.78823, 0.2], // turqoise
+            4 => [0.14118, 0.83992, 0.09412, 0.2], // green
+            _ => [1.00000, 1.00000, 1.00000, 0.2], // white
         };
 
         let next = Vector3::new(hitbox.next_pos.x, hitbox.next_pos.y, hitbox.next_pos.z);
