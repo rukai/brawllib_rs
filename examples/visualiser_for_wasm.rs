@@ -29,7 +29,7 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
         .dyn_ref::<HtmlElement>()
         .unwrap()
         .style()
-        .set_css_text("margin: auto; width: 50%; aspect-ratio: 4 / 3;");
+        .set_css_text("margin: auto; width: 80%; aspect-ratio: 4 / 2; background-color: black");
     body.append_child(&parent_div).unwrap();
 
     let app = App::new_insert_into_element(parent_div, subaction).await;

@@ -24,7 +24,7 @@ pub struct App {
     wgpu_state: WgpuState,
     app_state: AppState,
     input: WinitInputHelper,
-    _window: Window,
+    window: Window,
     surface: wgpu::Surface,
     surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
@@ -64,15 +64,15 @@ impl App {
     }
 
     async fn new_common(
-        _window: Window,
+        window: Window,
         event_loop: EventLoop<()>,
         subaction: HighLevelSubaction,
     ) -> App {
         let input = WinitInputHelper::new();
-        let size = _window.inner_size();
+        let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::Backends::all());
-        let surface = unsafe { instance.create_surface(&_window) };
+        let surface = unsafe { instance.create_surface(&window) };
         let wgpu_state = WgpuState::new(
             instance,
             CompatibleSurface::Surface(&surface),
@@ -107,7 +107,7 @@ impl App {
             wgpu_state,
             app_state,
             input,
-            _window,
+            window,
             surface,
             surface_configuration,
             subaction,
@@ -139,24 +139,8 @@ impl App {
 
     /// Manually update the app state, call this instead of `App::run` if you need to maintain control of the event loop.
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
-        if self.input.update(&event) {
-            if self.input.quit() {
-                *control_flow = ControlFlow::Exit;
-            }
-            self.app_state.update(
-                &self.input,
-                &self.subaction,
-                self.surface_configuration.width as u16,
-                self.surface_configuration.height as u16,
-            );
-
-            if let Some(size) = self.input.window_resized() {
-                self.surface_configuration.width = size.width;
-                self.surface_configuration.height = size.height;
-                self.surface
-                    .configure(&self.wgpu_state.device, &self.surface_configuration);
-            }
-
+        if let Event::RedrawRequested(_) = event {
+            // app loop relies on this blocking until draw completes due to PresentMode::Fifo
             let frame = self.surface.get_current_texture().unwrap();
             let command_encoder = draw_frame(
                 &mut self.wgpu_state,
@@ -175,6 +159,29 @@ impl App {
             );
             self.wgpu_state.queue.submit(Some(command_encoder.finish()));
             frame.present();
+        }
+
+        if self.input.update(&event) {
+            if self.input.quit() {
+                *control_flow = ControlFlow::Exit;
+            }
+            self.app_state.update(
+                &self.input,
+                &self.subaction,
+                self.surface_configuration.width as u16,
+                self.surface_configuration.height as u16,
+            );
+
+            if let Some(size) = self.input.window_resized() {
+                self.surface_configuration.width = size.width;
+                self.surface_configuration.height = size.height;
+                self.surface
+                    .configure(&self.wgpu_state.device, &self.surface_configuration);
+            }
+
+            // We arrive here constantly because of ControlFlow::Poll.
+            // So we request a redraw here to constantly redraw.
+            self.window.request_redraw();
         }
     }
 }
