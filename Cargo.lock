@@ -117,7 +117,7 @@ checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
 
 [[package]]
 name = "brawllib_rs"
-version = "0.24.0"
+version = "0.24.1"
 dependencies = [
  "anyhow",
  "bincode",
