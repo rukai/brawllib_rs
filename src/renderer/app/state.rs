@@ -121,44 +121,46 @@ impl AppState {
             }
         }
 
-        if input.key_pressed(VirtualKeyCode::Key1) {
+        if input.key_pressed_os(VirtualKeyCode::Key1) {
             self.wireframe = !self.wireframe;
             self.send_event(AppEventOutgoing::NewWireframe(self.wireframe));
         }
-        if input.key_pressed(VirtualKeyCode::Key2) {
+        if input.key_pressed_os(VirtualKeyCode::Key2) {
             self.perspective = !self.perspective;
             self.send_event(AppEventOutgoing::NewPerspective(self.perspective));
         }
-        if input.key_pressed(VirtualKeyCode::Key3) {
+        if input.key_pressed_os(VirtualKeyCode::Key3) {
             self.render_ecb = !self.render_ecb;
             self.send_event(AppEventOutgoing::NewRenderEcb(self.render_ecb));
         }
-        if input.key_pressed(VirtualKeyCode::Back) {
+        if input.key_pressed_os(VirtualKeyCode::Back) {
             self.camera
                 .reset(window_width, window_height, CharacterFacing::Right);
         }
-        if input.key_pressed(VirtualKeyCode::Space) || input.key_pressed(VirtualKeyCode::Right) {
+        if input.key_pressed_os(VirtualKeyCode::Space)
+            || input.key_pressed_os(VirtualKeyCode::Right)
+        {
             self.set_state(State::StepForward);
         }
-        if input.key_pressed(VirtualKeyCode::Left) {
+        if input.key_pressed_os(VirtualKeyCode::Left) {
             self.set_state(State::StepBackward);
         }
-        if input.key_pressed(VirtualKeyCode::Return) {
+        if input.key_pressed_os(VirtualKeyCode::Return) {
             self.set_state(State::Play);
         }
-        if input.key_pressed(VirtualKeyCode::Q) {
+        if input.key_pressed_os(VirtualKeyCode::Q) {
             self.invulnerable_type = InvulnerableType::Hit;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
             ));
         }
-        if input.key_pressed(VirtualKeyCode::W) {
+        if input.key_pressed_os(VirtualKeyCode::W) {
             self.invulnerable_type = InvulnerableType::Grab;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
             ));
         }
-        if input.key_pressed(VirtualKeyCode::E) {
+        if input.key_pressed_os(VirtualKeyCode::E) {
             self.invulnerable_type = InvulnerableType::TrapItem;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
