@@ -29,8 +29,33 @@ pub struct Camera {
 impl Camera {
     pub fn new(subaction: &HighLevelSubaction, window_width: u16, window_height: u16) -> Camera {
         let mut extent = subaction.hurt_box_extent();
+        let hurt_box_center_width = (extent.left + extent.right) / 2.0;
+        let hurt_box_center_height = (extent.down + extent.up) / 2.0;
+
         extent.extend(&subaction.hit_box_extent());
         extent.extend(&subaction.ledge_grab_box_extent());
+
+        let extent_center_width = (extent.left + extent.right) / 2.0;
+        let extent_center_height = (extent.down + extent.up) / 2.0;
+
+        // This logic is needed for e.g. P+ ivy solar beam
+        // It will enforce a maximum width + height while placing the extent in a useful location
+        const MAX_DIM: f32 = 400.0;
+        if extent.right - extent.left > MAX_DIM {
+            if hurt_box_center_width > extent_center_width {
+                extent.left = extent.right - MAX_DIM;
+            } else {
+                extent.right = extent.left + MAX_DIM;
+            }
+        }
+        if extent.up - extent.down > MAX_DIM {
+            if hurt_box_center_height > extent_center_height {
+                extent.down = extent.up - MAX_DIM;
+            } else {
+                extent.up = extent.down + MAX_DIM;
+            }
+        }
+
         Camera::new_from_extent(extent, window_width, window_height, CharacterFacing::Right)
     }
 
