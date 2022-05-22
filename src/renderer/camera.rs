@@ -12,6 +12,9 @@ pub enum CharacterFacing {
 /// <https://en.wikipedia.org/wiki/Spherical_coordinate_system>
 /// <https://threejs.org/docs/#api/en/math/Spherical>
 pub struct Camera {
+    /// Minimum dimensions of the move that the camera must contain
+    pub extent: Extent,
+    /// Point the camera looks towards
     pub target: Point3<f32>,
     /// polar angle from the y (up) axis
     pub phi: f32,
@@ -21,7 +24,6 @@ pub struct Camera {
     pub radius_mult: f32,
     /// optimal radius from the target to the camera such that the fighter fits exactly within the cameras view
     radius_base: f32,
-    extent: Extent,
 }
 
 impl Camera {

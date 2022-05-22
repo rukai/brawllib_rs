@@ -126,13 +126,8 @@ fn create_draws(
 
     let frame = &subaction.frames[frame_index];
 
-    // TODO: Should this stuff go in the camera? Lets not duplicate it...
-    let mut subaction_extent = subaction.hurt_box_extent();
-    subaction_extent.extend(&subaction.hit_box_extent());
-    subaction_extent.extend(&subaction.ledge_grab_box_extent());
-
-    let extent_height = subaction_extent.up - subaction_extent.down;
-    let extent_width = subaction_extent.right - subaction_extent.left;
+    let extent_height = camera.extent.up - camera.extent.down;
+    let extent_width = camera.extent.right - camera.extent.left;
     let extent_aspect = extent_width / extent_height;
     let aspect = width as f32 / height as f32;
     let fov = 40.0;
