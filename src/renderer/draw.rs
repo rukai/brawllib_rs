@@ -74,7 +74,7 @@ pub(crate) fn draw_frame(
             .multisampled_framebuffer
             .create_view(&wgpu::TextureViewDescriptor::default());
         let mut rpass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            color_attachments: &[wgpu::RenderPassColorAttachment {
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: if SAMPLE_COUNT == 1 {
                     framebuffer
                 } else {
@@ -89,7 +89,7 @@ pub(crate) fn draw_frame(
                     load: wgpu::LoadOp::Clear(state.background_color),
                     store: true,
                 },
-            }],
+            })],
             depth_stencil_attachment: None,
             label: None,
         });

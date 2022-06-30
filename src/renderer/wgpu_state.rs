@@ -74,7 +74,7 @@ impl WgpuState {
             .unwrap();
 
         let format = match compatible_surface {
-            CompatibleSurface::Surface(surface) => surface.get_preferred_format(&adapter).unwrap(),
+            CompatibleSurface::Surface(surface) => surface.get_supported_formats(&adapter)[0],
             CompatibleSurface::Headless(format) => format,
         };
 
@@ -94,7 +94,7 @@ impl WgpuState {
             .await
             .unwrap();
 
-        let shader_module = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!("shaders/shader.wgsl"))),
         });
@@ -228,11 +228,11 @@ impl WgpuState {
             fragment: Some(wgpu::FragmentState {
                 module: shader_module,
                 entry_point: "fs_main",
-                targets: &[wgpu::ColorTargetState {
+                targets: &[Some(wgpu::ColorTargetState {
                     format,
                     blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
-                }],
+                })],
             }),
             primitive: wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,

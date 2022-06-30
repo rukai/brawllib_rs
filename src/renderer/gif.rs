@@ -13,9 +13,7 @@ use crate::renderer::wgpu_state::WgpuState;
 ///
 /// Most of the time is spent CPU side waiting for the color quantization thread to finish.
 /// So if you are batch rendering gifs you will get a massive speedup by running multiple `render_gif`s concurrently.
-///
-/// TODO: I should probably only expose a wrapper of this function that calls executor::block_on, so the user doesnt have to care about async
-pub async fn render_gif(
+pub fn render_gif(
     state: &mut WgpuState,
     high_level_fighter: &HighLevelFighter,
     subaction_index: usize,
@@ -117,7 +115,7 @@ pub async fn render_gif(
             subaction,
             frame_index,
             &camera,
-        ); // 3.0ms
+        );
         command_encoder.copy_texture_to_buffer(
             framebuffer_copy_view,
             framebuffer_out_copy_view,
@@ -127,30 +125,32 @@ pub async fn render_gif(
 
         let frames_tx = frames_tx.clone();
         let framebuffer_out_slice = framebuffer_out.slice(..);
-        let read = framebuffer_out_slice.map_async(wgpu::MapMode::Read);
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        framebuffer_out_slice.map_async(wgpu::MapMode::Read, move |result| {
+            result.unwrap();
+            tx.send(()).unwrap()
+        });
 
-        state.poll(); // 5ms
+        // manually poll wgpu to force the read to be processed
+        state.poll();
 
-        match read.await {
-            Ok(()) => {
-                // move the padding to the end of the buffer
-                let mut padded_buffer = framebuffer_out_slice.get_mapped_range().to_vec();
-                for y in 1..height as usize {
-                    let padded_offset = y * padded_bytes_per_row as usize;
-                    let real_offset = y * real_bytes_per_row as usize;
-                    padded_buffer.copy_within(
-                        padded_offset..padded_offset + real_bytes_per_row as usize,
-                        real_offset,
-                    )
-                }
+        // wait for the read to be signalled complete
+        rx.recv().unwrap();
 
-                // send just the image data ignoring the padding at the end
-                let real_buffer =
-                    padded_buffer[0..real_bytes_per_row as usize * height as usize].to_vec();
-                frames_tx.send(real_buffer).unwrap();
-            }
-            Err(error) => panic!("map_read failed: {:?}", error),
+        // move the padding to the end of the buffer
+        let mut padded_buffer = framebuffer_out_slice.get_mapped_range().to_vec();
+        for y in 1..height as usize {
+            let padded_offset = y * padded_bytes_per_row as usize;
+            let real_offset = y * real_bytes_per_row as usize;
+            padded_buffer.copy_within(
+                padded_offset..padded_offset + real_bytes_per_row as usize,
+                real_offset,
+            )
         }
+
+        // send just the image data ignoring the padding at the end
+        let real_buffer = padded_buffer[0..real_bytes_per_row as usize * height as usize].to_vec();
+        frames_tx.send(real_buffer).unwrap();
     }
 
     gif_rx
@@ -162,7 +162,7 @@ pub fn render_gif_blocking(
     high_level_fighter: &HighLevelFighter,
     subaction_index: usize,
 ) -> Vec<u8> {
-    let gif_rx =
-        futures::executor::block_on(render_gif(state, high_level_fighter, subaction_index));
-    gif_rx.recv().unwrap()
+    render_gif(state, high_level_fighter, subaction_index)
+        .recv()
+        .unwrap()
 }

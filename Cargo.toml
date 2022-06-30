@@ -20,7 +20,7 @@ rayon = "1"
 anyhow = "1"
 env_logger = "0.9"
 gif = "0.11"
-wgpu = { version = "0.12", features = ["webgl"] }
+wgpu = { version = "0.13", features = ["webgl"] }
 fancy_slice = { version = "0.1", features = [] }
 winit = { version = "0.26.1" }
 winit_input_helper = "0.12"
