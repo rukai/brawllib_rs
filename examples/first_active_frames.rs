@@ -1,10 +1,9 @@
 use brawllib_rs::brawl_mod::BrawlMod;
 use brawllib_rs::high_level_fighter::HighLevelFighter;
-
 use getopts::Options;
-
 use std::collections::HashMap;
 use std::env;
+use std::fmt::Write;
 use std::path::PathBuf;
 
 fn print_usage(program: &str, opts: Options) {
@@ -90,7 +89,7 @@ fn main() {
     let mut fighter_names: Vec<_> = fighter_map.keys().cloned().collect();
     fighter_names.sort();
     for name in &fighter_names {
-        header.push_str(&format!(",{}", name));
+        write!(header, ",{}", name).unwrap();
     }
     println!("{}", header);
 
@@ -123,39 +122,39 @@ fn main() {
         for name in &fighter_names {
             if let Some(facts) = fighter_map[name].get(subaction_name) {
                 if let Some(first_active_frame) = facts.first_active_frame {
-                    row.push_str(&format!(",{}", first_active_frame))
+                    write!(row, ",{}", first_active_frame).unwrap();
                 } else if subaction_name == "AttackS4Start" {
                     if let Some(first_active_frame) = fighter_map[name]
                         .get("AttackS4S")
                         .and_then(|x| x.first_active_frame)
                     {
-                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
+                        write!(row, ",{}", facts.length + first_active_frame - 1).unwrap();
                     } else {
-                        row.push_str(",Unknown");
+                        write!(row, ",Unknown").unwrap();
                     }
                 } else if subaction_name == "AttackLw4Start" {
                     if let Some(first_active_frame) = fighter_map[name]
                         .get("AttackLw4")
                         .and_then(|x| x.first_active_frame)
                     {
-                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
+                        write!(row, ",{}", facts.length + first_active_frame - 1).unwrap();
                     } else {
-                        row.push_str(",Unknown");
+                        write!(row, ",Unknown").unwrap();
                     }
                 } else if subaction_name == "AttackHi4Start" {
                     if let Some(first_active_frame) = fighter_map[name]
                         .get("AttackHi4")
                         .and_then(|x| x.first_active_frame)
                     {
-                        row.push_str(&format!(",{}", facts.length + first_active_frame - 1));
+                        write!(row, ",{}", facts.length + first_active_frame - 1).unwrap();
                     } else {
-                        row.push_str(",Unknown");
+                        write!(row, ",Unknown").unwrap();
                     }
                 } else {
-                    row.push_str(",Unknown");
+                    write!(row, ",Unknown").unwrap();
                 }
             } else {
-                row.push_str(",Unknown");
+                write!(row, ",Unknown").unwrap();
             }
         }
         println!("{}", row);
