@@ -23,8 +23,10 @@
 //! }
 //! ```
 
-// We use 0 prefices for lining up constants across multiple lines
+// We use 0 prefixes for lining up constants across multiple lines
 #![allow(clippy::zero_prefixed_literal)]
+// stupid lint
+#![allow(clippy::derive_partial_eq_without_eq)]
 
 #[macro_use]
 extern crate serde_derive;
