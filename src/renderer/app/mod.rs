@@ -91,6 +91,7 @@ impl App {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             width: size.width,
             height: size.height,
+            alpha_mode: wgpu::CompositeAlphaMode::Auto,
         };
         surface.configure(&wgpu_state.device, &surface_configuration);
 
