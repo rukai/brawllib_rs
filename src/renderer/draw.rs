@@ -555,8 +555,8 @@ fn draw_cylinder(
             let c = grid[iy + 1][ix];
             let d = grid[iy + 1][ix + 1];
 
-            indices_vec.extend(&[a, b, d]);
-            indices_vec.extend(&[b, c, d]);
+            indices_vec.extend([a, b, d]);
+            indices_vec.extend([b, c, d]);
         }
     }
 

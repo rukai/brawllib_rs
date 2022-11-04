@@ -1506,8 +1506,8 @@ impl<'a> ScriptRunner<'a> {
                             _ => panic!("Cannot evaluate expression: {:?}", binary),
                         }
                     }
-                    ComparisonOperator::Or                 => self.evaluate_expression(&*binary.left).unwrap_bool() || self.evaluate_expression(&*binary.right).unwrap_bool(),
-                    ComparisonOperator::And                => self.evaluate_expression(&*binary.left).unwrap_bool() && self.evaluate_expression(&*binary.right).unwrap_bool(),
+                    ComparisonOperator::Or                 => self.evaluate_expression(&binary.left).unwrap_bool() || self.evaluate_expression(&binary.right).unwrap_bool(),
+                    ComparisonOperator::And                => self.evaluate_expression(&binary.left).unwrap_bool() && self.evaluate_expression(&binary.right).unwrap_bool(),
                     ComparisonOperator::UnknownArg (_)     => false,
                 };
                 ExprResult::Bool (result)
@@ -1530,13 +1530,7 @@ impl<'a> ScriptRunner<'a> {
         match variable.data_type() {
             VariableDataType::Int => self.get_variable_int_inner(variable),
             VariableDataType::Float => self.get_variable_float_inner(variable) as i32,
-            VariableDataType::Bool => {
-                if self.get_variable_bool_inner(variable) {
-                    1
-                } else {
-                    0
-                }
-            }
+            VariableDataType::Bool => self.get_variable_bool_inner(variable) as i32,
             VariableDataType::Unknown { .. } => 0,
         }
     }

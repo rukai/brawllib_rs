@@ -166,7 +166,7 @@ fn arguments(data: FancySlice, origin: u32, num_arguments: usize) -> Vec<Argumen
                 let value = value as u32;
                 let memory_type = ((value & 0xF0000000) >> 28) as u8;
                 let data_type   = ((value & 0x0F000000) >> 24) as u8;
-                let address     =  (value & 0x00FFFFFF)        as u32;
+                let address     =  value & 0x00FFFFFF;
 
                 let memory_type = VariableMemoryType::new(memory_type);
                 let data_type = VariableDataType::new(data_type);

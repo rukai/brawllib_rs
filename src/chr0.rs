@@ -294,7 +294,7 @@ impl Keyframe {
                 let children = header.children.iter().map(|child| InterpolatedNEntry {
                     value: header.base + header.step * child.step() as f32,
                     frame_index: child.frame_index() as i32,
-                    tangent: child.tangent() as f32,
+                    tangent: child.tangent(),
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
@@ -302,7 +302,7 @@ impl Keyframe {
                 let children = header.children.iter().map(|child| InterpolatedNEntry {
                     value: header.base + header.step * child.step as f32,
                     frame_index: child.frame_index(),
-                    tangent: child.tangent() as f32,
+                    tangent: child.tangent(),
                 });
                 Keyframe::get_value_interpolated_n_entry(children, loop_value, frame)
             }
@@ -327,7 +327,7 @@ impl Keyframe {
                 //    });
                 //}
                 //return Keyframe::get_value_interpolated_n_entry(&children, loop_value, frame);
-                header.base + header.step as f32 * header.children_steps[frame as usize] as f32
+                header.base + header.step * header.children_steps[frame as usize] as f32
             }
             Keyframe::Linear2(header) => {
                 header.base + header.step * header.children_steps[frame as usize] as f32

@@ -159,9 +159,9 @@ impl Mdl0 {
 
         // create mdl0 header
         output.extend("MDL0".chars().map(|x| x as u8));
-        output.extend(&i32::to_be_bytes(0x512e)); // size
-        output.extend(&i32::to_be_bytes(self.version));
-        output.extend(&i32::to_be_bytes(bres_offset));
+        output.extend(i32::to_be_bytes(0x512e)); // size
+        output.extend(i32::to_be_bytes(self.version));
+        output.extend(i32::to_be_bytes(bres_offset));
 
         // TODO: Determine version from the fields used
         let props_offset = match self.version {
@@ -182,43 +182,43 @@ impl Mdl0 {
 
         let definitions = self.definitions.as_ref().unwrap().compile();
 
-        output.extend(&i32::to_be_bytes(header_size)); // definitions_offset
-        output.extend(&i32::to_be_bytes(header_size + definitions.len() as i32)); // bones_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: vertices_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: normals_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: colors_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: uv_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: materials_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: shaders_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: objects_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: texture_refs_offset
-        output.extend(&i32::to_be_bytes(0)); // TODO: palette_refs_offset
+        output.extend(i32::to_be_bytes(header_size)); // definitions_offset
+        output.extend(i32::to_be_bytes(header_size + definitions.len() as i32)); // bones_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: vertices_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: normals_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: colors_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: uv_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: materials_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: shaders_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: objects_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: texture_refs_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: palette_refs_offset
 
         if self.version >= 0xA {
-            output.extend(&i32::to_be_bytes(0)); // TODO: fur_vectors_offset
-            output.extend(&i32::to_be_bytes(0)); // TODO: fur_layer_coords_offset
+            output.extend(i32::to_be_bytes(0)); // TODO: fur_vectors_offset
+            output.extend(i32::to_be_bytes(0)); // TODO: fur_layer_coords_offset
         }
         if self.version >= 0xB {
-            output.extend(&i32::to_be_bytes(0)); // TODO: An extra something ... goes here
+            output.extend(i32::to_be_bytes(0)); // TODO: An extra something ... goes here
         }
 
-        output.extend(&i32::to_be_bytes(0)); // TODO: string_offset
+        output.extend(i32::to_be_bytes(0)); // TODO: string_offset
 
         // TODO: Many of these should be generated rather than stored
         if let Some(props) = &self.props {
-            output.extend(&u32::to_be_bytes(props.header_len));
-            output.extend(&i32::to_be_bytes(props.mdl0offset));
-            output.extend(&i32::to_be_bytes(props.scaling_rule));
-            output.extend(&i32::to_be_bytes(props.tex_matrix_mode));
-            output.extend(&i32::to_be_bytes(props.num_vertices));
-            output.extend(&i32::to_be_bytes(props.num_triangles));
-            output.extend(&i32::to_be_bytes(props.orig_path_offset));
-            output.extend(&i32::to_be_bytes(props.num_nodes));
+            output.extend(u32::to_be_bytes(props.header_len));
+            output.extend(i32::to_be_bytes(props.mdl0offset));
+            output.extend(i32::to_be_bytes(props.scaling_rule));
+            output.extend(i32::to_be_bytes(props.tex_matrix_mode));
+            output.extend(i32::to_be_bytes(props.num_vertices));
+            output.extend(i32::to_be_bytes(props.num_triangles));
+            output.extend(i32::to_be_bytes(props.orig_path_offset));
+            output.extend(i32::to_be_bytes(props.num_nodes));
             output.push(props.need_nrm_mtx_array);
             output.push(props.need_tex_mtx_array);
             output.push(props.enable_extents);
             output.push(props.env_mtx_mode);
-            output.extend(&i32::to_be_bytes(props.data_offset));
+            output.extend(i32::to_be_bytes(props.data_offset));
             output.extend(&props.extents.compile());
         }
 

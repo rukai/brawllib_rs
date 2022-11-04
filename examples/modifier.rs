@@ -69,7 +69,7 @@ fn main() {
     for fighter in fighters {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
             let model = fighter.models.get(0).unwrap().compile();
-            std::fs::write("modifier_output.pac", &model).unwrap();
+            std::fs::write("modifier_output.pac", model).unwrap();
 
             return;
         }

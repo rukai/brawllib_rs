@@ -19,12 +19,12 @@ impl MBox {
     pub fn compile(&self) -> Vec<u8> {
         let mut output = vec![];
 
-        output.extend(&u32::to_be_bytes(self.min.x.to_bits()));
-        output.extend(&u32::to_be_bytes(self.min.y.to_bits()));
-        output.extend(&u32::to_be_bytes(self.min.z.to_bits()));
-        output.extend(&u32::to_be_bytes(self.max.x.to_bits()));
-        output.extend(&u32::to_be_bytes(self.max.y.to_bits()));
-        output.extend(&u32::to_be_bytes(self.max.z.to_bits()));
+        output.extend(u32::to_be_bytes(self.min.x.to_bits()));
+        output.extend(u32::to_be_bytes(self.min.y.to_bits()));
+        output.extend(u32::to_be_bytes(self.min.z.to_bits()));
+        output.extend(u32::to_be_bytes(self.max.x.to_bits()));
+        output.extend(u32::to_be_bytes(self.max.y.to_bits()));
+        output.extend(u32::to_be_bytes(self.max.z.to_bits()));
 
         output
     }

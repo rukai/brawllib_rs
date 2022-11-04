@@ -64,19 +64,19 @@ impl Plt0 {
 
         // create PLT0 header
         output.extend("PLT0".chars().map(|x| x as u8));
-        output.extend(&i32::to_be_bytes(size as i32));
-        output.extend(&i32::to_be_bytes(version));
-        output.extend(&i32::to_be_bytes(bres_offset));
-        output.extend(&i32::to_be_bytes(0)); // TODO: resources_offset
-        output.extend(&u32::to_be_bytes(0)); // TODO: string_offset
-        output.extend(&u32::to_be_bytes(self.pixel_format.value()));
-        output.extend(&u16::to_be_bytes(num_entries as u16));
-        output.extend(&u16::to_be_bytes(0)); // padding
-        output.extend(&i32::to_be_bytes(self.orig_path_offset));
+        output.extend(i32::to_be_bytes(size as i32));
+        output.extend(i32::to_be_bytes(version));
+        output.extend(i32::to_be_bytes(bres_offset));
+        output.extend(i32::to_be_bytes(0)); // TODO: resources_offset
+        output.extend(u32::to_be_bytes(0)); // TODO: string_offset
+        output.extend(u32::to_be_bytes(self.pixel_format.value()));
+        output.extend(u16::to_be_bytes(num_entries as u16));
+        output.extend(u16::to_be_bytes(0)); // padding
+        output.extend(i32::to_be_bytes(self.orig_path_offset));
         if !self.user_data.is_empty() {
-            output.extend(&i32::to_be_bytes(0x44)); // TODO: I just guessed this is a constant?
+            output.extend(i32::to_be_bytes(0x44)); // TODO: I just guessed this is a constant?
         }
-        output.extend(&[0; 0x1c]); // padding
+        output.extend([0; 0x1c]); // padding
 
         // create user data
         for _user_data in &self.user_data {
@@ -90,7 +90,7 @@ impl Plt0 {
 
         // create color data
         for color in &self.color_data {
-            output.extend(&u16::to_be_bytes(*color));
+            output.extend(u16::to_be_bytes(*color));
         }
 
         output

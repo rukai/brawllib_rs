@@ -150,7 +150,7 @@ fn hurtbox(data: FancySlice) -> HurtBox {
   //let padding    = ((flags & 0b0000_0000_0000_0110) >> 1) as u8; // Always 0
     let zone       = ((flags & 0b0000_0000_0001_1000) >> 3) as u8;
     let region     = ((flags & 0b0000_0000_0110_0000) >> 5) as u8;
-    let bone_index = ((flags & 0b1111_1111_1000_0000) >> 7) as u16;
+    let bone_index = (flags & 0b1111_1111_1000_0000) >> 7;
 
     let grabbable = region == 0 || region == 3;
     let trap_item_hittable = region == 2 || region == 3;

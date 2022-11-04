@@ -84,7 +84,7 @@ fn main() {
                     // this example only exports a single subaction_data.bin file
                     // rukaidata project will be responsible for mass exporting subactions for all characters for all mods
                     let data = bincode::serialize(&subaction).unwrap();
-                    std::fs::write("subaction_data.bin", &data).unwrap();
+                    std::fs::write("subaction_data.bin", data).unwrap();
                     return;
                 }
             }

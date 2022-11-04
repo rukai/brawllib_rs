@@ -452,7 +452,7 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
         .to_string();
     let mut cased_name: Option<String> = None;
 
-    for data_path in fs::read_dir(&fighter_path).unwrap() {
+    for data_path in fs::read_dir(fighter_path).unwrap() {
         let data_name = data_path
             .unwrap()
             .path()
@@ -478,7 +478,7 @@ fn fighter_data(fighter_path: &Path) -> Option<FighterData> {
             None
         } else {
             let mut data = HashMap::new();
-            for data_path in fs::read_dir(&fighter_path).unwrap() {
+            for data_path in fs::read_dir(fighter_path).unwrap() {
                 let data_path = data_path.unwrap().path();
                 let file_data = std::fs::read(&data_path).unwrap();
                 data.insert(

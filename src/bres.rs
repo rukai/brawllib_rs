@@ -83,17 +83,17 @@ impl Bres {
             // create resources header
             let resources_size =
                 (children.len() + 1) * resources::RESOURCE_SIZE + resources::RESOURCE_HEADER_SIZE; // includes the dummy child
-            root_output.extend(&i32::to_be_bytes(resources_size as i32));
-            root_output.extend(&i32::to_be_bytes(children.len() as i32)); // num_children
+            root_output.extend(i32::to_be_bytes(resources_size as i32));
+            root_output.extend(i32::to_be_bytes(children.len() as i32)); // num_children
 
             // insert the dummy resource
             let root_resource = 1;
-            root_output.extend(&[0xff, 0xff]); // id
-            root_output.extend(&u16::to_be_bytes(0)); // flag
-            root_output.extend(&u16::to_be_bytes(root_resource)); // left_index
-            root_output.extend(&u16::to_be_bytes(0)); // right_index
-            root_output.extend(&i32::to_be_bytes(0)); // string_offset
-            root_output.extend(&i32::to_be_bytes(0)); // data_offset
+            root_output.extend([0xff, 0xff]); // id
+            root_output.extend(u16::to_be_bytes(0)); // flag
+            root_output.extend(u16::to_be_bytes(root_resource)); // left_index
+            root_output.extend(u16::to_be_bytes(0)); // right_index
+            root_output.extend(i32::to_be_bytes(0)); // string_offset
+            root_output.extend(i32::to_be_bytes(0)); // data_offset
 
             let mut data_offset_current = resources_size;
             for (i, child) in children.iter().enumerate() {
@@ -142,12 +142,12 @@ impl Bres {
                 let right_index = (i + 1) as u16;
 
                 // create each resource
-                root_output.extend(&u16::to_be_bytes(id));
-                root_output.extend(&u16::to_be_bytes(0));
-                root_output.extend(&u16::to_be_bytes(left_index));
-                root_output.extend(&u16::to_be_bytes(right_index));
-                root_output.extend(&i32::to_be_bytes(0)); // TODO: string_offset
-                root_output.extend(&i32::to_be_bytes(data_offset));
+                root_output.extend(u16::to_be_bytes(id));
+                root_output.extend(u16::to_be_bytes(0));
+                root_output.extend(u16::to_be_bytes(left_index));
+                root_output.extend(u16::to_be_bytes(right_index));
+                root_output.extend(i32::to_be_bytes(0)); // TODO: string_offset
+                root_output.extend(i32::to_be_bytes(data_offset));
             }
         }
 
@@ -156,15 +156,15 @@ impl Bres {
 
         // create bres header
         output.extend("bres".chars().map(|x| x as u8));
-        output.extend(&u16::to_be_bytes(self.endian));
-        output.extend(&u16::to_be_bytes(self.version));
-        output.extend(&u32::to_be_bytes(bres_size as u32));
-        output.extend(&u16::to_be_bytes(0x10)); // root_offset
-        output.extend(&u16::to_be_bytes(leaf_count as u16 + 1)); // +1 for the root entry
+        output.extend(u16::to_be_bytes(self.endian));
+        output.extend(u16::to_be_bytes(self.version));
+        output.extend(u32::to_be_bytes(bres_size));
+        output.extend(u16::to_be_bytes(0x10)); // root_offset
+        output.extend(u16::to_be_bytes(leaf_count as u16 + 1)); // +1 for the root entry
 
         // create bres root child header
         output.extend("root".chars().map(|x| x as u8));
-        output.extend(&i32::to_be_bytes(root_size as i32));
+        output.extend(i32::to_be_bytes(root_size as i32));
 
         // create bres root child contents
         output.extend(root_output);

@@ -36,8 +36,7 @@ pub fn render_gif(
             let mut encoder = gif::Encoder::new(&mut result, width, height, &[]).unwrap();
             for _ in 0..subaction_len {
                 let mut frame_data: Vec<u8> = frames_rx.recv().unwrap();
-                let gif_frame =
-                    gif::Frame::from_rgba_speed(width as u16, height as u16, &mut frame_data, 30);
+                let gif_frame = gif::Frame::from_rgba_speed(width, height, &mut frame_data, 30);
                 encoder.write_frame(&gif_frame).unwrap();
             }
             encoder

@@ -374,15 +374,19 @@ impl HighLevelFighter {
                                 // *    The higher the min_height the higher the top ecb point.
                                 // *    The higher the min_height the lower the bottom ecb point, capping out at transN.
                                 // *    Actions such as crouching, lower the height of the top ecb point.
-                                let middle_y = (ecb.top + ecb.bottom) / 2.0;
-                                let new_top = middle_y + misc_ecb.min_height / 2.0;
-                                let new_bottom = middle_y - misc_ecb.min_height / 2.0;
-                                if new_top > ecb.top {
-                                    ecb.top = new_top;
+                                {
+                                    let middle_y = (ecb.top + ecb.bottom) / 2.0;
+                                    let new_top = middle_y + misc_ecb.min_height / 2.0;
+                                    let new_bottom = middle_y - misc_ecb.min_height / 2.0;
+                                    if new_top > ecb.top {
+                                        ecb.top = new_top;
+                                    }
+                                    if new_bottom < ecb.bottom {
+                                        ecb.bottom = new_bottom;
+                                    }
                                 }
-                                if new_bottom < ecb.bottom {
-                                    ecb.bottom = new_bottom;
-                                }
+
+                                // Ensure ecb bottom does not go below transn_y
                                 if ecb.bottom < ecb.transn_y {
                                     ecb.bottom = ecb.transn_y
                                 }

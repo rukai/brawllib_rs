@@ -70,9 +70,9 @@ impl Arc {
 
         // create arc header
         output.extend("ARC".chars().map(|x| x as u8));
-        output.extend(&[0x00, 0x01, 0x01]); // TODO: ??
-        output.extend(&u16::to_be_bytes(self.children.len() as u16));
-        output.extend(&[0x00; 8]);
+        output.extend([0x00, 0x01, 0x01]); // TODO: ??
+        output.extend(u16::to_be_bytes(self.children.len() as u16));
+        output.extend([0x00; 8]);
         output.extend(self.name.chars().map(|x| x as u8));
         while output.len() < ARC_HEADER_SIZE {
             output.push(0x00);
@@ -81,12 +81,12 @@ impl Arc {
         for child in &self.children {
             // create arc child header
             let start = output.len();
-            output.extend(&i16::to_be_bytes(child.ty));
-            output.extend(&i16::to_be_bytes(child.index));
-            output.extend(&i32::to_be_bytes(child.size)); // TODO: remove this field and calculate it instead
+            output.extend(i16::to_be_bytes(child.ty));
+            output.extend(i16::to_be_bytes(child.index));
+            output.extend(i32::to_be_bytes(child.size)); // TODO: remove this field and calculate it instead
             output.push(child.group_index);
             output.push(0x00);
-            output.extend(&i16::to_be_bytes(child.redirect_index));
+            output.extend(i16::to_be_bytes(child.redirect_index));
             while output.len() < start + ARC_CHILD_HEADER_SIZE {
                 output.push(0x00);
             }

@@ -87,7 +87,7 @@ fn main() {
                     let data = renderer::render_gif_blocking(&mut wgpu_state, &hl_fighter, i);
                     std::fs::write(
                         format!("output_{}_{}.gif", hl_fighter.name, subaction.name),
-                        &data,
+                        data,
                     )
                     .unwrap();
                     return;

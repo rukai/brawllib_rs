@@ -15,11 +15,11 @@ impl Definitions {
         // create resources header
         let resources_size =
             (self.values.len() + 1) * resources::RESOURCE_SIZE + resources::RESOURCE_HEADER_SIZE; // includes the dummy child
-        output.extend(&i32::to_be_bytes(resources_size as i32));
-        output.extend(&i32::to_be_bytes(self.values.len() as i32)); // num_children
+        output.extend(i32::to_be_bytes(resources_size as i32));
+        output.extend(i32::to_be_bytes(self.values.len() as i32)); // num_children
 
         // insert the dummy child
-        output.extend(&[
+        output.extend([
             0xff, 0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ]);
