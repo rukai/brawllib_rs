@@ -18,8 +18,8 @@ serde = "1"
 serde_derive = "1"
 rayon = "1"
 anyhow = "1"
-env_logger = "0.9"
-gif = "0.11"
+env_logger = "0.10"
+gif = "0.12"
 wgpu = { version = "0.14", features = ["webgl"] }
 fancy_slice = { version = "0.1", features = [] }
 winit = { version = "0.27.1" }
