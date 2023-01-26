@@ -404,12 +404,17 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
                     // fighter data already exists, overwrite and insert new files
                     for data_path in fs::read_dir(&fighter_path).unwrap() {
                         let data_path = data_path.unwrap().path();
-                        let file_data = std::fs::read(&data_path).unwrap();
-                        fighter_data.data.insert(
-                            data_path.file_name().unwrap().to_str().unwrap().to_string(),
-                            file_data,
-                        );
-                        fighter_data.read_from_mod = true;
+
+                        // TODO: should probably recursively read files in folders instead of just ignoring dirs
+                        // but currently brawllib never attempts to read such files anyway
+                        if !data_path.is_dir() {
+                            let file_data = std::fs::read(&data_path).unwrap();
+                            fighter_data.data.insert(
+                                data_path.file_name().unwrap().to_str().unwrap().to_string(),
+                                file_data,
+                            );
+                            fighter_data.read_from_mod = true;
+                        }
                     }
                 } else {
                     // fighter data doesnt exist yet, create it
