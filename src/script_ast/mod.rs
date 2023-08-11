@@ -40,14 +40,14 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
         let args = &event.arguments;
         use crate::script::Argument::*;
         let event_ast = match (event.namespace, event.code, args.get(0), args.get(1), args.get(2)) {
-            (0x00, 0x01, Some(&Scalar(v0)), None, None) => EventAst::SyncWait (v0),
-            (0x00, 0x02, None,              None, None) => EventAst::Nop,
-            (0x00, 0x02, Some(&Scalar(v0)), None, None) => EventAst::AsyncWait (v0),
-            (0x00, 0x04, Some(&Value(v0)),  None, None) => { // Loop
-                let iterations = if v0 == -1 {
+            (0x00, 0x01, Some(Scalar(v0)), None, None) => EventAst::SyncWait (*v0),
+            (0x00, 0x02, None,             None, None) => EventAst::Nop,
+            (0x00, 0x02, Some(Scalar(v0)), None, None) => EventAst::AsyncWait (*v0),
+            (0x00, 0x04, Some(Value(v0)),  None, None) => { // Loop
+                let iterations = if *v0 == -1 {
                     Iterations::Infinite
                 } else {
-                    Iterations::Finite (v0)
+                    Iterations::Finite (*v0)
                 };
 
                 match process_block(events) {
@@ -61,13 +61,13 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x05, None, None, None) => { // End loop
                 return ProcessedBlock::EndForLoop (Block { events: event_asts })
             }
-            (0x00, 0x07, Some(&Offset(ref v0)), None, None) => EventAst::Subroutine (v0.clone()),
-            (0x00, 0x07, Some(&Value (ref v0)), None, None) => EventAst::Subroutine (script::Offset { offset: *v0, origin: -1 }),
-            (0x00, 0x08, None,                  None, None) => EventAst::Return,
-            (0x00, 0x09, Some(&Offset(ref v0)), None, None) => EventAst::Goto (v0.clone()),
-            (0x00, 0x09, Some(&Value (ref v0)), None, None) => EventAst::Goto (script::Offset { offset: *v0, origin: -1 }),
-            (0x00, 0x0A, Some(&Requirement { ref ty, flip }), v1, v2) => { // If
-                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+            (0x00, 0x07, Some(Offset(v0)), None, None) => EventAst::Subroutine (v0.clone()),
+            (0x00, 0x07, Some(Value (v0)), None, None) => EventAst::Subroutine (script::Offset { offset: *v0, origin: -1 }),
+            (0x00, 0x08, None,             None, None) => EventAst::Return,
+            (0x00, 0x09, Some(Offset(v0)), None, None) => EventAst::Goto (v0.clone()),
+            (0x00, 0x09, Some(Value (v0)), None, None) => EventAst::Goto (script::Offset { offset: *v0, origin: -1 }),
+            (0x00, 0x0A, Some(Requirement { ty, flip }), v1, v2) => { // If
+                if let Some(test) = Expression::from_args(ty, *flip, v1, v2, args.get(3)) {
                     match process_block(events) {
                         ProcessedBlock::EndIf { then_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
@@ -97,7 +97,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     }
                 }
             }
-            (0x00, 0x0B, Some(&Requirement { ref ty, flip }), v1, v2) => { // And
+            (0x00, 0x0B, Some(Requirement { ty, flip }), v1, v2) => { // And
                 // It is tempting to combine this event with the previous IfStatement event.
                 // However that is a terrible idea, as an And/Or will alter the execution of the
                 // current IfStatement even if other events have occured since the IfStatement.
@@ -109,21 +109,21 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 //
                 // I have tested this with Nop and FrameSpeedModifier events in between the IfStatement and And/Or.
                 // It would probably also occur with an And/Or at a Goto/Subroutine destination
-                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                if let Some(test) = Expression::from_args(ty, *flip, v1, v2, args.get(3)) {
                     EventAst::IfStatementAnd (test)
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0C, Some(&Requirement { ref ty, flip }), v1, v2) => { // Or
-                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+            (0x00, 0x0C, Some(Requirement { ty, flip }), v1, v2) => { // Or
+                if let Some(test) = Expression::from_args(ty, *flip, v1, v2, args.get(3)) {
                     EventAst::IfStatementOr (test)
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x00, 0x0D, Some(&Requirement { ref ty, flip }), v1, v2) => { // Else If
-                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+            (0x00, 0x0D, Some(Requirement { ty, flip }), v1, v2) => { // Else If
+                if let Some(test) = Expression::from_args(ty, *flip, v1, v2, args.get(3)) {
                     let event = match process_block(events) {
                         ProcessedBlock::EndIf { then_branch } => {
                             EventAst::IfStatement (IfStatement { test, then_branch, else_branch: None })
@@ -144,80 +144,80 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 }
             }
             (0x00, 0x0F, None, None, None) => { return ProcessedBlock::EndIf { then_branch: Block { events: event_asts } } }
-            (0x00, 0x10, Some(&Value(v0)), Some(&Value(v1)),      None) => EventAst::Switch (v0, v1),
-            (0x00, 0x11, Some(&Value(v0)), None,                  None) => EventAst::Case (v0),
-            (0x00, 0x11, None,             None,                  None) => EventAst::DefaultCase,
-            (0x00, 0x13, None,             None,                  None) => EventAst::EndSwitch,
-            (0x01, 0x01, None,             None,                  None) => EventAst::LoopRest,
-            (0x0D, 0x00, Some(&Value(v0)), Some(&Offset(ref v1)), None) => EventAst::CallEveryFrame { thread_id: v0, offset: v1.clone() },
-            (0x0D, 0x01, Some(&Value(v0)), None,                  None) => EventAst::RemoveCallEveryFrame { thread_id: v0 },
-            (0x0D, 0x05, Some(&Value(v0)), Some(&Offset(ref v1)), None) => EventAst::IndependentSubroutine { thread_id: v0, offset: v1.clone() },
-            (0x0D, 0x06, Some(&Value(v0)), None,                  None) => EventAst::RemoveIndependentSubroutine { thread_id: v0 },
-            (0x0D, 0x07, Some(&Value(v0)), Some(&Value(v1)),      None) => EventAst::SetIndependentSubroutineThreadType { thread_id: v0, thread_type: v1 },
+            (0x00, 0x10, Some(Value(v0)), Some(Value(v1)),      None) => EventAst::Switch (*v0, *v1),
+            (0x00, 0x11, Some(Value(v0)), None,                 None) => EventAst::Case (*v0),
+            (0x00, 0x11, None,            None,                 None) => EventAst::DefaultCase,
+            (0x00, 0x13, None,            None,                 None) => EventAst::EndSwitch,
+            (0x01, 0x01, None,            None,                 None) => EventAst::LoopRest,
+            (0x0D, 0x00, Some(Value(v0)), Some(Offset(ref v1)), None) => EventAst::CallEveryFrame { thread_id: *v0, offset: v1.clone() },
+            (0x0D, 0x01, Some(Value(v0)), None,                 None) => EventAst::RemoveCallEveryFrame { thread_id: *v0 },
+            (0x0D, 0x05, Some(Value(v0)), Some(Offset(ref v1)), None) => EventAst::IndependentSubroutine { thread_id: *v0, offset: v1.clone() },
+            (0x0D, 0x06, Some(Value(v0)), None,                 None) => EventAst::RemoveIndependentSubroutine { thread_id: *v0 },
+            (0x0D, 0x07, Some(Value(v0)), Some(Value(v1)),      None) => EventAst::SetIndependentSubroutineThreadType { thread_id: *v0, thread_type: *v1 },
 
             // change action
-            (0x02, 0x00, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
-                if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
-                    EventAst::CreateInterrupt (Interrupt { interrupt_id: Some(v0), action: v1, test })
+            (0x02, 0x00, Some(Value(v0)), Some(Value(v1)), Some(Requirement { ty, flip })) => {
+                if let Some(test) = Expression::from_args(ty, *flip, args.get(3), args.get(4), args.get(5)) {
+                    EventAst::CreateInterrupt (Interrupt { interrupt_id: Some(*v0), action: *v1, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x01, Some(&Value(v0)), Some(&Requirement { ref ty, flip }), v2) => {
-                if let Some(test) = Expression::from_args(ty, flip, v2, args.get(3), args.get(4)) {
-                    EventAst::CreateInterrupt (Interrupt { interrupt_id: None, action: v0, test })
+            (0x02, 0x01, Some(Value(v0)), Some(Requirement { ty, flip }), v2) => {
+                if let Some(test) = Expression::from_args(ty, *flip, v2, args.get(3), args.get(4)) {
+                    EventAst::CreateInterrupt (Interrupt { interrupt_id: None, action: *v0, test })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x04, Some(&Requirement { ref ty, flip }), v1, v2) => {
+            (0x02, 0x04, Some(Requirement { ty, flip }), v1, v2) => {
                 // It is tempting to combine this event with the previous CreateInterrupt event.
                 // However that is a terrible idea as a InterruptAddRequirement will
                 // modify the last CreateInterrupt regardless of any events in between.
                 // I have tested this with Nop and FrameSpeedModifier events in between.
                 // It would probably also occur with a InterruptAddRequirement in an IfStatement, at a Goto/Subroutine
-                if let Some(test) = Expression::from_args(ty, flip, v1, v2, args.get(3)) {
+                if let Some(test) = Expression::from_args(ty, *flip, v1, v2, args.get(3)) {
                     EventAst::PreviousInterruptAddRequirement { test }
                 }
                 else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x05, Some(&Value(v0)), Some(&Value(v1)), Some(&Requirement { ref ty, flip })) => {
-                if let Some(test) = Expression::from_args(ty, flip, args.get(3), args.get(4), args.get(5)) {
-                    EventAst::InterruptAddRequirement { interrupt_type: InterruptType::new(v0), interrupt_id: v1, test }
+            (0x02, 0x05, Some(Value(v0)), Some(Value(v1)), Some(Requirement { ty, flip })) => {
+                if let Some(test) = Expression::from_args(ty, *flip, args.get(3), args.get(4), args.get(5)) {
+                    EventAst::InterruptAddRequirement { interrupt_type: InterruptType::new(*v0), interrupt_id: *v1, test }
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x02, 0x06, Some(&Value(v0)),  None,             None) => EventAst::EnableInterrupt (v0),
-            (0x02, 0x08, Some(&Value(v0)),  None,             None) => EventAst::DisableInterrupt (v0),
-            (0x02, 0x09, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::ToggleInterrupt { interrupt_type: InterruptType::new(v0), interrupt_id: v1 },
-            (0x02, 0x0A, Some(&Value(v0)),  None,             None) => EventAst::EnableInterruptGroup (InterruptType::new(v0)),
-            (0x02, 0x0B, Some(&Value(v0)),  None,             None) => EventAst::DisableInterruptGroup (InterruptType::new(v0)),
-            (0x02, 0x0C, Some(&Value(v0)),  None,             None) => EventAst::ClearInterruptGroup (InterruptType::new(v0)),
-            (0x64, 0x00, None,              None,             None) => EventAst::AllowInterrupts,
-            (0x64, 0x01, None,              None,             None) => EventAst::DisallowInterrupts,
-            (0x04, 0x00, Some(&Value(v0)),  None,             None) => EventAst::ChangeSubactionRestartFrame (v0),
-            (0x04, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),  None) => if v1 { EventAst::ChangeSubaction (v0) } else { EventAst::ChangeSubactionRestartFrame (v0) }
+            (0x02, 0x06, Some(Value(v0)),  None,            None) => EventAst::EnableInterrupt (*v0),
+            (0x02, 0x08, Some(Value(v0)),  None,            None) => EventAst::DisableInterrupt (*v0),
+            (0x02, 0x09, Some(Value(v0)),  Some(Value(v1)), None) => EventAst::ToggleInterrupt { interrupt_type: InterruptType::new(*v0), interrupt_id: *v1 },
+            (0x02, 0x0A, Some(Value(v0)),  None,            None) => EventAst::EnableInterruptGroup (InterruptType::new(*v0)),
+            (0x02, 0x0B, Some(Value(v0)),  None,            None) => EventAst::DisableInterruptGroup (InterruptType::new(*v0)),
+            (0x02, 0x0C, Some(Value(v0)),  None,            None) => EventAst::ClearInterruptGroup (InterruptType::new(*v0)),
+            (0x64, 0x00, None,             None,            None) => EventAst::AllowInterrupts,
+            (0x64, 0x01, None,             None,            None) => EventAst::DisallowInterrupts,
+            (0x04, 0x00, Some(Value(v0)),  None,            None) => EventAst::ChangeSubactionRestartFrame (*v0),
+            (0x04, 0x00, Some(Value(v0)),  Some(Bool(v1)),  None) => if *v1 { EventAst::ChangeSubaction (*v0) } else { EventAst::ChangeSubactionRestartFrame (*v0) }
 
             // timing
-            (0x04, 0x06, Some(&Scalar(v0)), None,             None) => EventAst::SetAnimationFrame (v0),
-            (0x04, 0x07, Some(&Scalar(v0)), None,             None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: 0 },
-            (0x04, 0x07, Some(&Scalar(v0)), Some(&Value(v1)), None) => EventAst::FrameSpeedModifier { multiplier: v0, unk: v1 },
-            (0x04, 0x14, Some(&Scalar(v0)), None,             None) => EventAst::SetAnimationAndTimerFrame (v0),
-            (0x0c, 0x23, Some(&Value(v0)),  Some(&Value(v1)), None) => EventAst::TimeManipulation (v0, v1),
+            (0x04, 0x06, Some(Scalar(v0)), None,            None) => EventAst::SetAnimationFrame (*v0),
+            (0x04, 0x07, Some(Scalar(v0)), None,            None) => EventAst::FrameSpeedModifier { multiplier: *v0, unk: 0 },
+            (0x04, 0x07, Some(Scalar(v0)), Some(Value(v1)), None) => EventAst::FrameSpeedModifier { multiplier: *v0, unk: *v1 },
+            (0x04, 0x14, Some(Scalar(v0)), None,            None) => EventAst::SetAnimationAndTimerFrame (*v0),
+            (0x0c, 0x23, Some(Value(v0)),  Some(Value(v1)), None) => EventAst::TimeManipulation (*v0, *v1),
 
             // misc state
-            (0x0e, 0x00, Some(&Value(v0)), None, None) => EventAst::SetAirGround (v0),
-            (0x08, 0x00, Some(&Value(v0)), None, None) => EventAst::SetEdgeSlide (EdgeSlide::new(v0)),
-            (0x05, 0x00, None,             None, None) => EventAst::ReverseDirection,
+            (0x0e, 0x00, Some(Value(v0)), None, None) => EventAst::SetAirGround (*v0),
+            (0x08, 0x00, Some(Value(v0)), None, None) => EventAst::SetEdgeSlide (EdgeSlide::new(*v0)),
+            (0x05, 0x00, None,            None, None) => EventAst::ReverseDirection,
 
             // hitboxes
             (0x06, 0x04, None,             None,     None) => EventAst::DeleteAllHitBoxes,
-            (0x06, 0x00, Some(&Value(v0)), Some(v1), Some(&Value(v2))) => {
+            (0x06, 0x00, Some(Value(v0)), Some(v1), Some(Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
-                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
+                    (Some(Value(v3)), Some(Value(v4)), Some(Scalar(v5)), Some(Scalar(v6)), Some(Scalar(v7)), Some(Scalar(v8)), Some(Scalar(v9)), Some(Scalar(v10)), Some(Scalar(v11)), Some(Value(v12))) => {
                         let damage = match v1 {
                             Value(constant)        => Some(FloatValue::Constant (*constant as f32)),
                             Variable(ref variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
@@ -225,38 +225,38 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                         };
 
                         if let Some(damage) = damage {
-                            let v12u = v12 as u32;
+                            let v12u = *v12 as u32;
                             EventAst::CreateHitBox (HitBoxArguments {
-                                bone_index:                  (v0 >> 16) as i16,
-                                set_id:                      (v0 >> 8)  as u8,
-                                hitbox_id:                    v0        as u8,
+                                bone_index:                  (*v0 >> 16) as i16,
+                                set_id:                      (*v0 >> 8)  as u8,
+                                hitbox_id:                    *v0        as u8,
                                 damage,
-                                trajectory:                   v2,
-                                wdsk:                        (v3 >> 16) as i16,
-                                kbg:                          v3        as i16,
-                                shield_damage:               (v4 >> 16) as i16,
-                                bkb:                          v4        as i16,
-                                size:                         v5,
-                                x_offset:                     v6,
-                                y_offset:                     v7,
-                                z_offset:                     v8,
-                                tripping_rate:                v9,
-                                hitlag_mult:                  v10,
-                                sdi_mult:                     v11,
-                                effect:     HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                                unk1:                        (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                                sound_level:                ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
-                                unk2:                       ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
-                                sound:      HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
-                                unk3:                       ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                                ground:                      (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                                aerial:                      (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                                unk4:                       ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                                sse_type: HitBoxSseType::new((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
-                                clang:                       (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk5:                        (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                direct:                      (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk6:                      ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                                trajectory:                   *v2,
+                                wdsk:                        (*v3 >> 16) as i16,
+                                kbg:                          *v3        as i16,
+                                shield_damage:               (*v4 >> 16) as i16,
+                                bkb:                          *v4        as i16,
+                                size:                         *v5,
+                                x_offset:                     *v6,
+                                y_offset:                     *v7,
+                                z_offset:                     *v8,
+                                tripping_rate:                *v9,
+                                hitlag_mult:                  *v10,
+                                sdi_mult:                     *v11,
+                                effect:     HitBoxEffect::new(*v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                                unk1:                        (*v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                                sound_level:                ((*v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                                unk2:                       ((*v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                                sound:      HitBoxSound::new((*v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
+                                unk3:                       ((*v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                                ground:                      (*v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                                aerial:                      (*v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                                unk4:                       ((*v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                                sse_type: HitBoxSseType::new((*v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
+                                clang:                       (*v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk5:                        (*v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                direct:                      (*v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk6:                       ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                             })
                         } else {
                             EventAst::Unknown (event.clone())
@@ -265,120 +265,120 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
-            (0x06, 0x2B, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+            (0x06, 0x2B, Some(Value(v0)), Some(Value(v1)), Some(Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12)) {
-                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12))) => {
-                        let v12u = v12 as u32;
+                    (Some(Value(v3)), Some(Value(v4)), Some(Scalar(v5)), Some(Scalar(v6)), Some(Scalar(v7)), Some(Scalar(v8)), Some(Scalar(v9)), Some(Scalar(v10)), Some(Scalar(v11)), Some(Value(v12))) => {
+                        let v12u = *v12 as u32;
                         EventAst::ThrownHitBox (HitBoxArguments {
-                            bone_index:                  (v0 >> 16) as i16,
-                            set_id:                      (v0 >> 8)  as u8,
-                            hitbox_id:                    v0        as u8,
-                            damage:                       FloatValue::Constant (v1 as f32),
-                            trajectory:                   v2,
-                            wdsk:                        (v3 >> 16) as i16,
-                            kbg:                          v3        as i16,
-                            shield_damage:               (v4 >> 16) as i16,
-                            bkb:                          v4        as i16,
-                            size:                         v5,
-                            x_offset:                     v6,
-                            y_offset:                     v7,
-                            z_offset:                     v8,
-                            tripping_rate:                v9,
-                            hitlag_mult:                  v10,
-                            sdi_mult:                     v11,
-                            effect:     HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                            unk1:                        (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                            sound_level:                ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
-                            unk2:                       ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
-                            sound:      HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
-                            unk3:                       ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                            ground:                      (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                            aerial:                      (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                            unk4:                       ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                            sse_type: HitBoxSseType::new((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
-                            clang:                       (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                            unk5:                        (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                            direct:                      (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            bone_index:                  (*v0 >> 16) as i16,
+                            set_id:                      (*v0 >> 8)  as u8,
+                            hitbox_id:                    *v0        as u8,
+                            damage:                       FloatValue::Constant (*v1 as f32),
+                            trajectory:                   *v2,
+                            wdsk:                        (*v3 >> 16) as i16,
+                            kbg:                          *v3        as i16,
+                            shield_damage:               (*v4 >> 16) as i16,
+                            bkb:                          *v4        as i16,
+                            size:                         *v5,
+                            x_offset:                     *v6,
+                            y_offset:                     *v7,
+                            z_offset:                     *v8,
+                            tripping_rate:                *v9,
+                            hitlag_mult:                  *v10,
+                            sdi_mult:                     *v11,
+                            effect:     HitBoxEffect::new(*v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                            unk1:                        (*v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                            sound_level:                ((*v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                            unk2:                       ((*v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                            sound:      HitBoxSound::new((*v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 9),
+                            unk3:                       ((*v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                            ground:                      (*v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                            aerial:                      (*v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                            unk4:                       ((*v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                            sse_type: HitBoxSseType::new((*v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
+                            clang:                       (*v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                            unk5:                        (*v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                            direct:                      (*v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
                             unk6:                      ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                         })
                     }
                     _ => EventAst::Unknown (event.clone())
                 }
             }
-            (0x06, 0x15, Some(&Value(v0)), Some(v1), Some(&Value(v2))) => {
+            (0x06, 0x15, Some(Value(v0)), Some(v1), Some(Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14)) {
-                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Scalar(v5)), Some(&Scalar(v6)), Some(&Scalar(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Scalar(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Value(v14))) => {
+                    (Some(Value(v3)), Some(Value(v4)), Some(Scalar(v5)), Some(Scalar(v6)), Some(Scalar(v7)), Some(Scalar(v8)), Some(Scalar(v9)), Some(Scalar(v10)), Some(Scalar(v11)), Some(Value(v12)), Some(Value(v13)), Some(Value(v14))) => {
                         let damage = match v1 {
-                            Value(constant)        => Some(FloatValue::Constant (*constant as f32)),
-                            Variable(ref variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
+                            Value(constant)    => Some(FloatValue::Constant (*constant as f32)),
+                            Variable(variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
                             _ => None,
                         };
 
                         if let Some(damage) = damage {
-                            let v12u = v12 as u32;
-                            let v14u = v14 as u32;
+                            let v12u = *v12 as u32;
+                            let v14u = *v14 as u32;
                             EventAst::CreateSpecialHitBox (SpecialHitBoxArguments {
                                 hitbox_args: HitBoxArguments {
-                                    bone_index:                  (v0 >> 16) as i16,
-                                    set_id:                      (v0 >> 8)  as u8,
-                                    hitbox_id:                    v0        as u8,
+                                    bone_index:                  (*v0 >> 16) as i16,
+                                    set_id:                      (*v0 >> 8)  as u8,
+                                    hitbox_id:                    *v0        as u8,
                                     damage,
-                                    trajectory:                   v2,
-                                    wdsk:                        (v3 >> 16) as i16,
-                                    kbg:                          v3        as i16,
-                                    shield_damage:               (v4 >> 16) as i16,
-                                    bkb:                          v4        as i16,
-                                    size:                         v5,
-                                    x_offset:                     v6,
-                                    y_offset:                     v7,
-                                    z_offset:                     v8,
-                                    tripping_rate:                v9,
-                                    hitlag_mult:                  v10,
-                                    sdi_mult:                     v11,
-                                    effect:     HitBoxEffect::new(v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
-                                    unk1:                        (v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                                    sound_level:                ((v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
-                                    unk2:                       ((v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
-                                    sound:      HitBoxSound::new((v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 6),
-                                    unk3:                       ((v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
-                                    ground:                      (v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                                    aerial:                      (v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                                    unk4:                       ((v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
-                                    sse_type: HitBoxSseType::new((v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
-                                    clang:                       (v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                                    unk5:                        (v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                    direct:                      (v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                    unk6:                      ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
+                                    trajectory:                   *v2,
+                                    wdsk:                        (*v3 >> 16) as i16,
+                                    kbg:                          *v3        as i16,
+                                    shield_damage:               (*v4 >> 16) as i16,
+                                    bkb:                          *v4        as i16,
+                                    size:                         *v5,
+                                    x_offset:                     *v6,
+                                    y_offset:                     *v7,
+                                    z_offset:                     *v8,
+                                    tripping_rate:                *v9,
+                                    hitlag_mult:                  *v10,
+                                    sdi_mult:                     *v11,
+                                    effect:     HitBoxEffect::new(*v12 & 0b0000_0000_0000_0000_0000_0000_0001_1111),
+                                    unk1:                        (*v12 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                                    sound_level:                ((*v12 & 0b0000_0000_0000_0000_0000_0000_1100_0000) >> 6) as u8,
+                                    unk2:                       ((*v12 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0),
+                                    sound:      HitBoxSound::new((*v12 & 0b0000_0000_0000_0000_0011_1110_0000_0000) >> 6),
+                                    unk3:                       ((*v12 & 0b0000_0000_0000_0000_1100_0000_0000_0000) >> 14) as u8,
+                                    ground:                      (*v12 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                                    aerial:                      (*v12 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                                    unk4:                       ((*v12 & 0b0000_0000_0011_1100_0000_0000_0000_0000) >> 18) as u8,
+                                    sse_type: HitBoxSseType::new((*v12 & 0b0000_0111_1100_0000_0000_0000_0000_0000) >> 22),
+                                    clang:                       (*v12 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                                    unk5:                        (*v12 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                    direct:                      (*v12 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                    unk6:                       ((v12u & 0b1100_0000_0000_0000_0000_0000_0000_0000) >> 30) as u8,
                                 },
-                                rehit_rate: v13,
-                                angle_flipping: AngleFlip::new(v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
-                                unk1:                         (v14 & 0b0000_0000_0000_0000_0000_0000_0000_1000) != 0,
-                                stretches_to_bone:            (v14 & 0b0000_0000_0000_0000_0000_0000_0001_0000) != 0,
-                                unk2:                         (v14 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
-                                can_hit1:                     (v14 & 0b0000_0000_0000_0000_0000_0000_0100_0000) != 0,
-                                can_hit2:                     (v14 & 0b0000_0000_0000_0000_0000_0000_1000_0000) != 0,
-                                can_hit3:                     (v14 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0,
-                                can_hit4:                     (v14 & 0b0000_0000_0000_0000_0000_0010_0000_0000) != 0,
-                                can_hit5:                     (v14 & 0b0000_0000_0000_0000_0000_0100_0000_0000) != 0,
-                                can_hit6:                     (v14 & 0b0000_0000_0000_0000_0000_1000_0000_0000) != 0,
-                                can_hit7:                     (v14 & 0b0000_0000_0000_0000_0001_0000_0000_0000) != 0,
-                                can_hit8:                     (v14 & 0b0000_0000_0000_0000_0010_0000_0000_0000) != 0,
-                                can_hit9:                     (v14 & 0b0000_0000_0000_0000_0100_0000_0000_0000) != 0,
-                                can_hit10:                    (v14 & 0b0000_0000_0000_0000_1000_0000_0000_0000) != 0,
-                                can_hit11:                    (v14 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
-                                can_hit12:                    (v14 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
-                                can_hit13:                    (v14 & 0b0000_0000_0000_0100_0000_0000_0000_0000) != 0,
-                                enabled:                      (v14 & 0b0000_0000_0000_1000_0000_0000_0000_0000) != 0,
-                                unk3:                        ((v14 & 0b0000_0000_0011_0000_0000_0000_0000_0000) >> 20) as u8,
-                                can_be_shielded:              (v14 & 0b0000_0000_0100_0000_0000_0000_0000_0000) != 0,
-                                can_be_reflected:             (v14 & 0b0000_0000_1000_0000_0000_0000_0000_0000) != 0,
-                                can_be_absorbed:              (v14 & 0b0000_0001_0000_0000_0000_0000_0000_0000) != 0,
-                                unk4:                        ((v14 & 0b0000_0110_0000_0000_0000_0000_0000_0000) >> 25) as u8,
-                                remain_grabbed:               (v14 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
-                                ignore_invincibility:         (v14 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                freeze_frame_disable:         (v14 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                unk5:                         (v14 & 0b0100_0000_0000_0000_0000_0000_0000_0000) != 0,
-                                flinchless:                  (v14u & 0b1000_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                rehit_rate:                    *v13,
+                                angle_flipping: AngleFlip::new(*v14 & 0b0000_0000_0000_0000_0000_0000_0000_0111),
+                                unk1:                         (*v14 & 0b0000_0000_0000_0000_0000_0000_0000_1000) != 0,
+                                stretches_to_bone:            (*v14 & 0b0000_0000_0000_0000_0000_0000_0001_0000) != 0,
+                                unk2:                         (*v14 & 0b0000_0000_0000_0000_0000_0000_0010_0000) != 0,
+                                can_hit1:                     (*v14 & 0b0000_0000_0000_0000_0000_0000_0100_0000) != 0,
+                                can_hit2:                     (*v14 & 0b0000_0000_0000_0000_0000_0000_1000_0000) != 0,
+                                can_hit3:                     (*v14 & 0b0000_0000_0000_0000_0000_0001_0000_0000) != 0,
+                                can_hit4:                     (*v14 & 0b0000_0000_0000_0000_0000_0010_0000_0000) != 0,
+                                can_hit5:                     (*v14 & 0b0000_0000_0000_0000_0000_0100_0000_0000) != 0,
+                                can_hit6:                     (*v14 & 0b0000_0000_0000_0000_0000_1000_0000_0000) != 0,
+                                can_hit7:                     (*v14 & 0b0000_0000_0000_0000_0001_0000_0000_0000) != 0,
+                                can_hit8:                     (*v14 & 0b0000_0000_0000_0000_0010_0000_0000_0000) != 0,
+                                can_hit9:                     (*v14 & 0b0000_0000_0000_0000_0100_0000_0000_0000) != 0,
+                                can_hit10:                    (*v14 & 0b0000_0000_0000_0000_1000_0000_0000_0000) != 0,
+                                can_hit11:                    (*v14 & 0b0000_0000_0000_0001_0000_0000_0000_0000) != 0,
+                                can_hit12:                    (*v14 & 0b0000_0000_0000_0010_0000_0000_0000_0000) != 0,
+                                can_hit13:                    (*v14 & 0b0000_0000_0000_0100_0000_0000_0000_0000) != 0,
+                                enabled:                      (*v14 & 0b0000_0000_0000_1000_0000_0000_0000_0000) != 0,
+                                unk3:                        ((*v14 & 0b0000_0000_0011_0000_0000_0000_0000_0000) >> 20) as u8,
+                                can_be_shielded:              (*v14 & 0b0000_0000_0100_0000_0000_0000_0000_0000) != 0,
+                                can_be_reflected:             (*v14 & 0b0000_0000_1000_0000_0000_0000_0000_0000) != 0,
+                                can_be_absorbed:              (*v14 & 0b0000_0001_0000_0000_0000_0000_0000_0000) != 0,
+                                unk4:                        ((*v14 & 0b0000_0110_0000_0000_0000_0000_0000_0000) >> 25) as u8,
+                                remain_grabbed:               (*v14 & 0b0000_1000_0000_0000_0000_0000_0000_0000) != 0,
+                                ignore_invincibility:         (*v14 & 0b0001_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                freeze_frame_disable:         (*v14 & 0b0010_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                unk5:                         (*v14 & 0b0100_0000_0000_0000_0000_0000_0000_0000) != 0,
+                                flinchless:                   (v14u & 0b1000_0000_0000_0000_0000_0000_0000_0000) != 0,
                             })
                         } else {
                             EventAst::Unknown (event.clone())
@@ -387,85 +387,85 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     _ => EventAst::Unknown (event.clone())
                 }
             }
-            (0x06, 0x17, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+            (0x06, 0x17, Some(Value(v0)), Some(Value(v1)), Some(Value(v2))) => {
                 EventAst::DefensiveCollision {
-                    ty: DefensiveCollisionType::new(v0),
-                    unk: v1,
-                    direction: DefensiveCollisionDirection::new(v2),
+                    ty: DefensiveCollisionType::new(*v0),
+                    unk: *v1,
+                    direction: DefensiveCollisionDirection::new(*v2),
                 }
             }
-            (0x06, 0x1B, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
-                if let (Some(&Scalar(v3)), Some(&Scalar(v4))) = (args.get(3), args.get(4)) {
+            (0x06, 0x1B, Some(Value(v0)), Some(Value(v1)), Some(Scalar(v2))) => {
+                if let (Some(Scalar(v3)), Some(Scalar(v4))) = (args.get(3), args.get(4)) {
                     EventAst::MoveHitBox (MoveHitBox {
-                        hitbox_id:    v0,
-                        new_bone:     v1,
-                        new_x_offset: v2,
-                        new_y_offset: v3,
-                        new_z_offset: v4,
+                        hitbox_id:    *v0,
+                        new_bone:     *v1,
+                        new_x_offset: *v2,
+                        new_y_offset: *v3,
+                        new_z_offset: *v4,
                     })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x06, 0x01, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: v0, new_damage: v1 },
-            (0x06, 0x02, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: v0, new_size:   v1 },
-            (0x06, 0x03, Some(&Value(v0)), None,             None) => EventAst::DeleteHitBox (v0),
-            (0x06, 0x0A, Some(&Value(v0)), Some(&Value(v1)), Some(&Scalar(v2))) => {
-                if let (Some(&Scalar(v3)), Some(&Scalar(v4)), Some(&Scalar(v5)), Some(&Value(v6)), Some(&Value(v7))) =
+            (0x06, 0x01, Some(Value(v0)), Some(Value(v1)), None) => EventAst::ChangeHitBoxDamage { hitbox_id: *v0, new_damage: *v1 },
+            (0x06, 0x02, Some(Value(v0)), Some(Value(v1)), None) => EventAst::ChangeHitBoxSize   { hitbox_id: *v0, new_size:   *v1 },
+            (0x06, 0x03, Some(Value(v0)), None,            None) => EventAst::DeleteHitBox (*v0),
+            (0x06, 0x0A, Some(Value(v0)), Some(Value(v1)), Some(Scalar(v2))) => {
+                if let (Some(Scalar(v3)), Some(Scalar(v4)), Some(Scalar(v5)), Some(Value(v6)), Some(Value(v7))) =
                     (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7))
                 {
-                    let unk = if let Some(&Value(value)) = args.get(8) { Some(value) } else { None };
+                    let unk = if let Some(Value(value)) = args.get(8) { Some(*value) } else { None };
 
-                    assert!((0..=0xFF).contains(&v0), "grab boxes shouldn't include any extra data with the hitbox_id");
+                    assert!((0..=0xFF).contains(v0), "grab boxes shouldn't include any extra data with the hitbox_id");
 
                     EventAst::CreateGrabBox(GrabBoxArguments {
-                        hitbox_id:    v0,
-                        bone_index:   v1,
-                        size:         v2,
-                        x_offset:     v3,
-                        y_offset:     v4,
-                        z_offset:     v5,
-                        set_action:   v6,
-                        target:       GrabTarget::new(v7),
+                        hitbox_id:    *v0,
+                        bone_index:   *v1,
+                        size:         *v2,
+                        x_offset:     *v3,
+                        y_offset:     *v4,
+                        z_offset:     *v5,
+                        set_action:   *v6,
+                        target:       GrabTarget::new(*v7),
                         unk
                     })
                 } else {
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x06, 0x0C, Some(&Value(v0)), None, None) => EventAst::DeleteGrabBox (v0),
+            (0x06, 0x0C, Some(Value(v0)), None, None) => EventAst::DeleteGrabBox (*v0),
             (0x06, 0x0D, None,             None, None) => EventAst::DeleteAllGrabBoxes,
-            (0x06, 0x0E, Some(&Value(v0)), Some(&Value(v1)), Some(&Value(v2))) => {
+            (0x06, 0x0E, Some(Value(v0)), Some(Value(v1)), Some(Value(v2))) => {
                 match (args.get(3), args.get(4), args.get(5), args.get(6), args.get(7), args.get(8), args.get(9), args.get(10), args.get(11), args.get(12), args.get(13), args.get(14), args.get(15), args.get(16)) {
-                    (Some(&Value(v3)), Some(&Value(v4)), Some(&Value(v5)), Some(&Value(v6)), Some(&Value(v7)), Some(&Scalar(v8)), Some(&Scalar(v9)), Some(&Scalar(v10)), Some(&Value(v11)), Some(&Value(v12)), Some(&Value(v13)), Some(&Bool(v14)), Some(&Bool(v15)), Some(&Value(v16))) => {
+                    (Some(Value(v3)), Some(Value(v4)), Some(Value(v5)), Some(Value(v6)), Some(Value(v7)), Some(Scalar(v8)), Some(Scalar(v9)), Some(Scalar(v10)), Some(Value(v11)), Some(Value(v12)), Some(Value(v13)), Some(Bool(v14)), Some(Bool(v15)), Some(Value(v16))) => {
                         EventAst::SpecifyThrow (SpecifyThrow {
-                            throw_use:   ThrowUse::new(v0),
-                            bone:        v1,
-                            damage:      v2,
-                            trajectory:  v3,
-                            kbg:         v4,
-                            wdsk:        v5,
-                            bkb:         v6,
-                            effect:      HitBoxEffect::new(v7),
-                            unk0:        v8,
-                            unk1:        v9,
-                            unk2:        v10,
-                            unk3:        v11,
-                            sfx:         HitBoxSound::new(v12),
-                            grab_target: GrabTarget::new(v13),
-                            unk4:        v14,
-                            unk5:        v15,
-                            i_frames:    v16,
+                            throw_use:   ThrowUse::new(*v0),
+                            bone:        *v1,
+                            damage:      *v2,
+                            trajectory:  *v3,
+                            kbg:         *v4,
+                            wdsk:        *v5,
+                            bkb:         *v6,
+                            effect:      HitBoxEffect::new(*v7),
+                            unk0:        *v8,
+                            unk1:        *v9,
+                            unk2:        *v10,
+                            unk3:        *v11,
+                            sfx:         HitBoxSound::new(*v12),
+                            grab_target: GrabTarget::new(*v13),
+                            unk4:        *v14,
+                            unk5:        *v15,
+                            i_frames:    *v16,
                         })
                     }
                     _ => EventAst::Unknown(event.clone())
                 }
             }
-            (0x06, 0x0F, Some(&Value(v0)), Some(&Value(v1)), Some(&Variable(ref v2))) => {
-                if let (Some(&Variable(ref v3)), Some(&Variable(ref v4))) = (args.get(3), args.get(4)) {
+            (0x06, 0x0F, Some(Value(v0)), Some(Value(v1)), Some(Variable(v2))) => {
+                if let (Some(Variable(v3)), Some(Variable(v4))) = (args.get(3), args.get(4)) {
                     EventAst::ApplyThrow (ApplyThrow {
-                        unk0: v0,
-                        bone: v1,
+                        unk0: *v0,
+                        bone: *v1,
                         unk1: VariableAst::new(v2),
                         unk2: VariableAst::new(v3),
                         unk3: VariableAst::new(v4),
@@ -474,14 +474,14 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     EventAst::Unknown(event.clone())
                 }
             }
-            (0x06, 0x14, Some(&Value(v0)), Some(v1), None) => {
+            (0x06, 0x14, Some(Value(v0)), Some(v1), None) => {
                 let add_damage = match v1 {
                     Value(constant)        => Some(FloatValue::Constant (*constant as f32)),
-                    Variable(ref variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
+                    Variable(variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
                     _ => None,
                 };
                 if let Some(add_damage) = add_damage {
-                    EventAst::AddHitBoxDamage { hitbox_id: v0, add_damage }
+                    EventAst::AddHitBoxDamage { hitbox_id: *v0, add_damage }
                 } else {
                     EventAst::Unknown(event.clone())
                 }
@@ -489,40 +489,40 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x06, 0x14, a,                b,                c,  ) => panic!("{:?} {:?} {:?}", a , b, c),
 
             // hurtboxes
-            (0x06, 0x05, Some(&Value(v0)), None,             None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(v0) },
-            (0x06, 0x08, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ChangeHurtBoxStateSpecific { bone: v0, state: HurtBoxState::new(v1) },
-            (0x06, 0x06, Some(&Value(v0)), None,             None) => {
-                if v0 != 0 {
+            (0x06, 0x05, Some(Value(v0)), None,            None) => EventAst::ChangeHurtBoxStateAll { state: HurtBoxState::new(*v0) },
+            (0x06, 0x08, Some(Value(v0)), Some(Value(v1)), None) => EventAst::ChangeHurtBoxStateSpecific { bone: *v0, state: HurtBoxState::new(*v1) },
+            (0x06, 0x06, Some(Value(v0)), None,            None) => {
+                if *v0 != 0 {
                     error!("Unsual UnchangeHurtBoxStateSpecific argument: All known cases of this event have an argument of 0")
                 }
                 EventAst::UnchangeHurtBoxStateSpecific
             }
 
             // controller
-            (0x07, 0x00, None,              None,              None) => EventAst::ControllerClearBuffer,
-            (0x07, 0x01, None,              None,              None) => EventAst::ControllerUnk01,
-            (0x07, 0x02, None,              None,              None) => EventAst::ControllerUnk02,
-            (0x07, 0x06, Some(&Bool(v0)),   None,              None) => EventAst::ControllerUnk06 (v0),
-            (0x07, 0x06, None,              None,              None) => EventAst::ControllerUnk0C,
-            (0x07, 0x07, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::Rumble { unk1: v0, unk2: v1 },
-            (0x07, 0x0B, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::RumbleLoop { unk1: v0, unk2: v1 },
+            (0x07, 0x00, None,             None,            None) => EventAst::ControllerClearBuffer,
+            (0x07, 0x01, None,             None,            None) => EventAst::ControllerUnk01,
+            (0x07, 0x02, None,             None,            None) => EventAst::ControllerUnk02,
+            (0x07, 0x06, Some(Bool(v0)),   None,            None) => EventAst::ControllerUnk06 (*v0),
+            (0x07, 0x06, None,             None,            None) => EventAst::ControllerUnk0C,
+            (0x07, 0x07, Some(Value(v0)),  Some(Value(v1)), None) => EventAst::Rumble { unk1: *v0, unk2: *v1 },
+            (0x07, 0x0B, Some(Value(v0)),  Some(Value(v1)), None) => EventAst::RumbleLoop { unk1: *v0, unk2: *v1 },
 
             // misc
-            (0x18, 0x00, Some(&Value(v0)),  None,              None) => EventAst::SlopeContourStand { leg_bone_parent: v0 },
-            (0x18, 0x01, Some(&Value(v0)),  Some(&Value(v1)),  None) => EventAst::SlopeContourFull { hip_n_or_top_n: v0, trans_bone: v1 },
-            (0x10, 0x00, Some(&Value(v0)),  None,              None) => EventAst::GenerateArticle { article_id: v0, subaction_only: true }, // TODO: subaction_only?
-            (0x10, 0x00, Some(&Value(v0)),  Some(&Bool(v1)),   None) => EventAst::GenerateArticle { article_id: v0, subaction_only: v1 },
-            (0x10, 0x01, Some(&Value(v0)),  None,              None) => EventAst::ArticleEvent (v0),
-            (0x10, 0x02, Some(&Value(v0)),  None,              None) => EventAst::ArticleAnimation (v0),
-            (0x10, 0x03, Some(&Value(v0)),  None,              None) => EventAst::ArticleRemove (v0),
-            (0x10, 0x05, Some(&Value(v0)),  Some(&Bool(v1)),   None) => EventAst::ArticleVisibility { article_id: v0, visibility: v1 },
-            (0x0C, 0x06, None,              None,              None) => EventAst::FinalSmashEnter,
-            (0x0C, 0x07, None,              None,              None) => EventAst::FinalSmashExit,
-            (0x0C, 0x08, None,              None,              None) => EventAst::TerminateSelf,
-            (0x0C, 0x09, Some(&Value(v0)),  None,              None) => EventAst::LedgeGrabEnable (LedgeGrabEnable::new(v0)),
-            (0x0C, 0x25, Some(&Bool(v0)),   None,              None) => EventAst::TagDisplay (v0),
-            (0x1E, 0x00, Some(&Value(v0)),  Some(&Scalar(v1)), None) => EventAst::Armor { armor_type: ArmorType::new(v0), tolerance: v1 },
-            (0x1E, 0x03, Some(&Scalar(v0)), None,              None) => EventAst::AddDamage (v0),
+            (0x18, 0x00, Some(Value(v0)),  None,             None) => EventAst::SlopeContourStand { leg_bone_parent: *v0 },
+            (0x18, 0x01, Some(Value(v0)),  Some(Value(v1)),  None) => EventAst::SlopeContourFull { hip_n_or_top_n: *v0, trans_bone: *v1 },
+            (0x10, 0x00, Some(Value(v0)),  None,             None) => EventAst::GenerateArticle { article_id: *v0, subaction_only: true }, // TODO: subaction_only?
+            (0x10, 0x00, Some(Value(v0)),  Some(Bool(v1)),   None) => EventAst::GenerateArticle { article_id: *v0, subaction_only: *v1 },
+            (0x10, 0x01, Some(Value(v0)),  None,             None) => EventAst::ArticleEvent (*v0),
+            (0x10, 0x02, Some(Value(v0)),  None,             None) => EventAst::ArticleAnimation (*v0),
+            (0x10, 0x03, Some(Value(v0)),  None,             None) => EventAst::ArticleRemove (*v0),
+            (0x10, 0x05, Some(Value(v0)),  Some(Bool(v1)),   None) => EventAst::ArticleVisibility { article_id: *v0, visibility: *v1 },
+            (0x0C, 0x06, None,             None,             None) => EventAst::FinalSmashEnter,
+            (0x0C, 0x07, None,             None,             None) => EventAst::FinalSmashExit,
+            (0x0C, 0x08, None,             None,             None) => EventAst::TerminateSelf,
+            (0x0C, 0x09, Some(Value(v0)),  None,             None) => EventAst::LedgeGrabEnable (LedgeGrabEnable::new(*v0)),
+            (0x0C, 0x25, Some(Bool(v0)),   None,             None) => EventAst::TagDisplay (*v0),
+            (0x1E, 0x00, Some(Value(v0)),  Some(Scalar(v1)), None) => EventAst::Armor { armor_type: ArmorType::new(*v0), tolerance: *v1 },
+            (0x1E, 0x03, Some(Scalar(v0)), None,             None) => EventAst::AddDamage (*v0),
 
             // posture
             (0x05, 0x01, None, None, None) => EventAst::Posture (0x01),
@@ -545,48 +545,48 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     EventAst::Unknown (event.clone())
                 }
             }
-            (0x0E, 0x08, Some(&Scalar(v0)),       Some(&Scalar(v1)),       None) => EventAst::SetVelocity { x_vel: v0, y_vel: v1 },
-            (0x0E, 0x01, Some(&Scalar(v0)),       Some(&Scalar(v1)),       None) => EventAst::AddVelocity { x_vel: FloatValue::Constant(v0),                   y_vel: FloatValue::Constant(v1) },
-            (0x0E, 0x01, Some(&Variable(ref v0)), Some(&Scalar(v1)),       None) => EventAst::AddVelocity { x_vel: FloatValue::Variable(VariableAst::new(v0)), y_vel: FloatValue::Constant(v1) },
-            (0x0E, 0x01, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::AddVelocity { x_vel: FloatValue::Constant(v0),                   y_vel: FloatValue::Variable(VariableAst::new(v1)) },
-            (0x0E, 0x01, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::AddVelocity { x_vel: FloatValue::Variable(VariableAst::new(v0)), y_vel: FloatValue::Variable(VariableAst::new(v1)) },
-            (0x0E, 0x06, Some(&Value(v0)),        None,                    None) => EventAst::DisableMovement (DisableMovement::new(v0)),
-            (0x0E, 0x07, Some(&Value(v0)),        None,                    None) => EventAst::DisableMovement2 (DisableMovement::new(v0)),
-            (0x0E, 0x02, Some(&Value(v0)),        None,                    None) => EventAst::ResetVerticalVelocityAndAcceleration (v0 == 1),
-            (0x17, 0x00, None,                    None,                    None) => EventAst::NormalizePhysics,
+            (0x0E, 0x08, Some(Scalar(v0)),   Some(Scalar(v1)),   None) => EventAst::SetVelocity { x_vel: *v0, y_vel: *v1 },
+            (0x0E, 0x01, Some(Scalar(v0)),   Some(Scalar(v1)),   None) => EventAst::AddVelocity { x_vel: FloatValue::Constant(*v0),                  y_vel: FloatValue::Constant(*v1) },
+            (0x0E, 0x01, Some(Variable(v0)), Some(Scalar(v1)),   None) => EventAst::AddVelocity { x_vel: FloatValue::Variable(VariableAst::new(v0)), y_vel: FloatValue::Constant(*v1) },
+            (0x0E, 0x01, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::AddVelocity { x_vel: FloatValue::Constant(*v0),                  y_vel: FloatValue::Variable(VariableAst::new(v1)) },
+            (0x0E, 0x01, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::AddVelocity { x_vel: FloatValue::Variable(VariableAst::new(v0)), y_vel: FloatValue::Variable(VariableAst::new(v1)) },
+            (0x0E, 0x06, Some(Value(v0)),    None,               None) => EventAst::DisableMovement (DisableMovement::new(*v0)),
+            (0x0E, 0x07, Some(Value(v0)),    None,               None) => EventAst::DisableMovement2 (DisableMovement::new(*v0)),
+            (0x0E, 0x02, Some(Value(v0)),    None,               None) => EventAst::ResetVerticalVelocityAndAcceleration (*v0 == 1),
+            (0x17, 0x00, None,               None,               None) => EventAst::NormalizePhysics,
 
             // sound
-            (0x0A, 0x00, Some(&Value(v0)), None, None) => EventAst::SoundEffect1 (v0),
-            (0x0A, 0x01, Some(&Value(v0)), None, None) => EventAst::SoundEffect2 (v0),
-            (0x0A, 0x02, Some(&Value(v0)), None, None) => EventAst::SoundEffectTransient (v0),
-            (0x0A, 0x03, Some(&Value(v0)), None, None) => EventAst::SoundEffectStop (v0),
-            (0x0A, 0x05, Some(&Value(v0)), None, None) => EventAst::SoundEffectVictory (v0),
-            (0x0A, 0x07, Some(&Value(v0)), None, None) => EventAst::SoundEffectUnk (v0),
-            (0x0A, 0x09, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther1 (v0),
-            (0x0A, 0x0A, Some(&Value(v0)), None, None) => EventAst::SoundEffectOther2 (v0),
-            (0x0C, 0x0B, None,             None, None) => EventAst::SoundVoiceLow,
-            (0x0C, 0x19, None,             None, None) => EventAst::SoundVoiceDamage,
-            (0x0C, 0x1D, None,             None, None) => EventAst::SoundVoiceOttotto,
-            (0x0C, 0x1F, None,             None, None) => EventAst::SoundVoiceEating,
+            (0x0A, 0x00, Some(Value(v0)), None, None) => EventAst::SoundEffect1 (*v0),
+            (0x0A, 0x01, Some(Value(v0)), None, None) => EventAst::SoundEffect2 (*v0),
+            (0x0A, 0x02, Some(Value(v0)), None, None) => EventAst::SoundEffectTransient (*v0),
+            (0x0A, 0x03, Some(Value(v0)), None, None) => EventAst::SoundEffectStop (*v0),
+            (0x0A, 0x05, Some(Value(v0)), None, None) => EventAst::SoundEffectVictory (*v0),
+            (0x0A, 0x07, Some(Value(v0)), None, None) => EventAst::SoundEffectUnk (*v0),
+            (0x0A, 0x09, Some(Value(v0)), None, None) => EventAst::SoundEffectOther1 (*v0),
+            (0x0A, 0x0A, Some(Value(v0)), None, None) => EventAst::SoundEffectOther2 (*v0),
+            (0x0C, 0x0B, None,            None, None) => EventAst::SoundVoiceLow,
+            (0x0C, 0x19, None,            None, None) => EventAst::SoundVoiceDamage,
+            (0x0C, 0x1D, None,            None, None) => EventAst::SoundVoiceOttotto,
+            (0x0C, 0x1F, None,            None, None) => EventAst::SoundVoiceEating,
 
             // Modify variables
-            (0x12, 0x00, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableSet { value: v0, variable: VariableAst::new(v1) },
-            (0x12, 0x01, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableAdd { value: v0, variable: VariableAst::new(v1) },
-            (0x12, 0x02, Some(&Value(v0)),        Some(&Variable(ref v1)), None) => EventAst::IntVariableSubtract { value: v0, variable: VariableAst::new(v1) },
-            (0x12, 0x03, Some(&Variable(ref v0)), None,                    None) => EventAst::IntVariableIncrement { variable: VariableAst::new(v0) },
-            (0x12, 0x04, Some(&Variable(ref v0)), None,                    None) => EventAst::IntVariableDecrement { variable: VariableAst::new(v0) },
-            (0x12, 0x06, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableSet      { value: FloatValue::Constant(v0),                   variable: VariableAst::new(v1) },
-            (0x12, 0x06, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::FloatVariableSet      { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
-            (0x12, 0x07, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableAdd      { value: FloatValue::Constant(v0),                   variable: VariableAst::new(v1) },
-            (0x12, 0x07, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::FloatVariableAdd      { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
-            (0x12, 0x08, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableSubtract { value: FloatValue::Constant(v0),                   variable: VariableAst::new(v1) },
-            (0x12, 0x08, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::FloatVariableSubtract { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
-            (0x12, 0x0F, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableMultiply { value: FloatValue::Constant(v0),                   variable: VariableAst::new(v1) },
-            (0x12, 0x0F, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::FloatVariableMultiply { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
-            (0x12, 0x10, Some(&Scalar(v0)),       Some(&Variable(ref v1)), None) => EventAst::FloatVariableDivide   { value: FloatValue::Constant(v0),                   variable: VariableAst::new(v1) },
-            (0x12, 0x10, Some(&Variable(ref v0)), Some(&Variable(ref v1)), None) => EventAst::FloatVariableDivide   { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
-            (0x12, 0x0A, Some(&Variable(ref v0)), None,                    None) => EventAst::BoolVariableSetTrue { variable: VariableAst::new(v0) },
-            (0x12, 0x0B, Some(&Variable(ref v0)), None,                    None) => EventAst::BoolVariableSetFalse { variable: VariableAst::new(v0) },
+            (0x12, 0x00, Some(Value(v0)),    Some(Variable(v1)), None) => EventAst::IntVariableSet        { value: *v0, variable: VariableAst::new(v1) },
+            (0x12, 0x01, Some(Value(v0)),    Some(Variable(v1)), None) => EventAst::IntVariableAdd        { value: *v0, variable: VariableAst::new(v1) },
+            (0x12, 0x02, Some(Value(v0)),    Some(Variable(v1)), None) => EventAst::IntVariableSubtract   { value: *v0, variable: VariableAst::new(v1) },
+            (0x12, 0x03, Some(Variable(v0)), None,               None) => EventAst::IntVariableIncrement  { variable: VariableAst::new(v0) },
+            (0x12, 0x04, Some(Variable(v0)), None,               None) => EventAst::IntVariableDecrement  { variable: VariableAst::new(v0) },
+            (0x12, 0x06, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::FloatVariableSet      { value: FloatValue::Constant(*v0),                   variable: VariableAst::new(v1) },
+            (0x12, 0x06, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::FloatVariableSet      { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
+            (0x12, 0x07, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::FloatVariableAdd      { value: FloatValue::Constant(*v0),                   variable: VariableAst::new(v1) },
+            (0x12, 0x07, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::FloatVariableAdd      { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
+            (0x12, 0x08, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::FloatVariableSubtract { value: FloatValue::Constant(*v0),                   variable: VariableAst::new(v1) },
+            (0x12, 0x08, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::FloatVariableSubtract { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
+            (0x12, 0x0F, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::FloatVariableMultiply { value: FloatValue::Constant(*v0),                   variable: VariableAst::new(v1) },
+            (0x12, 0x0F, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::FloatVariableMultiply { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
+            (0x12, 0x10, Some(Scalar(v0)),   Some(Variable(v1)), None) => EventAst::FloatVariableDivide   { value: FloatValue::Constant(*v0),                   variable: VariableAst::new(v1) },
+            (0x12, 0x10, Some(Variable(v0)), Some(Variable(v1)), None) => EventAst::FloatVariableDivide   { value: FloatValue::Variable(VariableAst::new(v0)), variable: VariableAst::new(v1) },
+            (0x12, 0x0A, Some(Variable(v0)), None,               None) => EventAst::BoolVariableSetTrue   { variable: VariableAst::new(v0) },
+            (0x12, 0x0B, Some(Variable(v0)), None,               None) => EventAst::BoolVariableSetFalse  { variable: VariableAst::new(v0) },
 
             // graphics
             (0x0B, 0x00, Some(&Value(v0)), Some(&Value(v1)), None) => EventAst::ModelChanger { reference: 0, switch_index: v0, bone_group_index: v1 },
@@ -805,26 +805,26 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                 } else {
                     EventAst::Unknown (event.clone())
                 },
-            (0x1F, 0x01, Some(&Variable(ref v0)), Some(&Variable(ref v1)), Some(&Variable(ref v2))) =>
-                if let (Some(&Variable(ref v3)), Some(&Variable(ref v4))) = (args.get(3), args.get(4)) {
+            (0x1F, 0x01, Some(Variable(v0)), Some(Variable(v1)), Some(Variable(v2))) =>
+                if let (Some(Variable(v3)), Some(Variable(v4))) = (args.get(3), args.get(4)) {
                     EventAst::ItemThrow { unk1: VariableAst::new(v0), unk2: VariableAst::new(v1), unk3: VariableAst::new(v2), unk4: Some(VariableAst::new(v3)), unk5: Some(VariableAst::new(v4)) }
                 } else {
                     EventAst::Unknown (event.clone())
                 },
-            (0x1F, 0x0E, Some(&Variable(ref v0)), Some(&Variable(ref v1)), Some(&Variable(ref v2)))
+            (0x1F, 0x0E, Some(Variable(v0)), Some(Variable(v1)), Some(Variable(v2)))
                 => EventAst::ItemThrow { unk1: VariableAst::new(v0), unk2: VariableAst::new(v1), unk3: VariableAst::new(v2), unk4: None, unk5: None },
-            (0x1F, 0x01, Some(&Scalar(v0)), Some(&Scalar(v1)), Some(&Variable(ref v2))) =>
-                    EventAst::ItemThrow2 { unk1: v0, unk2: v1, unk3: VariableAst::new(v2) },
-            (0x1F, 0x02, None,             None,              None) => EventAst::ItemDrop,
-            (0x1F, 0x03, Some(&Value(v0)), None,              None) => EventAst::ItemConsume { unk: v0 },
-            (0x1F, 0x04, Some(&Value(v0)), Some(&Scalar(v1)), None) => EventAst::ItemSetProperty { unk1: v0, unk2: v1 },
-            (0x1F, 0x05, None,             None,              None) => EventAst::FireWeapon,
-            (0x1F, 0x06, None,             None,              None) => EventAst::FireProjectile,
-            (0x1F, 0x07, Some(&Value(v0)), None,              None) => EventAst::Item1F { unk: v0 },
-            (0x1F, 0x08, Some(&Value(v0)), None,              None) => EventAst::ItemCreate { unk: v0 },
-            (0x1F, 0x09, Some(&Bool(v0)),  None,              None) => EventAst::ItemVisibility (v0),
-            (0x1F, 0x0A, None,             None,              None) => EventAst::ItemDelete,
-            (0x1F, 0x0C, Some(&Value(v0)), None,              None) => EventAst::BeamSwordTrail { unk: v0 },
+            (0x1F, 0x01, Some(Scalar(v0)), Some(Scalar(v1)), Some(Variable(v2))) =>
+                    EventAst::ItemThrow2 { unk1: *v0, unk2: *v1, unk3: VariableAst::new(v2) },
+            (0x1F, 0x02, None,            None,             None) => EventAst::ItemDrop,
+            (0x1F, 0x03, Some(Value(v0)), None,             None) => EventAst::ItemConsume { unk: *v0 },
+            (0x1F, 0x04, Some(Value(v0)), Some(Scalar(v1)), None) => EventAst::ItemSetProperty { unk1: *v0, unk2: *v1 },
+            (0x1F, 0x05, None,            None,             None) => EventAst::FireWeapon,
+            (0x1F, 0x06, None,            None,             None) => EventAst::FireProjectile,
+            (0x1F, 0x07, Some(Value(v0)), None,             None) => EventAst::Item1F { unk: *v0 },
+            (0x1F, 0x08, Some(Value(v0)), None,             None) => EventAst::ItemCreate { unk: *v0 },
+            (0x1F, 0x09, Some(Bool(v0)),  None,             None) => EventAst::ItemVisibility (*v0),
+            (0x1F, 0x0A, None,            None,             None) => EventAst::ItemDelete,
+            (0x1F, 0x0C, Some(Value(v0)), None,             None) => EventAst::BeamSwordTrail { unk: *v0 },
             _ => EventAst::Unknown (event.clone())
         };
         // Brawlbox has some extra parameter types it uses to handle some special cases:
