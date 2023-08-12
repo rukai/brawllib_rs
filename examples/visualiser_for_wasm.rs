@@ -18,7 +18,6 @@ pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::High
     use brawllib_rs::renderer::app::state::{AppEventIncoming, State};
     use brawllib_rs::renderer::app::App;
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
     use web_sys::HtmlElement;
 
     let document = web_sys::window().unwrap().document().unwrap();

@@ -10,7 +10,7 @@ keywords = ["super", "smash", "bros", "brawl", "lib"]
 categories = ["games", "game-engines"]
 
 [dependencies]
-bitflags = "1"
+bitflags = { version = "2" , features = ["serde"]}
 byteorder = "1"
 cgmath = { version = "0.18", features = ["mint", "serde"] }
 log = "0.4"

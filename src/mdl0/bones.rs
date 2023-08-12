@@ -213,6 +213,7 @@ impl Bone {
 }
 
 bitflags! {
+    #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
     #[rustfmt::skip]
     pub struct BoneFlags: u32 {
         /// Needs to match what this bones transformation does. Identity matrix.

@@ -325,7 +325,7 @@ pub struct FighterAttributes {
 }
 
 bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
     #[rustfmt::skip]
     pub struct AnimationFlags: u8 {
         const NONE                      = 0x0;
