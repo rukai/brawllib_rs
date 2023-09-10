@@ -29,7 +29,7 @@ futures = "0.3"
 bytemuck = { version = "1", features = ["derive"] }
 
 # wasm
-console_log = "0.2"
+console_log = "1.0"
 console_error_panic_hook = "0.1"
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
