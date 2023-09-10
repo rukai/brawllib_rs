@@ -163,7 +163,7 @@ impl App {
         }
 
         if self.input.update(&event) {
-            if self.input.quit() {
+            if self.input.close_requested() || self.input.destroyed() {
                 *control_flow = ControlFlow::Exit;
             }
             self.app_state.update(
