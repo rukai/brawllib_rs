@@ -1,4 +1,5 @@
 # brawllib\_rs
+
 [![dependency status](https://deps.rs/repo/github/rukai/brawllib_rs/status.svg)](https://deps.rs/repo/github/rukai/brawllib_rs)
 [![Crates.io](https://img.shields.io/crates/v/brawllib_rs.svg)](https://crates.io/crates/brawllib_rs)
 [![Released API docs](https://docs.rs/brawllib_rs/badge.svg)](https://docs.rs/brawllib_rs)
@@ -10,10 +11,11 @@ Doesn't support modifying files, only reading, processing and rendering them.
 ## Example
 
 In this example we:
-*   Create a `BrawlMod` from the a brawl mod sd card folder and a brawl dump folder.
-*   Load `Fighter`s from the brawl_mod.
+
+* Create a `BrawlMod` from a brawl mod sd card folder and a brawl dump folder.
+* Load `Fighter`s from the brawl_mod.
     This is the raw data from the fighter folder, stored in a tree of structs.
-*   Create a `HighLevelFighter` from an exported brawl fighter directory.
+* Create a `HighLevelFighter` from an exported brawl fighter directory.
     This contains processed data from the `Fighter` struct, stored in a tree of structs.
 
 ```rust

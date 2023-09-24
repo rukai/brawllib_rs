@@ -40,7 +40,10 @@ pub enum CompatibleSurface<'a> {
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
-        let instance = wgpu::Instance::new(wgpu::Backends::PRIMARY);
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            dx12_shader_compiler: wgpu::Dx12Compiler::default(),
+        });
         WgpuState::new(
             instance,
             CompatibleSurface::Headless(wgpu::TextureFormat::Rgba8UnormSrgb),
@@ -74,14 +77,14 @@ impl WgpuState {
             .unwrap();
 
         let format = match compatible_surface {
-            CompatibleSurface::Surface(surface) => surface.get_supported_formats(&adapter)[0],
+            CompatibleSurface::Surface(surface) => surface.get_capabilities(&adapter).formats[0],
             CompatibleSurface::Headless(format) => format,
         };
 
         // Once we move to webgpu backend instead of webgl we can enable this
-        #[cfg(not(target_arch = "wasm32"))]
-        let features = wgpu::Features::empty().union(wgpu::Features::POLYGON_MODE_LINE);
-        #[cfg(target_arch = "wasm32")]
+        // #[cfg(not(target_arch = "wasm32"))]
+        // let features = wgpu::Features::empty().union(wgpu::Features::POLYGON_MODE_LINE);
+        // #[cfg(target_arch = "wasm32")]
         let features = wgpu::Features::empty();
 
         let device_descriptor = wgpu::DeviceDescriptor {
@@ -125,9 +128,9 @@ impl WgpuState {
             &shader_module,
             &pipeline_layout,
             // Once we move to webgpu backend instead of webgl we can enable this
-            #[cfg(not(target_arch = "wasm32"))]
-            wgpu::PolygonMode::Line,
-            #[cfg(target_arch = "wasm32")]
+            // #[cfg(not(target_arch = "wasm32"))]
+            // wgpu::PolygonMode::Line,
+            // #[cfg(target_arch = "wasm32")]
             wgpu::PolygonMode::Fill,
         );
         let render_pipeline_fill = WgpuState::render_pipeline(
@@ -177,6 +180,7 @@ impl WgpuState {
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             label: None,
+            view_formats: &[],
         };
         let multisampled_framebuffer = device.create_texture(&multisampled_framebuffer_descriptor);
 

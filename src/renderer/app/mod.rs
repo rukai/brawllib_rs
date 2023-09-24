@@ -71,8 +71,8 @@ impl App {
         let input = WinitInputHelper::new();
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new(wgpu::Backends::all());
-        let surface = unsafe { instance.create_surface(&window) };
+        let instance = wgpu::Instance::default();
+        let surface = unsafe { instance.create_surface(&window).unwrap() };
         let wgpu_state = WgpuState::new(
             instance,
             CompatibleSurface::Surface(&surface),
@@ -87,11 +87,17 @@ impl App {
 
         let surface_configuration = wgpu::SurfaceConfiguration {
             format: wgpu_state.format,
+            // does not work on desktop as we immediately write the 3 frames then timeout waiting for the next frame
+            #[cfg(target_arch = "wasm32")]
             present_mode: wgpu::PresentMode::Fifo,
+            // does not work on webgl as it does not support Immediate
+            #[cfg(not(target_arch = "wasm32"))]
+            present_mode: wgpu::PresentMode::Immediate,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             width: size.width,
             height: size.height,
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
+            view_formats: vec![],
         };
         surface.configure(&wgpu_state.device, &surface_configuration);
 
@@ -141,7 +147,9 @@ impl App {
     /// Manually update the app state, call this instead of `App::run` if you need to maintain control of the event loop.
     pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
         if let Event::RedrawRequested(_) = event {
-            // app loop relies on this blocking until draw completes due to PresentMode::Fifo
+            // app loop relies on this blocking until draw completes due to PresentMode configuration.
+            // Currently we rely on PresentMode::Immediate on desktop which in theory should not work as it does not block.
+            // We had to swap to it because PresentMode::Fifo times out which is possibly a wgpu bug.
             let frame = self.surface.get_current_texture().unwrap();
             let command_encoder = draw_frame(
                 &mut self.wgpu_state,

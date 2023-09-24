@@ -1,4 +1,3 @@
-use std::num::NonZeroU32;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread;
@@ -64,6 +63,7 @@ pub fn render_gif(
             format: state.format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
             label: None,
+            view_formats: &[],
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
@@ -96,7 +96,7 @@ pub fn render_gif(
             buffer: &framebuffer_out,
             layout: wgpu::ImageDataLayout {
                 offset: 0,
-                bytes_per_row: Some(NonZeroU32::new(padded_bytes_per_row).unwrap()),
+                bytes_per_row: Some(padded_bytes_per_row),
                 rows_per_image: None,
             },
         };
