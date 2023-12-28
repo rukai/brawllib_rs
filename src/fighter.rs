@@ -276,7 +276,7 @@ impl Fighter {
 
     /// retrieves the bones from a character model
     pub fn get_bones(&self) -> Option<&Bone> {
-        if let Some(model) = self.models.get(0) {
+        if let Some(model) = self.models.first() {
             for sub_arc in model.children.iter() {
                 match &sub_arc.data {
                     ArcChildData::Arc(_) => {

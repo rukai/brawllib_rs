@@ -79,7 +79,7 @@ fn main() {
     for fighter in fighters {
         if fighter.cased_name.to_lowercase() == fighter_name.to_lowercase() {
             let hl_fighter = HighLevelFighter::new(&fighter);
-            for (_i, subaction) in hl_fighter.subactions.iter().enumerate() {
+            for subaction in hl_fighter.subactions.iter() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
                     // this example only exports a single subaction_data.bin file
                     // rukaidata project will be responsible for mass exporting subactions for all characters for all mods
