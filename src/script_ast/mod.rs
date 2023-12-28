@@ -39,7 +39,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
     while let Some(event) = events.next() {
         let args = &event.arguments;
         use crate::script::Argument::*;
-        let event_ast = match (event.namespace, event.code, args.get(0), args.get(1), args.get(2)) {
+        let event_ast = match (event.namespace, event.code, args.first(), args.get(1), args.get(2)) {
             (0x00, 0x01, Some(Scalar(v0)), None, None) => EventAst::SyncWait (*v0),
             (0x00, 0x02, None,             None, None) => EventAst::Nop,
             (0x00, 0x02, Some(Scalar(v0)), None, None) => EventAst::AsyncWait (*v0),

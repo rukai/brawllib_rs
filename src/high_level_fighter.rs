@@ -424,7 +424,7 @@ impl HighLevelFighter {
                             let ledge_grab_box = if script_runner.ledge_grab_enable.enabled() {
                                 // The first misc.ledge_grabs entry seems to be used for everything, not sure what the other entries are for.
                                 if let Some(ledge_grab_box) =
-                                    fighter_data.misc.ledge_grab_boxes.get(0)
+                                    fighter_data.misc.ledge_grab_boxes.first()
                                 {
                                     let left = if let LedgeGrabEnable::EnableInFrontAndBehind =
                                         script_runner.ledge_grab_enable

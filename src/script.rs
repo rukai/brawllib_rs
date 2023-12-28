@@ -31,14 +31,14 @@ pub(crate) fn fragment_scripts(
                 if event.namespace == 0x00 && (event.code == 0x07 || event.code == 0x09) {
                     // if the event is a subroutine or goto
                     if let Some(Argument::Offset(Offset { offset, origin })) =
-                        event.arguments.get(0)
+                        event.arguments.first()
                     {
                         if !ignore_origins.contains(origin) {
                             found_offset = Some(*offset);
                         }
                     }
 
-                    if let Some(Argument::Value(offset)) = event.arguments.get(0) {
+                    if let Some(Argument::Value(offset)) = event.arguments.first() {
                         found_offset = Some(*offset);
                     }
                 }
