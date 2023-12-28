@@ -1,7 +1,7 @@
 use std::sync::mpsc::{channel, Sender};
 
-use winit::event::Event;
-use winit::event_loop::{ControlFlow, EventLoop};
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::window::Window;
 use winit_input_helper::WinitInputHelper;
 
@@ -35,7 +35,7 @@ pub struct App {
 impl App {
     /// Opens a window for the app
     pub async fn new(subaction: HighLevelSubaction) -> Self {
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().unwrap();
         let window = Window::new(&event_loop).unwrap();
         App::new_common(window, event_loop, subaction).await
     }
@@ -48,10 +48,10 @@ impl App {
     ) -> Self {
         use winit::platform::web::WindowExtWebSys;
 
-        let event_loop = EventLoop::new();
+        let event_loop = EventLoop::new().unwrap();
         let window = Window::new(&event_loop).unwrap();
 
-        let canvas = window.canvas();
+        let canvas = window.canvas().unwrap();
         canvas
             .style()
             .set_css_text("display: block; width: 100%; height: 100%");
@@ -94,8 +94,8 @@ impl App {
             #[cfg(not(target_arch = "wasm32"))]
             present_mode: wgpu::PresentMode::Immediate,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            width: size.width,
-            height: size.height,
+            width: size.width.max(1),
+            height: size.height.max(1),
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
         };
@@ -129,9 +129,10 @@ impl App {
         self.event_loop
             .take()
             .unwrap()
-            .run(move |event, _, control_flow| {
-                self.update(event, control_flow);
-            });
+            .run(move |event, elwt| {
+                self.update(event, elwt);
+            })
+            .unwrap();
     }
 
     /// Sets a function that will be called when various internal events occur within the app
@@ -145,8 +146,12 @@ impl App {
     }
 
     /// Manually update the app state, call this instead of `App::run` if you need to maintain control of the event loop.
-    pub fn update(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
-        if let Event::RedrawRequested(_) = event {
+    pub fn update(&mut self, event: Event<()>, elwt: &EventLoopWindowTarget<()>) {
+        if let Event::WindowEvent {
+            event: WindowEvent::RedrawRequested,
+            ..
+        } = event
+        {
             // app loop relies on this blocking until draw completes due to PresentMode configuration.
             // Currently we rely on PresentMode::Immediate on desktop which in theory should not work as it does not block.
             // We had to swap to it because PresentMode::Fifo times out which is possibly a wgpu bug.
@@ -172,7 +177,7 @@ impl App {
 
         if self.input.update(&event) {
             if self.input.close_requested() || self.input.destroyed() {
-                *control_flow = ControlFlow::Exit;
+                elwt.exit();
             }
             self.app_state.update(
                 &self.input,

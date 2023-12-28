@@ -1,7 +1,7 @@
-use instant::Instant;
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
-use winit::event::VirtualKeyCode;
+use web_time::Instant;
+use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
 use crate::high_level_fighter::HighLevelSubaction;
@@ -121,46 +121,44 @@ impl AppState {
             }
         }
 
-        if input.key_pressed_os(VirtualKeyCode::Key1) {
+        if input.key_pressed_os(KeyCode::Digit1) {
             self.wireframe = !self.wireframe;
             self.send_event(AppEventOutgoing::NewWireframe(self.wireframe));
         }
-        if input.key_pressed_os(VirtualKeyCode::Key2) {
+        if input.key_pressed_os(KeyCode::Digit2) {
             self.perspective = !self.perspective;
             self.send_event(AppEventOutgoing::NewPerspective(self.perspective));
         }
-        if input.key_pressed_os(VirtualKeyCode::Key3) {
+        if input.key_pressed_os(KeyCode::Digit3) {
             self.render_ecb = !self.render_ecb;
             self.send_event(AppEventOutgoing::NewRenderEcb(self.render_ecb));
         }
-        if input.key_pressed_os(VirtualKeyCode::Back) {
+        if input.key_pressed_os(KeyCode::Backspace) {
             self.camera
                 .reset(window_width, window_height, CharacterFacing::Right);
         }
-        if input.key_pressed_os(VirtualKeyCode::Space)
-            || input.key_pressed_os(VirtualKeyCode::Right)
-        {
+        if input.key_pressed_os(KeyCode::Space) || input.key_pressed_os(KeyCode::ArrowRight) {
             self.set_state(State::StepForward);
         }
-        if input.key_pressed_os(VirtualKeyCode::Left) {
+        if input.key_pressed_os(KeyCode::ArrowLeft) {
             self.set_state(State::StepBackward);
         }
-        if input.key_pressed_os(VirtualKeyCode::Return) {
+        if input.key_pressed_os(KeyCode::Enter) {
             self.set_state(State::Play);
         }
-        if input.key_pressed_os(VirtualKeyCode::Q) {
+        if input.key_pressed_os(KeyCode::KeyQ) {
             self.invulnerable_type = InvulnerableType::Hit;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
             ));
         }
-        if input.key_pressed_os(VirtualKeyCode::W) {
+        if input.key_pressed_os(KeyCode::KeyW) {
             self.invulnerable_type = InvulnerableType::Grab;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
             ));
         }
-        if input.key_pressed_os(VirtualKeyCode::E) {
+        if input.key_pressed_os(KeyCode::KeyE) {
             self.invulnerable_type = InvulnerableType::TrapItem;
             self.send_event(AppEventOutgoing::NewInvulnerableType(
                 self.invulnerable_type.clone(),
@@ -187,7 +185,7 @@ impl AppState {
             self.camera.phi = small;
         }
 
-        self.camera.radius_mult -= input.scroll_diff() / 10.0;
+        self.camera.radius_mult -= input.scroll_diff().1 / 10.0;
         self.camera.radius_mult = self.camera.radius_mult.max(0.001);
 
         // advance frame
