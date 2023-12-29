@@ -4,7 +4,7 @@ use std::num::NonZeroU64;
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::Matrix4;
-use wgpu::util::DeviceExt;
+use wgpu::{util::DeviceExt, InstanceFlags};
 
 // TODO: Detect by capability or something
 #[cfg(not(target_arch = "wasm32"))]
@@ -43,6 +43,8 @@ impl WgpuState {
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             dx12_shader_compiler: wgpu::Dx12Compiler::default(),
+            flags: InstanceFlags::from_build_config(),
+            gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
         });
         WgpuState::new(
             instance,
