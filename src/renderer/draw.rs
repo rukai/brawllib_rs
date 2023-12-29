@@ -3,6 +3,7 @@ use std::mem;
 
 use cgmath::{InnerSpace, Matrix4, MetricSpace, Quaternion, Rad, SquareMatrix, Vector3};
 use wgpu::util::DeviceExt;
+use wgpu::StoreOp;
 
 use crate::high_level_fighter::{CollisionBoxValues, Extent, HighLevelSubaction};
 use crate::renderer::app::state::InvulnerableType;
@@ -87,11 +88,13 @@ pub(crate) fn draw_frame(
                 },
                 ops: wgpu::Operations {
                     load: wgpu::LoadOp::Clear(state.background_color),
-                    store: true,
+                    store: StoreOp::Store,
                 },
             })],
             depth_stencil_attachment: None,
             label: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
         });
         if wireframe {
             rpass.set_pipeline(&state.render_pipeline_line);
