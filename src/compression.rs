@@ -4,6 +4,7 @@ use fancy_slice::FancySlice;
 enum CompressionType {
     None,
     LZ77,
+    // This appears to be a custom implementation of LZ77
     ExtendedLZ77,
 }
 
@@ -30,7 +31,6 @@ pub fn decompress(bytes: FancySlice) -> Vec<u8> {
     };
     match compression_type {
         CompressionType::ExtendedLZ77 => {
-            // TODO: not quite sure where to start it
             decompress_lz77_extended(bytes.relative_slice(4..), &mut output);
         }
         other => panic!("Support for compression type {other:?} is not yet implemented"),

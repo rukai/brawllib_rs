@@ -9,7 +9,6 @@ use fancy_slice::FancySlice;
 
 pub fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
     // read the main header
-    let num_sub_headers = data.u16_be(6);
     let tag = util::parse_tag(data.relative_slice(0..3));
     let decompressed;
     let data = if tag == "ARC" {
@@ -20,6 +19,7 @@ pub fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
         decompressed = decompress(data);
         FancySlice::new(&decompressed)
     };
+    let num_sub_headers = data.u16_be(6);
 
     let name = data.str(0x10).unwrap().to_string();
 
@@ -81,11 +81,11 @@ impl Arc {
         let mut output = Vec::with_capacity(1024 * 1024); // Preallocate 1MB, we will likely need more, but dont want to overdo it as we have arcs in arcs.
 
         // create arc header
-        output.extend("ARC".chars().map(|x| x as u8));
+        output.extend("ARC".as_bytes());
         output.extend([0x00, 0x01, 0x01]); // TODO: ??
         output.extend(u16::to_be_bytes(self.children.len() as u16));
         output.extend([0x00; 8]);
-        output.extend(self.name.chars().map(|x| x as u8));
+        output.extend(self.name.as_bytes());
         while output.len() < ARC_HEADER_SIZE {
             output.push(0x00);
         }
