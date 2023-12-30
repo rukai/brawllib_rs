@@ -40,6 +40,7 @@ pub mod arc;
 pub mod brawl_mod;
 pub mod bres;
 pub mod chr0;
+mod compression;
 pub mod fighter;
 mod fighter_maps;
 pub mod high_level_fighter;

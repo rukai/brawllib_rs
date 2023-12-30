@@ -1,4 +1,5 @@
 use crate::bres::*;
+use crate::compression::decompress;
 use crate::sakurai;
 use crate::sakurai::ArcSakurai;
 use crate::util;
@@ -6,9 +7,20 @@ use crate::wii_memory::WiiMemory;
 
 use fancy_slice::FancySlice;
 
-pub(crate) fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
+pub fn arc(data: FancySlice, wii_memory: &WiiMemory, item: bool) -> Arc {
     // read the main header
     let num_sub_headers = data.u16_be(6);
+    let tag = util::parse_tag(data.relative_slice(0..3));
+    let decompressed;
+    let data = if tag == "ARC" {
+        // raw arc
+        data
+    } else {
+        // compressed arc
+        decompressed = decompress(data);
+        FancySlice::new(&decompressed)
+    };
+
     let name = data.str(0x10).unwrap().to_string();
 
     // read the sub headers
