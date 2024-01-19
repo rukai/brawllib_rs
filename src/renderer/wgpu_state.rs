@@ -33,7 +33,7 @@ pub struct WgpuState {
 }
 
 pub enum CompatibleSurface<'a> {
-    Surface(&'a wgpu::Surface),
+    Surface(&'a wgpu::Surface<'static>),
     Headless(wgpu::TextureFormat),
 }
 
@@ -85,13 +85,14 @@ impl WgpuState {
 
         // Once we move to webgpu backend instead of webgl we can enable this
         // #[cfg(not(target_arch = "wasm32"))]
-        // let features = wgpu::Features::empty().union(wgpu::Features::POLYGON_MODE_LINE);
+        // let required_features = wgpu::Features::empty().union(wgpu::Features::POLYGON_MODE_LINE);
         // #[cfg(target_arch = "wasm32")]
-        let features = wgpu::Features::empty();
+        let required_features = wgpu::Features::empty();
 
         let device_descriptor = wgpu::DeviceDescriptor {
-            limits: wgpu::Limits::downlevel_webgl2_defaults().using_resolution(adapter.limits()),
-            features,
+            required_limits: wgpu::Limits::downlevel_webgl2_defaults()
+                .using_resolution(adapter.limits()),
+            required_features,
             label: None,
         };
         let (device, queue) = adapter

@@ -1,4 +1,5 @@
 use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
@@ -24,8 +25,8 @@ pub struct App {
     wgpu_state: WgpuState,
     app_state: AppState,
     input: WinitInputHelper,
-    window: Window,
-    surface: wgpu::Surface,
+    window: Arc<Window>,
+    surface: wgpu::Surface<'static>,
     surface_configuration: wgpu::SurfaceConfiguration,
     subaction: HighLevelSubaction,
     event_tx: Sender<AppEventIncoming>,
@@ -68,11 +69,12 @@ impl App {
         event_loop: EventLoop<()>,
         subaction: HighLevelSubaction,
     ) -> App {
+        let window = Arc::new(window);
         let input = WinitInputHelper::new();
         let size = window.inner_size();
 
         let instance = wgpu::Instance::default();
-        let surface = unsafe { instance.create_surface(&window).unwrap() };
+        let surface = instance.create_surface(window.clone()).unwrap();
         let wgpu_state = WgpuState::new(
             instance,
             CompatibleSurface::Surface(&surface),
@@ -98,6 +100,7 @@ impl App {
             height: size.height.max(1),
             alpha_mode: wgpu::CompositeAlphaMode::Auto,
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&wgpu_state.device, &surface_configuration);
 
