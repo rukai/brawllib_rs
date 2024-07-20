@@ -1,6 +1,7 @@
 use std::sync::mpsc::Receiver;
 use std::time::Duration;
 use web_time::Instant;
+use winit::event::MouseButton;
 use winit::keyboard::KeyCode;
 use winit_input_helper::WinitInputHelper;
 
@@ -167,7 +168,7 @@ impl AppState {
 
         let small = 0.00001;
 
-        if input.mouse_held(0) {
+        if input.mouse_held(MouseButton::Left) {
             let diff = input.mouse_diff();
             self.camera.theta -= diff.0 / 100.0;
             self.camera.phi -= diff.1 / 100.0;
