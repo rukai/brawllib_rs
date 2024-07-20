@@ -92,6 +92,7 @@ impl WgpuState {
         let device_descriptor = wgpu::DeviceDescriptor {
             required_limits: wgpu::Limits::downlevel_webgl2_defaults()
                 .using_resolution(adapter.limits()),
+            memory_hints: Default::default(),
             required_features,
             label: None,
         };
@@ -257,6 +258,7 @@ impl WgpuState {
                 alpha_to_coverage_enabled: false,
             },
             multiview: None,
+            cache: None,
         })
     }
 
