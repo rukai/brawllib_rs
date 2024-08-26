@@ -1,6 +1,7 @@
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 
+use wgpu::{Backends, InstanceDescriptor};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::window::Window;
@@ -73,7 +74,17 @@ impl App {
         let input = WinitInputHelper::new();
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::default();
+        #[cfg(target_arch = "wasm32")]
+        let backends = Backends::GL;
+        #[cfg(not(target_arch = "wasm32"))]
+        let backends = Backends::PRIMARY;
+
+        let instance = wgpu::Instance::new(InstanceDescriptor {
+            backends,
+            flags: Default::default(),
+            dx12_shader_compiler: Default::default(),
+            gles_minor_version: Default::default(),
+        });
         let surface = instance.create_surface(window.clone()).unwrap();
         let wgpu_state = WgpuState::new(
             instance,
