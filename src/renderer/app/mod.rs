@@ -1,6 +1,7 @@
 use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
 
+use wgpu::InstanceDescriptor;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{EventLoop, EventLoopWindowTarget};
 use winit::window::Window;
@@ -73,7 +74,8 @@ impl App {
         let input = WinitInputHelper::new();
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::default();
+        let instance =
+            wgpu::util::new_instance_with_webgpu_detection(InstanceDescriptor::default()).await;
         let surface = instance.create_surface(window.clone()).unwrap();
         let wgpu_state = WgpuState::new(
             instance,
