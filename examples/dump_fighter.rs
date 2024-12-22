@@ -1,14 +1,14 @@
+//! You may find it useful to:
+//! 1.  Store the output in a .rs file.
+//! 2.  Open the file in an IDE like vscode.
+//! 3.  "fold all" to get a readable tree structure.
+
 use brawllib_rs::brawl_mod::BrawlMod;
 
 use getopts::Options;
 
 use std::env;
 use std::path::PathBuf;
-
-/// You may find it useful to:
-/// 1.  Store the output in a .rs file.
-/// 2.  Open the file in an IDE like vscode.
-/// 3.  "fold all" to get a readable tree structure.
 
 fn print_usage(program: &str, opts: Options) {
     let brief = format!("Usage: {} [options]", program);
