@@ -257,6 +257,7 @@ pub enum HurtBoxZone {
 /// *   The fighter can only grab ledge when facing towards it
 /// *   The left x value of the box = x_left
 /// *   The right x value of the box = ecb right x value + x_padding
+///
 /// When `LedgeGrabEnable::EnableInFrontAndBehind`:
 /// *   The fighter can grab ledge no matter the direction they are facing
 /// *   The left x value of the box = ecb left x value - x_padding
