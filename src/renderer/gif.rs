@@ -67,7 +67,7 @@ pub fn render_gif(
         };
 
         let framebuffer = state.device.create_texture(framebuffer_descriptor);
-        let framebuffer_copy_view = wgpu::ImageCopyTexture {
+        let framebuffer_copy_view = wgpu::TexelCopyTextureInfo {
             texture: &framebuffer,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
@@ -92,9 +92,9 @@ pub fn render_gif(
         };
 
         let framebuffer_out = state.device.create_buffer(framebuffer_out_descriptor);
-        let framebuffer_out_copy_view = wgpu::ImageCopyBuffer {
+        let framebuffer_out_copy_view = wgpu::TexelCopyBufferInfo {
             buffer: &framebuffer_out,
-            layout: wgpu::ImageDataLayout {
+            layout: wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(padded_bytes_per_row),
                 rows_per_image: None,

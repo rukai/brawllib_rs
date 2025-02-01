@@ -40,11 +40,10 @@ pub enum CompatibleSurface<'a> {
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
-            dx12_shader_compiler: wgpu::Dx12Compiler::default(),
             flags: InstanceFlags::from_build_config(),
-            gles_minor_version: wgpu::Gles3MinorVersion::Automatic,
+            backend_options: Default::default(),
         });
         WgpuState::new(
             instance,

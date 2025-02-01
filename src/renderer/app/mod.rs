@@ -75,7 +75,7 @@ impl App {
         let size = window.inner_size();
 
         let instance =
-            wgpu::util::new_instance_with_webgpu_detection(InstanceDescriptor::default()).await;
+            wgpu::util::new_instance_with_webgpu_detection(&InstanceDescriptor::default()).await;
         let surface = instance.create_surface(window.clone()).unwrap();
         let wgpu_state = WgpuState::new(
             instance,
