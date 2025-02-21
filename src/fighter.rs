@@ -234,7 +234,7 @@ impl Fighter {
     /// retrieves the fighter data
     pub fn get_fighter_data(&self) -> Option<&ArcFighterData> {
         for sub_arc in &self.moveset.children {
-            if let ArcChildData::Sakurai(ref data) = &sub_arc.data {
+            if let ArcChildData::Sakurai(data) = &sub_arc.data {
                 for section in &data.sections {
                     if let SectionData::FighterData(fighter_data_ref) = &section.data {
                         return Some(fighter_data_ref);
@@ -337,7 +337,7 @@ impl Fighter {
         let mut chr0s: Vec<&Chr0> = vec![];
         for sub_arc in &motion.children {
             match &sub_arc.data {
-                ArcChildData::Bres(ref bres) => {
+                ArcChildData::Bres(bres) => {
                     for bres_child in bres.children.iter() {
                         match &bres_child.data {
                             BresChildData::Bres(children) => {

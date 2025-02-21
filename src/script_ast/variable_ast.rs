@@ -70,7 +70,7 @@ impl VariableAst {
             VariableAst::RandomAccessFloat(_) => VariableDataType::Float,
             VariableAst::RandomAccessBool(_) => VariableDataType::Bool,
 
-            VariableAst::Unknown { ref data_type, .. } => data_type.clone(),
+            VariableAst::Unknown { data_type, .. } => data_type.clone(),
         }
     }
 }

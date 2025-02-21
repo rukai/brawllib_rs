@@ -149,9 +149,9 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
             (0x00, 0x11, None,            None,                 None) => EventAst::DefaultCase,
             (0x00, 0x13, None,            None,                 None) => EventAst::EndSwitch,
             (0x01, 0x01, None,            None,                 None) => EventAst::LoopRest,
-            (0x0D, 0x00, Some(Value(v0)), Some(Offset(ref v1)), None) => EventAst::CallEveryFrame { thread_id: *v0, offset: v1.clone() },
+            (0x0D, 0x00, Some(Value(v0)), Some(Offset(v1)), None) => EventAst::CallEveryFrame { thread_id: *v0, offset: v1.clone() },
             (0x0D, 0x01, Some(Value(v0)), None,                 None) => EventAst::RemoveCallEveryFrame { thread_id: *v0 },
-            (0x0D, 0x05, Some(Value(v0)), Some(Offset(ref v1)), None) => EventAst::IndependentSubroutine { thread_id: *v0, offset: v1.clone() },
+            (0x0D, 0x05, Some(Value(v0)), Some(Offset(v1)), None) => EventAst::IndependentSubroutine { thread_id: *v0, offset: v1.clone() },
             (0x0D, 0x06, Some(Value(v0)), None,                 None) => EventAst::RemoveIndependentSubroutine { thread_id: *v0 },
             (0x0D, 0x07, Some(Value(v0)), Some(Value(v1)),      None) => EventAst::SetIndependentSubroutineThreadType { thread_id: *v0, thread_type: *v1 },
 
@@ -220,7 +220,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                     (Some(Value(v3)), Some(Value(v4)), Some(Scalar(v5)), Some(Scalar(v6)), Some(Scalar(v7)), Some(Scalar(v8)), Some(Scalar(v9)), Some(Scalar(v10)), Some(Scalar(v11)), Some(Value(v12))) => {
                         let damage = match v1 {
                             Value(constant)        => Some(FloatValue::Constant (*constant as f32)),
-                            Variable(ref variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
+                            Variable(variable) => Some(FloatValue::Variable (VariableAst::new(variable))),
                             _ => None,
                         };
 
@@ -860,7 +860,7 @@ impl Expression {
             (Some(v1), None, None) => {
                 let value = Box::new(match v1 {
                     Argument::Scalar(v1) => Expression::Scalar(*v1),
-                    Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
+                    Argument::Variable(v1) => Expression::Variable(VariableAst::new(v1)),
                     Argument::Value(v1) => Expression::Value(*v1),
                     _ => {
                         error!("Unhandled expression case: value: {:?}", v1);
@@ -875,7 +875,7 @@ impl Expression {
             (Some(v1), Some(Argument::Value(v2)), Some(v3)) => {
                 let left = Box::new(match v1 {
                     Argument::Scalar(v1) => Expression::Scalar(*v1),
-                    Argument::Variable(ref v1) => Expression::Variable(VariableAst::new(v1)),
+                    Argument::Variable(v1) => Expression::Variable(VariableAst::new(v1)),
                     Argument::Value(v1) => Expression::Value(*v1),
                     _ => {
                         error!("Unhandled expression case: left");
@@ -884,7 +884,7 @@ impl Expression {
                 });
                 let right = Box::new(match v3 {
                     Argument::Scalar(v3) => Expression::Scalar(*v3),
-                    Argument::Variable(ref v3) => Expression::Variable(VariableAst::new(v3)),
+                    Argument::Variable(v3) => Expression::Variable(VariableAst::new(v3)),
                     Argument::Value(v3) => Expression::Value(*v3),
                     _ => {
                         error!("Unhandled expression case: right");

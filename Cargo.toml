@@ -1,6 +1,6 @@
 [package]
 name = "brawllib_rs"
-edition = "2021"
+edition = "2024"
 version = "0.27.0"
 authors = ["Rukai <rubickent@gmail.com>"]
 description = "Brawl character file parser, based on brawlbox/brawllib"
