@@ -202,7 +202,7 @@ impl Event {
     pub fn raw_id(&self) -> u32 {
         let num_args = self.arguments.len();
         assert!(num_args < 0x100);
-        (self.namespace as u32) << 24 | (self.code as u32) << 16 | (num_args as u32) << 8
+        ((self.namespace as u32) << 24) | ((self.code as u32) << 16) | ((num_args as u32) << 8)
     }
 }
 

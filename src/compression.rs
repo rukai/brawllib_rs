@@ -23,7 +23,7 @@ pub fn decompress(bytes: FancySlice) -> Vec<u8> {
     let compression_type = CompressionType::new(bytes.u8(0));
     // TODO: bytes.le_u32(0) & 0xFFFFFF
     let decompressed_len =
-        (bytes.u8(1) as u32) | (bytes.u8(2) as u32) << 8 | (bytes.u8(3) as u32) << 16;
+        (bytes.u8(1) as u32) | ((bytes.u8(2) as u32) << 8) | ((bytes.u8(3) as u32) << 16);
     let mut output = if decompressed_len == 0 {
         panic!("extended length unimplemented")
     } else {
