@@ -2,13 +2,13 @@ use std::f32::consts;
 use std::mem;
 
 use cgmath::{InnerSpace, Matrix4, MetricSpace, Quaternion, Rad, SquareMatrix, Vector3};
-use wgpu::util::DeviceExt;
 use wgpu::StoreOp;
+use wgpu::util::DeviceExt;
 
 use crate::high_level_fighter::{CollisionBoxValues, Extent, HighLevelSubaction};
 use crate::renderer::app::state::InvulnerableType;
 use crate::renderer::camera::Camera;
-use crate::renderer::wgpu_state::{Vertex, WgpuState, SAMPLE_COUNT};
+use crate::renderer::wgpu_state::{SAMPLE_COUNT, Vertex, WgpuState};
 
 struct Draw {
     uniform: Matrix4<f32>,

@@ -6,7 +6,7 @@ use crate::fighter::Fighter;
 use crate::wii_memory::WiiMemory;
 use crate::wiird_runner;
 
-use anyhow::{bail, Error};
+use anyhow::{Error, bail};
 
 use fancy_slice::FancySlice;
 
@@ -118,7 +118,9 @@ impl BrawlMod {
                                 match std::fs::read(&codeset_path) {
                                     Ok(data) => {
                                         if data.len() < 8 {
-                                            bail!("Not a WiiRD gct codeset file: File size is less than 8 bytes");
+                                            bail!(
+                                                "Not a WiiRD gct codeset file: File size is less than 8 bytes"
+                                            );
                                         }
                                         if let Some(matching_file) =
                                             gct_files.iter().find(|x| x.name == name)

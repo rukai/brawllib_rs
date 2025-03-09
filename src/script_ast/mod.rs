@@ -901,7 +901,10 @@ impl Expression {
                     // Seems to be just modders using this as a quick hack.
                     script::Requirement::Always => Expression::Nullary(requirement.clone()),
                     _ => {
-                        error!("Unhandled expression case: comparison v0: {:?} v1: {:?} v2: {:?}: v3: {:?}", requirement, v1, v2, v3);
+                        error!(
+                            "Unhandled expression case: comparison v0: {:?} v1: {:?} v2: {:?}: v3: {:?}",
+                            requirement, v1, v2, v3
+                        );
                         return None;
                     }
                 }

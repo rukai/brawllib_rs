@@ -388,7 +388,9 @@ fn model_visibility(parent_data: FancySlice, model_visibility_start: i32) -> Mod
             (defaults_offset - reference_offset) / VISIBILITY_REFERENCE_SIZE as i32
         };
         if reference_count < 0 {
-            error!("Oh no the reference_count calculation is messed up, please handle this case properly");
+            error!(
+                "Oh no the reference_count calculation is messed up, please handle this case properly"
+            );
             return ModelVisibility {
                 references: vec![],
                 defaults: vec![],

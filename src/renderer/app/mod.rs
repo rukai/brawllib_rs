@@ -1,5 +1,5 @@
-use std::sync::mpsc::{channel, Sender};
 use std::sync::Arc;
+use std::sync::mpsc::{Sender, channel};
 
 use wgpu::InstanceDescriptor;
 use winit::event::{Event, WindowEvent};

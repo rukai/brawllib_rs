@@ -15,8 +15,8 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 pub async fn render_window_wasm(subaction: brawllib_rs::high_level_fighter::HighLevelSubaction) {
-    use brawllib_rs::renderer::app::state::{AppEventIncoming, State};
     use brawllib_rs::renderer::app::App;
+    use brawllib_rs::renderer::app::state::{AppEventIncoming, State};
     use wasm_bindgen::prelude::*;
     use web_sys::HtmlElement;
 

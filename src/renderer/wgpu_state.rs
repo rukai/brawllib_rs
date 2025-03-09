@@ -4,7 +4,7 @@ use std::num::NonZeroU64;
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::Matrix4;
-use wgpu::{util::DeviceExt, InstanceFlags};
+use wgpu::{InstanceFlags, util::DeviceExt};
 
 // TODO: Detect by capability or something
 #[cfg(not(target_arch = "wasm32"))]

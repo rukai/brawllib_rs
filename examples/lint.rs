@@ -65,9 +65,13 @@ fn main() {
         .collect();
 
     println!("Bad overlapping hitboxes:");
-    println!("If there are 2 Hitboxes occupying the exact same space and one or more hits both grounded and aerial opponents.");
+    println!(
+        "If there are 2 Hitboxes occupying the exact same space and one or more hits both grounded and aerial opponents."
+    );
     println!("Or if there are 3 hitboxes occupying the exact same space.");
-    println!("This is bad because sometimes it doesnt work correctly, resulting in a hitbox hitting that should never be possible e.g. https://twitter.com/ShaydonJohn/status/1147308339753127936");
+    println!(
+        "This is bad because sometimes it doesnt work correctly, resulting in a hitbox hitting that should never be possible e.g. https://twitter.com/ShaydonJohn/status/1147308339753127936"
+    );
     for fighter in fighters.iter() {
         let fighter = HighLevelFighter::new(fighter);
         'subactions: for subaction in &fighter.subactions {
@@ -110,7 +114,9 @@ fn main() {
 
     println!("\nCreating an unconditional interrupt on the first line of a subaction:");
     println!("This was used by PMDT before action overrides were understood.");
-    println!("All of these cases should be replaced with action overrides so that move staling is properly handled.");
+    println!(
+        "All of these cases should be replaced with action overrides so that move staling is properly handled."
+    );
     for fighter in fighters {
         let fighter = HighLevelFighter::new(fighter);
         for subaction in &fighter.subactions {
