@@ -559,7 +559,7 @@ impl HighLevelFighter {
         for chr0_child in &chr0.children {
             if chr0_child.name == bone.name {
                 let transform = parent_transform * chr0_child.get_transform(chr0.loop_value, frame);
-                if moves_character && bone.index == bone_refs.trans_n {
+                if moves_character && bone.index == get_bone_index(bone_refs.trans_n) {
                     // in this case TransN is not part of the animation but instead used to move the character in game.
                     assert!(offset.is_none());
                     offset = Some(Vector3::new(transform.w.x, transform.w.y, transform.w.z));
@@ -1135,7 +1135,7 @@ fn gen_ecb(bone: &BoneTransforms, ecb_bones: &[i32], bone_refs: &BoneRefs, mut e
             }
         }
     }
-    if bone.index == bone_refs.trans_n {
+    if bone.index == get_bone_index(bone_refs.trans_n) {
         ecb.transn_x = bone.transform_normal.w.z;
         ecb.transn_y = bone.transform_normal.w.y;
     }
@@ -1243,8 +1243,9 @@ fn gen_hit_boxes(
     pos_hit_boxes
 }
 
-// This is a basic (incorrect) implementation to handle wario and kirby's weird bone indices.
-// Refer to https://github.com/libertyernie/brawltools/blob/83b79a571d84efc1884950204852a14eab58060e/Ikarus/Moveset%20Entries/MovesetNode.cs#L261
+// Kirby and Wario have indexes starting at 400.
+// These special indices can be remapped at runtime to allow moves to function after swapping models e.g. kirby's copy ability
+// By default these bone remappings are not used by any moves so we can safely ignore them by just offsetting back to 0.
 pub fn get_bone_index(index: i32) -> i32 {
     if index >= 400 { index - 400 } else { index }
 }
