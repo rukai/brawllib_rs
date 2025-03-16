@@ -263,7 +263,7 @@ dependencies = [
 
 [[package]]
 name = "brawllib_rs"
-version = "0.27.0"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "bincode",
