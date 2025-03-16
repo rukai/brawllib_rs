@@ -9,7 +9,9 @@ fn main() {
     console_log::init_with_level(log::Level::Warn).expect("could not initialize logger");
 
     let fighter_bytes = include_bytes!("subaction_data.bin");
-    let subaction = bincode::deserialize(fighter_bytes).unwrap();
+    let subaction = bincode::serde::decode_from_slice(fighter_bytes, bincode::config::standard())
+        .unwrap()
+        .0;
     wasm_bindgen_futures::spawn_local(render_window_wasm(subaction));
 }
 
