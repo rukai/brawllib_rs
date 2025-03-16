@@ -83,7 +83,9 @@ fn main() {
                 if subaction.name.to_lowercase() == subaction_name.to_lowercase() {
                     // this example only exports a single subaction_data.bin file
                     // rukaidata project will be responsible for mass exporting subactions for all characters for all mods
-                    let data = bincode::serialize(&subaction).unwrap();
+                    let data =
+                        bincode::serde::encode_to_vec(subaction, bincode::config::standard())
+                            .unwrap();
                     std::fs::write("subaction_data.bin", data).unwrap();
                     return;
                 }
