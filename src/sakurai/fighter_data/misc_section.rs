@@ -159,7 +159,7 @@ fn hurtbox(data: FancySlice) -> HurtBox {
         0 => HurtBoxZone::Low,
         1 => HurtBoxZone::Middle,
         2 => HurtBoxZone::High,
-        _ => unreachable!()
+        x => HurtBoxZone::Unknown(x),
     };
 
     HurtBox {
@@ -248,6 +248,7 @@ pub enum HurtBoxZone {
     Low,
     Middle,
     High,
+    Unknown(u8),
 }
 
 /// The up most y value of the box = y + height
