@@ -32,10 +32,9 @@ pub(crate) fn fragment_scripts(
                     // if the event is a subroutine or goto
                     if let Some(Argument::Offset(Offset { offset, origin })) =
                         event.arguments.first()
+                        && !ignore_origins.contains(origin)
                     {
-                        if !ignore_origins.contains(origin) {
-                            found_offset = Some(*offset);
-                        }
+                        found_offset = Some(*offset);
                     }
 
                     if let Some(Argument::Value(offset)) = event.arguments.first() {
@@ -46,10 +45,9 @@ pub(crate) fn fragment_scripts(
                     // if the event is a CallEveryFrame or IndependentSubroutine
                     if let Some(Argument::Offset(Offset { offset, origin })) =
                         event.arguments.get(1)
+                        && !ignore_origins.contains(origin)
                     {
-                        if !ignore_origins.contains(origin) {
-                            found_offset = Some(*offset);
-                        }
+                        found_offset = Some(*offset);
                     }
                 }
                 if let Some(offset) = found_offset {

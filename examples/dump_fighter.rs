@@ -63,10 +63,10 @@ fn main() {
     };
 
     for fighter in fighters {
-        if let Some(fighter_filter) = &fighter_filter {
-            if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
-                continue;
-            }
+        if let Some(fighter_filter) = &fighter_filter
+            && fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase()
+        {
+            continue;
         }
 
         println!("{:#?}", fighter);

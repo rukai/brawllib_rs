@@ -306,11 +306,10 @@ impl<'a> ScriptRunner<'a> {
             for default in &fighter_data.model_visibility.defaults {
                 if let Some(bone_switch) =
                     reference.bone_switches.get(default.switch_index as usize)
+                    && let Some(group) = bone_switch.groups.get(default.group_index as usize)
                 {
-                    if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
-                        for bone in &group.bones {
-                            invisible_bones.push(*bone);
-                        }
+                    for bone in &group.bones {
+                        invisible_bones.push(*bone);
                     }
                 }
             }
@@ -339,11 +338,10 @@ impl<'a> ScriptRunner<'a> {
             for default in &fighter_data.model_visibility.defaults {
                 if let Some(bone_switch) =
                     reference.bone_switches.get(default.switch_index as usize)
+                    && let Some(group) = bone_switch.groups.get(default.group_index as usize)
                 {
-                    if let Some(group) = bone_switch.groups.get(default.group_index as usize) {
-                        for bone in &group.bones {
-                            invisible_bones.retain(|x| x != bone);
-                        }
+                    for bone in &group.bones {
+                        invisible_bones.retain(|x| x != bone);
                     }
                 }
             }
@@ -788,16 +786,15 @@ impl<'a> ScriptRunner<'a> {
                 }
             }
             EventAst::Subroutine(offset) => {
-                if !external {
-                    if let Some(script) = section_scripts
+                if !external
+                    && let Some(script) = section_scripts
                         .iter()
                         .find(|x| x.callers.contains(&offset.origin))
-                    {
-                        return StepEventResult::Subroutine {
-                            block: &script.script.block,
-                            external: true,
-                        };
-                    }
+                {
+                    return StepEventResult::Subroutine {
+                        block: &script.script.block,
+                        external: true,
+                    };
                 }
 
                 let all_scripts = if external {
@@ -829,16 +826,15 @@ impl<'a> ScriptRunner<'a> {
                 return StepEventResult::Return;
             }
             EventAst::Goto(offset) => {
-                if !external {
-                    if let Some(script) = section_scripts
+                if !external
+                    && let Some(script) = section_scripts
                         .iter()
                         .find(|x| x.callers.contains(&offset.origin))
-                    {
-                        return StepEventResult::Goto {
-                            block: &script.script.block,
-                            external: true,
-                        };
-                    }
+                {
+                    return StepEventResult::Goto {
+                        block: &script.script.block,
+                        external: true,
+                    };
                 }
 
                 let all_scripts = if external {
@@ -846,7 +842,7 @@ impl<'a> ScriptRunner<'a> {
                 } else {
                     fighter_scripts
                 };
-                if !self.visited_gotos.iter().any(|x| *x == offset.offset) {
+                if !self.visited_gotos.contains(&offset.offset) {
                     self.visited_gotos.push(offset.offset);
                     for script in all_scripts.iter() {
                         if script.offset == offset.offset {
@@ -884,17 +880,16 @@ impl<'a> ScriptRunner<'a> {
                 error!("LoopRest: This means the code is expected to infinite loop")
             } // TODO: Handle infinite loops better
             EventAst::CallEveryFrame { thread_id, offset } => {
-                if !external {
-                    if let Some(script) = section_scripts
+                if !external
+                    && let Some(script) = section_scripts
                         .iter()
                         .find(|x| x.callers.contains(&offset.origin))
-                    {
-                        return StepEventResult::CallEveryFrame {
-                            thread_id: *thread_id,
-                            block: &script.script.block,
-                            external: true,
-                        };
-                    }
+                {
+                    return StepEventResult::CallEveryFrame {
+                        thread_id: *thread_id,
+                        block: &script.script.block,
+                        external: true,
+                    };
                 }
 
                 let all_scripts = if external {
@@ -1007,16 +1002,16 @@ impl<'a> ScriptRunner<'a> {
                     // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html?frame=11
                     let mut empty_set = true;
                     for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
-                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values {
-                            if hitbox.set_id == args.set_id {
-                                empty_set = false;
-                            }
+                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values
+                            && hitbox.set_id == args.set_id
+                        {
+                            empty_set = false;
                         }
                     }
-                    if empty_set {
-                        if let Some(rehit) = self.hitbox_sets_rehit.get_mut(args.set_id as usize) {
-                            *rehit = true;
-                        }
+                    if empty_set
+                        && let Some(rehit) = self.hitbox_sets_rehit.get_mut(args.set_id as usize)
+                    {
+                        *rehit = true;
                     }
 
                     let damage = self.get_float_value(&args.damage);
@@ -1051,19 +1046,18 @@ impl<'a> ScriptRunner<'a> {
                     // http://localhost:8000/PM3.6/Squirtle/subactions/SpecialHi.html
                     let mut empty_set = true;
                     for hitbox in self.hitboxes.iter().filter_map(|x| x.clone()) {
-                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values {
-                            if hitbox.set_id == args.hitbox_args.set_id {
-                                empty_set = false;
-                            }
+                        if let CollisionBoxValues::Hit(hitbox) = hitbox.values
+                            && hitbox.set_id == args.hitbox_args.set_id
+                        {
+                            empty_set = false;
                         }
                     }
-                    if empty_set {
-                        if let Some(rehit) = self
+                    if empty_set
+                        && let Some(rehit) = self
                             .hitbox_sets_rehit
                             .get_mut(args.hitbox_args.set_id as usize)
-                        {
-                            *rehit = true;
-                        }
+                    {
+                        *rehit = true;
                     }
 
                     let damage = self.get_float_value(&args.hitbox_args.damage);
@@ -1099,20 +1093,20 @@ impl<'a> ScriptRunner<'a> {
                 hitbox_id,
                 new_damage,
             } => {
-                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
-                        hitbox.damage = *new_damage as f32;
-                    }
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize]
+                    && let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values
+                {
+                    hitbox.damage = *new_damage as f32;
                 }
             }
             EventAst::ChangeHitBoxSize {
                 hitbox_id,
                 new_size,
             } => {
-                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
-                        hitbox.size = *new_size as f32;
-                    }
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize]
+                    && let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values
+                {
+                    hitbox.size = *new_size as f32;
                 }
             }
             EventAst::DeleteHitBox(hitbox_id) => {
@@ -1180,10 +1174,10 @@ impl<'a> ScriptRunner<'a> {
                 add_damage,
             } => {
                 let add_damage = self.get_float_value(add_damage);
-                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize] {
-                    if let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values {
-                        hitbox.damage += add_damage;
-                    }
+                if let Some(hitbox) = &mut self.hitboxes[*hitbox_id as usize]
+                    && let CollisionBoxValues::Hit(hitbox) = &mut hitbox.values
+                {
+                    hitbox.damage += add_damage;
                 }
             }
 

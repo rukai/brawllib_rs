@@ -76,19 +76,19 @@ fn main() {
     match data_level.as_ref() {
         "frame" => {
             for fighter in fighters {
-                if let Some(fighter_filter) = &fighter_filter {
-                    if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
-                        continue;
-                    }
+                if let Some(fighter_filter) = &fighter_filter
+                    && fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase()
+                {
+                    continue;
                 }
                 println!("Fighter name: {}", fighter.cased_name);
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
                 for subaction in hl_fighter.subactions {
-                    if let Some(subaction_filter) = &subaction_filter {
-                        if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
-                            continue;
-                        }
+                    if let Some(subaction_filter) = &subaction_filter
+                        && subaction.name.to_lowercase() != subaction_filter.to_lowercase()
+                    {
+                        continue;
                     }
                     println!("Subaction name: {}", subaction.name);
 
@@ -104,19 +104,19 @@ fn main() {
         }
         "subaction" => {
             for fighter in fighters {
-                if let Some(fighter_filter) = &fighter_filter {
-                    if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
-                        continue;
-                    }
+                if let Some(fighter_filter) = &fighter_filter
+                    && fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase()
+                {
+                    continue;
                 }
                 println!("Fighter name: {}", fighter.cased_name);
 
                 let hl_fighter = HighLevelFighter::new(&fighter);
                 for mut subaction in hl_fighter.subactions {
-                    if let Some(subaction_filter) = &subaction_filter {
-                        if subaction.name.to_lowercase() != subaction_filter.to_lowercase() {
-                            continue;
-                        }
+                    if let Some(subaction_filter) = &subaction_filter
+                        && subaction.name.to_lowercase() != subaction_filter.to_lowercase()
+                    {
+                        continue;
                     }
 
                     if let Some(frame_filter) = frame_filter {
@@ -132,10 +132,10 @@ fn main() {
         }
         "fighter" => {
             for fighter in fighters {
-                if let Some(fighter_filter) = &fighter_filter {
-                    if fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase() {
-                        continue;
-                    }
+                if let Some(fighter_filter) = &fighter_filter
+                    && fighter.cased_name.to_lowercase() != fighter_filter.to_lowercase()
+                {
+                    continue;
                 }
 
                 let mut hl_fighter = HighLevelFighter::new(&fighter);
