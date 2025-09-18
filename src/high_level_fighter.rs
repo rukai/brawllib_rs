@@ -310,18 +310,18 @@ impl HighLevelFighter {
                                     let mut prev_pos = None;
                                     let mut prev_size = None;
                                     let mut prev_values = None;
-                                    if next.interpolate {
-                                        if let Some(prev_hit_boxes) = &prev_hit_boxes {
-                                            for prev_hit_box in prev_hit_boxes {
-                                                if prev_hit_box.hitbox_id == next.hitbox_id {
-                                                    // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
-                                                    prev_pos = Some(
-                                                        prev_hit_box.hitbox_position
-                                                            - Vector3::new(0.0, y_vel, x_vel),
-                                                    );
-                                                    prev_size = Some(prev_hit_box.size);
-                                                    prev_values = Some(prev_hit_box.values.clone());
-                                                }
+                                    if next.interpolate
+                                        && let Some(prev_hit_boxes) = &prev_hit_boxes
+                                    {
+                                        for prev_hit_box in prev_hit_boxes {
+                                            if prev_hit_box.hitbox_id == next.hitbox_id {
+                                                // A bit hacky, but we need to undo the movement that occured this frame to get the correct hitbox interpolation
+                                                prev_pos = Some(
+                                                    prev_hit_box.hitbox_position
+                                                        - Vector3::new(0.0, y_vel, x_vel),
+                                                );
+                                                prev_size = Some(prev_hit_box.size);
+                                                prev_values = Some(prev_hit_box.values.clone());
                                             }
                                         }
                                     }
@@ -404,21 +404,21 @@ impl HighLevelFighter {
                             };
 
                             let mut throw = None;
-                            if let Some(ref specify_throw) = script_runner.throw {
-                                if script_runner.throw_activate {
-                                    throw = Some(HighLevelThrow {
-                                        damage: specify_throw.damage,
-                                        trajectory: specify_throw.trajectory,
-                                        kbg: specify_throw.kbg,
-                                        wdsk: specify_throw.wdsk,
-                                        bkb: specify_throw.bkb,
-                                        effect: specify_throw.effect.clone(),
-                                        sfx: specify_throw.sfx.clone(),
-                                        grab_target: specify_throw.grab_target.clone(),
-                                        i_frames: specify_throw.i_frames,
-                                        weight_dependent_speed,
-                                    });
-                                }
+                            if let Some(ref specify_throw) = script_runner.throw
+                                && script_runner.throw_activate
+                            {
+                                throw = Some(HighLevelThrow {
+                                    damage: specify_throw.damage,
+                                    trajectory: specify_throw.trajectory,
+                                    kbg: specify_throw.kbg,
+                                    wdsk: specify_throw.wdsk,
+                                    bkb: specify_throw.bkb,
+                                    effect: specify_throw.effect.clone(),
+                                    sfx: specify_throw.sfx.clone(),
+                                    grab_target: specify_throw.grab_target.clone(),
+                                    i_frames: specify_throw.i_frames,
+                                    weight_dependent_speed,
+                                });
                             }
 
                             let ledge_grab_box = if script_runner.ledge_grab_enable.enabled() {

@@ -377,11 +377,11 @@ fn fighter_datas(brawl_fighter_dir: ReadDir, mod_fighter_dir: Option<ReadDir>) -
     for fighter_path in brawl_fighter_dir {
         let fighter_path = fighter_path.unwrap();
         let file_type = fighter_path.file_type().unwrap();
-        if file_type.is_dir() {
-            if let Some(mut fighter_data) = fighter_data(&fighter_path.path()) {
-                fighter_data.read_from_vanilla = true;
-                fighter_datas.push(fighter_data);
-            }
+        if file_type.is_dir()
+            && let Some(mut fighter_data) = fighter_data(&fighter_path.path())
+        {
+            fighter_data.read_from_vanilla = true;
+            fighter_datas.push(fighter_data);
         }
     }
 

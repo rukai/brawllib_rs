@@ -353,11 +353,11 @@ impl Keyframe {
             // All cases I have seen is with trailing children that have frame_index of 0.
             // Maybe when the animation was modified the modding tool was not able to delete children yet?
             // So I will just ignore these trailing frame_index == 0 children
-            if let Some(prev) = &prev {
-                if child.frame_index < prev.frame_index {
-                    assert_eq!(child.frame_index, 0);
-                    break;
-                }
+            if let Some(prev) = &prev
+                && child.frame_index < prev.frame_index
+            {
+                assert_eq!(child.frame_index, 0);
+                break;
             }
 
             if child.frame_index >= frame {

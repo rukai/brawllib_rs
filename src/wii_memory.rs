@@ -128,7 +128,7 @@ impl WiiMemory {
             &[]
         }
     }
-    pub fn fancy_slice_from(&self, address: usize) -> FancySlice {
+    pub fn fancy_slice_from(&self, address: usize) -> FancySlice<'_> {
         let slice = if (0x8000_0000..0x8180_0000).contains(&address) {
             &self.mem1[address - 0x8000_0000..]
         } else if (0x9000_0000..0x9400_0000).contains(&address) {

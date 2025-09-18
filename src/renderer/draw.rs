@@ -209,10 +209,10 @@ fn create_draws(
 
     for hitbox in frame.hit_boxes.iter() {
         // only display hitboxes that are used in regular matches
-        if let CollisionBoxValues::Hit(hit_values) = &hitbox.next_values {
-            if !hit_values.enabled {
-                continue;
-            }
+        if let CollisionBoxValues::Hit(hit_values) = &hitbox.next_values
+            && !hit_values.enabled
+        {
+            continue;
         }
 
         let color = match hitbox.hitbox_id {
