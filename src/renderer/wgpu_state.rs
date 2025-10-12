@@ -96,6 +96,7 @@ impl WgpuState {
             required_features,
             label: None,
             trace: wgpu::Trace::Off,
+            experimental_features: Default::default(),
         };
         let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
@@ -261,6 +262,11 @@ impl WgpuState {
     }
 
     pub fn poll(&self) {
-        self.device.poll(wgpu::PollType::Wait).unwrap();
+        self.device
+            .poll(wgpu::PollType::Wait {
+                submission_index: None,
+                timeout: None,
+            })
+            .unwrap();
     }
 }
