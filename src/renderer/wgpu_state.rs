@@ -4,7 +4,7 @@ use std::num::NonZeroU64;
 
 use bytemuck::{Pod, Zeroable};
 use cgmath::Matrix4;
-use wgpu::{InstanceFlags, util::DeviceExt};
+use wgpu::{InstanceFlags, MemoryBudgetThresholds, util::DeviceExt};
 
 // TODO: Detect by capability or something
 #[cfg(not(target_arch = "wasm32"))]
@@ -44,6 +44,7 @@ impl WgpuState {
             backends: wgpu::Backends::PRIMARY,
             flags: InstanceFlags::from_build_config(),
             backend_options: Default::default(),
+            memory_budget_thresholds: MemoryBudgetThresholds::default(),
         });
         WgpuState::new(
             instance,
