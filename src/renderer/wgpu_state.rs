@@ -94,11 +94,9 @@ impl WgpuState {
             memory_hints: Default::default(),
             required_features,
             label: None,
+            trace: wgpu::Trace::Off,
         };
-        let (device, queue) = adapter
-            .request_device(&device_descriptor, None)
-            .await
-            .unwrap();
+        let (device, queue) = adapter.request_device(&device_descriptor).await.unwrap();
 
         let shader_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: None,
@@ -262,6 +260,6 @@ impl WgpuState {
     }
 
     pub fn poll(&self) {
-        self.device.poll(wgpu::Maintain::Wait);
+        self.device.poll(wgpu::PollType::Wait).unwrap();
     }
 }
