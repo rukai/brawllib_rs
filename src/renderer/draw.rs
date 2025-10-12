@@ -90,6 +90,7 @@ pub(crate) fn draw_frame(
                     load: wgpu::LoadOp::Clear(state.background_color),
                     store: StoreOp::Store,
                 },
+                depth_slice: None,
             })],
             depth_stencil_attachment: None,
             label: None,
