@@ -68,7 +68,7 @@ impl Bres {
         let bres_size_leafless = BRES_HEADER_SIZE + root_size;
 
         let mut bres_size_leafless_buffered = bres_size_leafless;
-        while bres_size_leafless_buffered % 0x20 != 0 {
+        while !bres_size_leafless_buffered.is_multiple_of(0x20) {
             bres_size_leafless_buffered += 1; // TODO: arithmeticize the loop
         }
 
