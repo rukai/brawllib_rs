@@ -96,6 +96,7 @@ pub(crate) fn draw_frame(
             label: None,
             timestamp_writes: None,
             occlusion_query_set: None,
+            multiview_mask: None,
         });
         if wireframe {
             rpass.set_pipeline(&state.render_pipeline_line);

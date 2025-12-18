@@ -122,7 +122,7 @@ impl WgpuState {
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[&bind_group_layout],
-            push_constant_ranges: &[],
+            immediate_size: 0,
         });
 
         let render_pipeline_line = WgpuState::render_pipeline(
@@ -256,8 +256,8 @@ impl WgpuState {
                 mask: !0,
                 alpha_to_coverage_enabled: false,
             },
-            multiview: None,
             cache: None,
+            multiview_mask: None,
         })
     }
 
