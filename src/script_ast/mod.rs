@@ -35,7 +35,7 @@ impl ScriptAst {
 
 #[rustfmt::skip]
 fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> ProcessedBlock {
-    let mut event_asts = vec!();
+    let mut event_asts = vec![];
     while let Some(event) = events.next() {
         let args = &event.arguments;
         use crate::script::Argument::*;
@@ -136,7 +136,7 @@ fn process_block(events: &mut std::iter::Peekable<slice::Iter<Event>>) -> Proces
                             return ProcessedBlock::Finished (Block { events: event_asts });
                         }
                     };
-                    let else_branch = Some(Box::new(Block { events: vec!(event) }));
+                    let else_branch = Some(Box::new(Block { events: vec![event] }));
                     let then_branch = Block { events: event_asts };
                     return ProcessedBlock::EndIfAndElse { then_branch, else_branch };
                 } else {

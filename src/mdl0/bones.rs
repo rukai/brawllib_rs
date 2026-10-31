@@ -142,13 +142,13 @@ fn bone_siblings(data_root: FancySlice, offset: i32) -> Vec<Bone> {
     };
 
     let children = if first_child_offset == 0 {
-        vec!()
+        vec![]
     } else {
         bone_siblings(data_root, offset + first_child_offset)
     };
 
     let mut siblings = if next_offset == 0 {
-        vec!()
+        vec![]
     } else {
         bone_siblings(data_root, offset + next_offset)
     };

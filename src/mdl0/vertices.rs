@@ -5,7 +5,7 @@ use crate::resources::Resource;
 
 #[rustfmt::skip]
 pub(crate) fn vertices(data: FancySlice, resources: Vec<Resource>) -> Vec<Vertices> {
-    let mut vertices = vec!();
+    let mut vertices = vec![];
     for resource in resources {
         let data = data.relative_fancy_slice(resource.data_offset as usize..);
 

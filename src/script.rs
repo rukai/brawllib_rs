@@ -142,7 +142,7 @@ pub fn new_script(parent_data: FancySlice, offset: u32, wii_memory: &WiiMemory) 
 
 #[rustfmt::skip]
 fn arguments(data: FancySlice, origin: u32, num_arguments: usize) -> Vec<Argument> {
-    let mut arguments = vec!();
+    let mut arguments = vec![];
     for i in 0..num_arguments as i32 {
         let argument_offset = i * ARGUMENT_SIZE as i32;
 

@@ -4,7 +4,7 @@ use crate::resources::Resource;
 
 #[rustfmt::skip]
 pub(crate) fn objects(data: FancySlice, resources: Vec<Resource>) -> Vec<Object> {
-    let mut objects = vec!();
+    let mut objects = vec![];
     for resource in resources {
         let data = data.relative_fancy_slice(resource.data_offset as usize ..);
         let _total_length            = data.i32_be(0x00);

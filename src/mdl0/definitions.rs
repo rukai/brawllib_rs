@@ -41,13 +41,13 @@ impl Definitions {
 
 #[rustfmt::skip]
 pub(crate) fn definitions(data: FancySlice, resources: Vec<Resource>) -> Definitions {
-    let mut definitions = vec!();
+    let mut definitions = vec![];
     for resource in resources {
         let data = data.relative_fancy_slice(resource.data_offset as usize ..);
         let name = resource.string;
 
         let mut offset = 0;
-        let mut draw_calls = vec!();
+        let mut draw_calls = vec![];
         // TODO: Looks like data[offset] specifies what type the child is.
         //       If so draw_calls should be renamed children and store an enum of all possible children types
         //       Alternatively it might be branching on the names "DrawOpa" and "DrawXlu" - this is what brawlbox does, but brawlbox's implementation looks hacky.

@@ -8,7 +8,7 @@ pub(crate) fn resources(data: FancySlice) -> Vec<Resource> {
 
     assert_eq!(total_size, (num_children + 1) * RESOURCE_SIZE as i32 + RESOURCE_HEADER_SIZE as i32);
 
-    let mut resources = vec!();
+    let mut resources = vec![];
     for i in 1..=num_children { // the first child is a dummy so we skip it.
         let child_index = RESOURCE_HEADER_SIZE + RESOURCE_SIZE * i as usize;
 
