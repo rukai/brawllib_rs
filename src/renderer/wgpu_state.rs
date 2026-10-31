@@ -40,11 +40,12 @@ pub enum CompatibleSurface<'a> {
 impl WgpuState {
     /// Easy initialiser that doesnt handle rendering to a window
     pub async fn new_for_gif() -> WgpuState {
-        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             flags: InstanceFlags::from_build_config(),
             backend_options: Default::default(),
             memory_budget_thresholds: MemoryBudgetThresholds::default(),
+            display: None,
         });
         WgpuState::new(
             instance,
@@ -121,7 +122,7 @@ impl WgpuState {
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
-            bind_group_layouts: &[&bind_group_layout],
+            bind_group_layouts: &[Some(&bind_group_layout)],
             immediate_size: 0,
         });
 
