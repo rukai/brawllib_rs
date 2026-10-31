@@ -8,7 +8,7 @@ fn main() {
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     console_log::init_with_level(log::Level::Warn).expect("could not initialize logger");
 
-    let fighter_bytes = include_bytes!("subaction_data.bin");
+    let fighter_bytes = include_bytes!("../subaction_data.bin");
     let subaction = bincode::serde::decode_from_slice(fighter_bytes, bincode::config::standard())
         .unwrap()
         .0;

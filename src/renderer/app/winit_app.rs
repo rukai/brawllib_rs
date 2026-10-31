@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::sync::mpsc::{Sender, channel};
 
-use wgpu::InstanceDescriptor;
+use wgpu::{CurrentSurfaceTexture, InstanceDescriptor};
 use winit::application::ApplicationHandler;
 use winit::event::{DeviceEvent, DeviceId, StartCause, WindowEvent};
 use winit::event_loop::ActiveEventLoop;
@@ -50,24 +50,25 @@ impl ApplicationHandler for WinitApp {
             // app loop relies on this blocking until draw completes due to PresentMode configuration.
             // Currently we rely on PresentMode::Immediate on desktop which in theory should not work as it does not block.
             // We had to swap to it because PresentMode::Fifo times out which is possibly a wgpu bug.
-            let frame = self.surface.get_current_texture().unwrap();
-            let command_encoder = draw_frame(
-                &mut self.wgpu_state,
-                &frame
-                    .texture
-                    .create_view(&wgpu::TextureViewDescriptor::default()),
-                self.surface_configuration.width,
-                self.surface_configuration.height,
-                self.app_state.perspective,
-                self.app_state.wireframe,
-                self.app_state.render_ecb,
-                &self.app_state.invulnerable_type,
-                &self.subaction,
-                self.app_state.frame_index,
-                &self.app_state.camera,
-            );
-            self.wgpu_state.queue.submit(Some(command_encoder.finish()));
-            frame.present();
+            if let CurrentSurfaceTexture::Success(frame) = self.surface.get_current_texture() {
+                let command_encoder = draw_frame(
+                    &mut self.wgpu_state,
+                    &frame
+                        .texture
+                        .create_view(&wgpu::TextureViewDescriptor::default()),
+                    self.surface_configuration.width,
+                    self.surface_configuration.height,
+                    self.app_state.perspective,
+                    self.app_state.wireframe,
+                    self.app_state.render_ecb,
+                    &self.app_state.invulnerable_type,
+                    &self.subaction,
+                    self.app_state.frame_index,
+                    &self.app_state.camera,
+                );
+                self.wgpu_state.queue.submit(Some(command_encoder.finish()));
+                frame.present();
+            };
         }
     }
 
@@ -111,8 +112,10 @@ impl WinitApp {
         let input = WinitInputHelper::new();
         let size = window.inner_size();
 
-        let instance =
-            wgpu::util::new_instance_with_webgpu_detection(&InstanceDescriptor::default()).await;
+        let instance = wgpu::util::new_instance_with_webgpu_detection(
+            InstanceDescriptor::new_without_display_handle(),
+        )
+        .await;
         let surface = instance.create_surface(window.clone()).unwrap();
         let wgpu_state = WgpuState::new(
             instance,
