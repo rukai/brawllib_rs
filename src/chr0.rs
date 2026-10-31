@@ -30,7 +30,7 @@ pub(crate) fn chr0(data: FancySlice) -> Chr0 {
 
     let name = data.str(string_offset as usize).unwrap().to_string();
 
-    let mut children = vec!();
+    let mut children = vec![];
     for resource in resources::resources(data.relative_fancy_slice(resources_offset as usize ..)) {
         let child_data = data.relative_fancy_slice(resources_offset as usize + resource.data_offset as usize .. );
 
@@ -545,7 +545,7 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             let frame_scale = data.f32_be(0x4);
             let step        = data.f32_be(0x8);
             let base        = data.f32_be(0xc);
-            let mut children = vec!();
+            let mut children = vec![];
             for i in 0..entries as usize {
                 let child_data = data.relative_fancy_slice(INTERPOLATED_4_HEADER_SIZE + INTERPOLATED_4_ENTRY_SIZE * i ..);
                 let data = child_data.u32_be(0);
@@ -559,7 +559,7 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             let frame_scale = data.f32_be(0x4);
             let step        = data.f32_be(0x8);
             let base        = data.f32_be(0xc);
-            let mut children = vec!();
+            let mut children = vec![];
             for i in 0..num_frames as usize {
                 let child_data = data.relative_fancy_slice(INTERPOLATED_6_HEADER_SIZE + INTERPOLATED_6_ENTRY_SIZE * i ..);
                 let frame_index = child_data.u16_be(0x0);
@@ -574,7 +574,7 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             let unk         = data.u16_be(0x2);
             let frame_scale = data.f32_be(0x4);
 
-            let mut children = vec!();
+            let mut children = vec![];
             for i in 0..num_frames as usize {
                 let child_data = data.relative_fancy_slice(INTERPOLATED_12_HEADER_SIZE + INTERPOLATED_12_ENTRY_SIZE * i ..);
                 let frame_index = child_data.f32_be(0x0);
@@ -594,14 +594,14 @@ fn keyframe(data: FancySlice, format: &Chr0Format, num_frames: u16) -> Keyframe 
             let step = data.f32_be(0x0);
             let base = data.f32_be(0x4);
 
-            let mut children_steps = vec!();
+            let mut children_steps = vec![];
             for i in 0..num_frames as usize {
                 children_steps.push(data.u16_be(LINEAR_2_HEADER_SIZE + LINEAR_2_ENTRY_SIZE * i));
             }
             Keyframe::Linear2 (Linear2Header { step, base, children_steps })
         }
         Chr0Format::Linear4 => {
-            let mut values = vec!();
+            let mut values = vec![];
             for i in 0..num_frames as usize {
                 values.push(data.f32_be(LINEAR_4_ENTRY_SIZE * i));
             }

@@ -18,15 +18,15 @@ pub(crate) fn plt0(data: FancySlice) -> Plt0 {
 
     let user_data = if version == 3 {
         let _user_data_offset = data.i32_be(0x24);
-        vec!(
+        vec![
             // TODO
             UserData {
                 name: "TODO".into(),
                 value: UserDataValue::Int(42),
             }
-        )
+        ]
     } else if version == 1 {
-        vec!()
+        vec![]
     } else {
         panic!("Unknown PLT0 verison: {}", version)
     };
@@ -37,7 +37,7 @@ pub(crate) fn plt0(data: FancySlice) -> Plt0 {
     // resources which I havent parsed yet??
     // Brawlcrate seems to just be reading from PLT0_HEADER_SIZE ???
     let color_data: Vec<u16> = data.relative_slice(PLT0_HEADER_SIZE..size as usize)
-        .chunks_exact(2)
+        .as_chunks::<2>().0.iter()
         .map(|x| u16::from_be_bytes([x[0], x[1]])).collect();
 
     Plt0 { name, pixel_format, orig_path_offset, user_data, color_data }

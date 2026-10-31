@@ -21,25 +21,25 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     let tether_offset         = data.i32_be(0x44);
     let _unk18_offset         = data.i32_be(0x48);
 
-    let mut final_smash_auras = vec!();
+    let mut final_smash_auras = vec![];
     for i in 0..final_smash_aura_list.count {
         let offset = final_smash_aura_list.start_offset as usize + i as usize * FINAL_SMASH_AURA_SIZE;
         final_smash_auras.push(final_smash_aura(parent_data.relative_fancy_slice(offset..)));
     }
 
-    let mut hurt_boxes = vec!();
+    let mut hurt_boxes = vec![];
     for i in 0..hurt_box_list.count {
         let offset = hurt_box_list.start_offset as usize + i as usize * HURTBOX_SIZE;
         hurt_boxes.push(hurtbox(parent_data.relative_fancy_slice(offset..)));
     }
 
-    let mut ledge_grab_boxes = vec!();
+    let mut ledge_grab_boxes = vec![];
     for i in 0..ledge_grab_list.count {
         let offset = ledge_grab_list.start_offset as usize + i as usize * LEDGE_GRAB_SIZE;
         ledge_grab_boxes.push(ledge_grab_box(parent_data.relative_fancy_slice(offset ..)));
     }
 
-    let mut unk7s = vec!();
+    let mut unk7s = vec![];
     for i in 0..unk7_list.count {
         let offset = unk7_list.start_offset as usize + i as usize * UNK7_SIZE;
         unk7s.push(unk7(parent_data.relative_fancy_slice(offset ..)));
@@ -70,7 +70,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
     let ecbs_list = util::list_offset(parent_data.relative_fancy_slice(ecbs_offset as usize..));
 
     // it looks like this same structure is used elsewhere as well. Check the DataSection.cs and ExtraDataOffsets.cs files in brawlbox.
-    let mut ecbs = vec!();
+    let mut ecbs = vec![];
     for i in 0..ecbs_list.count {
         let pointer  = parent_data.i32_be(ecbs_list.start_offset as usize + i as usize * ECB_SIZE); // TODO: Is this indirection for anything? Maybe the list is supposed to occur here instead?
         let ecb_type = parent_data.i32_be(pointer as usize);
@@ -81,7 +81,7 @@ pub fn misc_section(data: FancySlice, parent_data: FancySlice) -> MiscSection {
             let min_width        = parent_data.f32_be(pointer as usize + 0x10);
             let unk              = parent_data.f32_be(pointer as usize + 0x14);
 
-            let mut bones = vec!();
+            let mut bones = vec![];
             for i in 0..ecb_bones_count {
                 bones.push(parent_data.i32_be(ecb_bones_offset as usize + i as usize * 4));
             }

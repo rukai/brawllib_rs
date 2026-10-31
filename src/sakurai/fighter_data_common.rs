@@ -41,14 +41,14 @@ pub(crate) fn arc_fighter_data_common(parent_data: FancySlice, data: FancySlice,
     let exit_actions = script::scripts(parent_data, parent_data.relative_fancy_slice(exit_actions_start as usize ..), entry_actions_num, wii_memory);
 
     let leg_bones_left_list = util::list_offset(parent_data.relative_fancy_slice(leg_bones as usize..));
-    let mut leg_bones_left = vec!();
+    let mut leg_bones_left = vec![];
     for i in 0..leg_bones_left_list.count as usize {
         let string_offset = parent_data.i32_be(leg_bones_left_list.start_offset as usize + i * 4);
         leg_bones_left.push(parent_data.str(string_offset as usize).unwrap().to_string());
     }
 
     let leg_bones_right_list = util::list_offset(parent_data.relative_fancy_slice(leg_bones as usize + util::LIST_OFFSET_SIZE ..));
-    let mut leg_bones_right = vec!();
+    let mut leg_bones_right = vec![];
     for i in 0..leg_bones_right_list.count as usize {
         let string_offset = parent_data.i32_be(leg_bones_right_list.start_offset as usize + i * 4);
         leg_bones_right.push(parent_data.str(string_offset as usize).unwrap().to_string());

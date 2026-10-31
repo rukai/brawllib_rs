@@ -66,13 +66,13 @@ pub(crate) fn arc_fighter_data(parent_data: FancySlice, data: FancySlice, wii_me
     let entry_action_overrides = if entry_action_overrides_start != 0 {
         action_overrides(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(entry_action_overrides_start as usize ..), wii_memory)
     } else {
-        vec!()
+        vec![]
     };
 
     let exit_action_overrides = if exit_action_overrides_start != 0 {
         action_overrides(parent_data.relative_fancy_slice(..), parent_data.relative_fancy_slice(exit_action_overrides_start as usize ..), wii_memory)
     } else {
-        vec!()
+        vec![]
     };
 
     ArcFighterData {
